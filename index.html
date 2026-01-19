@@ -3,243 +3,333 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analyse Coûts-Bénéfices — Compteurs d'Eau Québec</title>
+    <title>Analyse Coûts-Bénéfices — Compteurs d'Eau Intelligents</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #1a5f7a;
-            --primary-light: #2d8bba;
-            --secondary: #57c5b6;
-            --accent: #159895;
-            --bg: #f8fafc;
+            --primary: #0f4c75;
+            --primary-light: #3282b8;
+            --primary-dark: #0b3d5e;
+            --secondary: #00b4d8;
+            --accent: #48cae4;
+            --success: #06d6a0;
+            --warning: #ffd166;
+            --danger: #ef476f;
+            --bg: #f0f4f8;
+            --bg-dark: #e2e8f0;
             --card: #ffffff;
-            --text: #1e293b;
-            --text-light: #64748b;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
+            --text: #1a202c;
+            --text-secondary: #4a5568;
+            --text-muted: #718096;
             --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.04);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04);
+            --radius: 16px;
+            --radius-sm: 8px;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             background: var(--bg);
             color: var(--text);
             line-height: 1.6;
+            min-height: 100vh;
         }
 
+        /* Header */
         .header {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 50%, var(--secondary) 100%);
             color: white;
-            padding: 1.5rem 2rem;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            padding: 2rem 3rem;
+            position: relative;
+            overflow: hidden;
         }
 
-        .header h1 { font-size: 1.75rem; font-weight: 600; }
-        .header p { opacity: 0.9; font-size: 0.95rem; margin-top: 0.25rem; }
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            opacity: 0.5;
+        }
 
-        .container {
-            display: grid;
-            grid-template-columns: 400px 1fr;
-            gap: 1.5rem;
-            padding: 1.5rem;
-            max-width: 1900px;
+        .header-content {
+            position: relative;
+            z-index: 1;
+            max-width: 1800px;
             margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        @media (max-width: 1200px) {
-            .container { grid-template-columns: 1fr; }
+        .header h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
         }
 
-        .sidebar { display: flex; flex-direction: column; gap: 1rem; }
-
-        .card {
-            background: var(--card);
-            border-radius: 12px;
-            padding: 1.25rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            border: 1px solid var(--border);
+        .header-subtitle {
+            opacity: 0.9;
+            font-size: 0.95rem;
+            margin-top: 0.25rem;
+            font-weight: 400;
         }
 
-        .card-title {
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: var(--primary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 1rem;
+        .header-badge {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .api-status {
+            font-size: 0.8rem;
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            font-weight: 500;
             display: flex;
             align-items: center;
             gap: 0.5rem;
         }
 
-        .card-title::before {
+        .api-status::before {
             content: '';
-            width: 4px;
-            height: 16px;
-            background: var(--secondary);
-            border-radius: 2px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
         }
 
-        .input-group { margin-bottom: 1rem; }
+        .api-status.connected {
+            background: rgba(6, 214, 160, 0.2);
+            color: #06d6a0;
+        }
+
+        .api-status.connected::before { background: #06d6a0; }
+
+        .api-status.disconnected {
+            background: rgba(239, 71, 111, 0.2);
+            color: #ef476f;
+        }
+
+        .api-status.disconnected::before { background: #ef476f; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Main Layout */
+        .container {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 2rem;
+            padding: 2rem;
+            max-width: 1900px;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 1400px) {
+            .container { grid-template-columns: 1fr; }
+            .sidebar { order: 2; }
+            .main { order: 1; }
+        }
+
+        /* Sidebar */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            transition: box-shadow 0.2s;
+        }
+
+        .card:hover { box-shadow: var(--shadow-lg); }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.25rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .card-icon.blue { background: linear-gradient(135deg, #e0f2fe, #bae6fd); color: #0369a1; }
+        .card-icon.green { background: linear-gradient(135deg, #d1fae5, #a7f3d0); color: #047857; }
+        .card-icon.purple { background: linear-gradient(135deg, #ede9fe, #ddd6fe); color: #6d28d9; }
+        .card-icon.orange { background: linear-gradient(135deg, #ffedd5, #fed7aa); color: #c2410c; }
+
+        .card-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text);
+            letter-spacing: -0.2px;
+        }
+
+        .card-subtitle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.1rem;
+        }
+
+        /* Presets */
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+
+        .preset-btn {
+            padding: 0.875rem 1rem;
+            border: 2px solid var(--border);
+            background: var(--card);
+            border-radius: var(--radius-sm);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        .preset-btn:hover {
+            border-color: var(--primary-light);
+            background: #f8fafc;
+        }
+
+        .preset-btn.active {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            color: white;
+            border-color: transparent;
+        }
+
+        .preset-btn .city { display: block; font-weight: 600; }
+        .preset-btn .info { font-size: 0.7rem; opacity: 0.7; margin-top: 0.25rem; }
+
+        /* Input Groups */
+        .input-group {
+            margin-bottom: 1.25rem;
+        }
+
         .input-group:last-child { margin-bottom: 0; }
 
         .input-group label {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 0.85rem;
-            color: var(--text-light);
-            margin-bottom: 0.35rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            font-weight: 500;
         }
 
         .input-group .value {
-            font-weight: 600;
-            color: var(--text);
-            font-family: 'SF Mono', 'Consolas', monospace;
+            font-weight: 700;
+            color: var(--primary);
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.85rem;
+            background: var(--bg);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
         }
 
+        /* Custom Range Slider */
         input[type="range"] {
             width: 100%;
-            height: 6px;
-            border-radius: 3px;
-            background: var(--border);
+            height: 8px;
+            border-radius: 4px;
+            background: var(--bg-dark);
             outline: none;
             -webkit-appearance: none;
+            transition: background 0.2s;
         }
 
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 18px;
-            height: 18px;
+            width: 20px;
+            height: 20px;
             border-radius: 50%;
-            background: var(--primary);
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
             cursor: pointer;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            transition: transform 0.15s;
+            box-shadow: 0 2px 6px rgba(15, 76, 117, 0.3);
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 3px solid white;
         }
 
-        input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.1); }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(15, 76, 117, 0.4);
+        }
 
+        input[type="range"]:focus::-webkit-slider-thumb {
+            box-shadow: 0 0 0 4px rgba(15, 76, 117, 0.15);
+        }
+
+        /* Select */
         select {
             width: 100%;
-            padding: 0.5rem 0.75rem;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 0.9rem;
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            font-weight: 500;
             background: white;
             cursor: pointer;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            color: var(--text);
         }
+
+        select:hover { border-color: var(--primary-light); }
 
         select:focus {
             outline: none;
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(26,95,122,0.1);
+            box-shadow: 0 0 0 4px rgba(15, 76, 117, 0.1);
         }
 
-        .main { display: flex; flex-direction: column; gap: 1.5rem; }
-
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 1rem;
-        }
-
-        .metric-card {
-            background: var(--card);
-            border-radius: 12px;
-            padding: 1.25rem;
-            border: 1px solid var(--border);
-            text-align: center;
-        }
-
-        .metric-card.highlight {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-            color: white;
-            border: none;
-        }
-
-        .metric-card.highlight .metric-label { color: rgba(255,255,255,0.85); }
-
-        .metric-value { font-size: 1.75rem; font-weight: 700; line-height: 1.2; }
-        .metric-label {
-            font-size: 0.75rem;
-            color: var(--text-light);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-top: 0.25rem;
-        }
-
-        .metric-card.positive .metric-value { color: var(--success); }
-        .metric-card.negative .metric-value { color: var(--danger); }
-
-        .charts-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 1.5rem;
-        }
-
-        @media (max-width: 900px) {
-            .charts-grid { grid-template-columns: 1fr; }
-        }
-
-        .chart-container {
-            background: var(--card);
-            border-radius: 12px;
-            padding: 1.25rem;
-            border: 1px solid var(--border);
-        }
-
-        .chart-container h3 {
-            font-size: 1rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            color: var(--text);
-        }
-
-        .chart-wrapper { position: relative; height: 280px; }
-
-        .recommendation {
-            padding: 1rem 1.25rem;
-            border-radius: 8px;
-            font-size: 0.95rem;
-        }
-
-        .recommendation.positive {
-            background: #ecfdf5;
-            border: 1px solid #a7f3d0;
-            color: #065f46;
-        }
-
-        .recommendation.negative {
-            background: #fef2f2;
-            border: 1px solid #fecaca;
-            color: #991b1b;
-        }
-
-        .recommendation.warning {
-            background: #fffbeb;
-            border: 1px solid #fde68a;
-            color: #92400e;
-        }
-
+        /* Toggle */
         .toggle-container {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            padding: 0.5rem 0;
+            gap: 1rem;
+            padding: 0.75rem 0;
+            margin-bottom: 1rem;
         }
 
         .toggle {
             position: relative;
-            width: 48px;
-            height: 26px;
-            background: var(--border);
-            border-radius: 13px;
+            width: 56px;
+            height: 30px;
+            background: var(--bg-dark);
+            border-radius: 15px;
             cursor: pointer;
             transition: background 0.3s;
+            flex-shrink: 0;
         }
 
         .toggle.active { background: var(--primary); }
@@ -249,127 +339,326 @@
             position: absolute;
             top: 3px;
             left: 3px;
-            width: 20px;
-            height: 20px;
+            width: 24px;
+            height: 24px;
             background: white;
             border-radius: 50%;
             transition: transform 0.3s;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
 
-        .toggle.active::after { transform: translateX(22px); }
+        .toggle.active::after { transform: translateX(26px); }
 
-        .toggle-label { font-size: 0.85rem; color: var(--text-light); }
-
-        .preset-buttons {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-            margin-bottom: 1rem;
+        .toggle-label {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-secondary);
         }
 
-        .preset-btn {
-            padding: 0.4rem 0.75rem;
+        /* Main Area */
+        .main { display: flex; flex-direction: column; gap: 1.5rem; }
+
+        /* Metrics Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 1rem;
+        }
+
+        @media (max-width: 1600px) {
+            .metrics-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+
+        @media (max-width: 900px) {
+            .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        .metric-card {
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
             border: 1px solid var(--border);
-            background: white;
-            border-radius: 6px;
-            font-size: 0.8rem;
-            cursor: pointer;
-            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
         }
 
-        .preset-btn:hover {
-            border-color: var(--primary);
-            color: var(--primary);
-        }
-
-        .preset-btn.active {
-            background: var(--primary);
-            color: white;
-            border-color: var(--primary);
-        }
-
-        .loading {
-            position: fixed;
+        .metric-card::before {
+            content: '';
+            position: absolute;
             top: 0;
             left: 0;
             right: 0;
-            height: 3px;
-            background: var(--primary);
-            transform: scaleX(0);
-            transform-origin: left;
-            transition: transform 0.3s;
-            z-index: 1000;
+            height: 4px;
+            background: var(--border);
         }
 
-        .loading.active { transform: scaleX(1); }
+        .metric-card.primary::before {
+            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+        }
 
-        .footer {
-            text-align: center;
+        .metric-card.success::before { background: var(--success); }
+        .metric-card.warning::before { background: var(--warning); }
+        .metric-card.danger::before { background: var(--danger); }
+
+        .metric-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text);
+            line-height: 1.1;
+            letter-spacing: -1px;
+        }
+
+        .metric-card.primary .metric-value { color: var(--primary); }
+        .metric-card.success .metric-value { color: var(--success); }
+        .metric-card.danger .metric-value { color: var(--danger); }
+
+        .metric-change {
+            font-size: 0.75rem;
+            margin-top: 0.5rem;
+            color: var(--text-muted);
+        }
+
+        /* Recommendation Banner */
+        .recommendation {
+            padding: 1.25rem 1.5rem;
+            border-radius: var(--radius);
+            font-size: 1rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            box-shadow: var(--shadow);
+        }
+
+        .recommendation-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .recommendation.positive {
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            border: 1px solid #6ee7b7;
+            color: #065f46;
+        }
+
+        .recommendation.positive .recommendation-icon {
+            background: #10b981;
+            color: white;
+        }
+
+        .recommendation.negative {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            border: 1px solid #fca5a5;
+            color: #991b1b;
+        }
+
+        .recommendation.negative .recommendation-icon {
+            background: #ef4444;
+            color: white;
+        }
+
+        .recommendation.warning {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 1px solid #fcd34d;
+            color: #92400e;
+        }
+
+        .recommendation.warning .recommendation-icon {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .recommendation-text strong { font-weight: 700; }
+
+        /* Charts Grid */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 1200px) {
+            .charts-grid { grid-template-columns: 1fr; }
+        }
+
+        .chart-card {
+            background: var(--card);
+            border-radius: var(--radius);
             padding: 1.5rem;
-            color: var(--text-light);
-            font-size: 0.85rem;
-            border-top: 1px solid var(--border);
-            margin-top: 1rem;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
         }
 
-        .footer a { color: var(--primary); text-decoration: none; }
+        .chart-card.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.25rem;
+        }
+
+        .chart-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .chart-subtitle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+        }
+
+        /* Detail Table */
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 1200px) {
+            .detail-grid { grid-template-columns: 1fr; }
+        }
 
         .breakdown-table {
             width: 100%;
-            border-collapse: collapse;
-            font-size: 0.85rem;
-            margin-top: 1rem;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 0.875rem;
         }
 
         .breakdown-table th,
         .breakdown-table td {
-            padding: 0.5rem 0.75rem;
+            padding: 0.875rem 1rem;
             text-align: left;
-            border-bottom: 1px solid var(--border);
         }
 
         .breakdown-table th {
             background: var(--bg);
             font-weight: 600;
-            color: var(--text-light);
+            color: var(--text-muted);
             text-transform: uppercase;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
+            letter-spacing: 0.5px;
+        }
+
+        .breakdown-table th:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+        .breakdown-table th:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+
+        .breakdown-table td {
+            border-bottom: 1px solid var(--border);
         }
 
         .breakdown-table td:last-child {
             text-align: right;
-            font-family: 'SF Mono', 'Consolas', monospace;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-weight: 600;
+            color: var(--primary);
         }
 
-        .api-status {
-            font-size: 0.75rem;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            margin-left: auto;
+        .breakdown-table tr:last-child td {
+            border-bottom: none;
+            background: var(--bg);
+            font-weight: 700;
         }
 
-        .api-status.connected {
-            background: #dcfce7;
-            color: #166534;
+        .breakdown-table tr:last-child td:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+        .breakdown-table tr:last-child td:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+
+        /* Loading Bar */
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary), var(--accent));
+            background-size: 200% 100%;
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.3s;
+            z-index: 1000;
+            animation: shimmer 1.5s infinite;
         }
 
-        .api-status.disconnected {
-            background: #fee2e2;
-            color: #991b1b;
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
         }
+
+        .loading.active { transform: scaleX(1); }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border);
+            background: var(--card);
+            margin-top: 1rem;
+        }
+
+        .footer a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .footer a:hover { text-decoration: underline; }
+
+        .footer-logos {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 2rem;
+            margin-top: 1rem;
+            opacity: 0.6;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
     </style>
 </head>
 <body>
     <div class="loading" id="loading"></div>
 
     <div class="header">
-        <div style="display: flex; align-items: center; gap: 1rem;">
+        <div class="header-content">
             <div>
-                <h1>Analyse Coûts-Bénéfices — Compteurs d'Eau</h1>
-                <p>Modèle interactif v3.10 — Python backend</p>
+                <h1>Analyse Coûts-Bénéfices</h1>
+                <p class="header-subtitle">Compteurs d'eau intelligents — Modèle économique v3.10</p>
             </div>
-            <span class="api-status disconnected" id="api-status">API: Connexion...</span>
+            <div class="header-badge">
+                <span class="api-status disconnected" id="api-status">Connexion API...</span>
+            </div>
         </div>
     </div>
 
@@ -377,36 +666,60 @@
         <div class="sidebar">
             <!-- Presets -->
             <div class="card">
-                <div class="card-title">Préréglages</div>
-                <div class="preset-buttons">
-                    <button class="preset-btn active" onclick="loadPreset('longueuil')">Longueuil</button>
-                    <button class="preset-btn" onclick="loadPreset('montreal')">Montréal</button>
-                    <button class="preset-btn" onclick="loadPreset('quebec')">Québec</button>
-                    <button class="preset-btn" onclick="loadPreset('winnipeg')">Winnipeg</button>
+                <div class="card-header">
+                    <div class="card-icon blue">🏙️</div>
+                    <div>
+                        <div class="card-title">Municipalités</div>
+                        <div class="card-subtitle">Sélectionner un profil prédéfini</div>
+                    </div>
+                </div>
+                <div class="preset-grid">
+                    <button class="preset-btn active" onclick="loadPreset('longueuil')">
+                        <span class="city">Longueuil</span>
+                        <span class="info">116K ménages • 236 LPCD</span>
+                    </button>
+                    <button class="preset-btn" onclick="loadPreset('montreal')">
+                        <span class="city">Montréal</span>
+                        <span class="info">750K ménages • 332 LPCD</span>
+                    </button>
+                    <button class="preset-btn" onclick="loadPreset('quebec')">
+                        <span class="city">Québec</span>
+                        <span class="info">180K ménages • 280 LPCD</span>
+                    </button>
+                    <button class="preset-btn" onclick="loadPreset('winnipeg')">
+                        <span class="city">Winnipeg</span>
+                        <span class="info">221K ménages • 250 LPCD</span>
+                    </button>
                 </div>
             </div>
 
-            <!-- Paramètres du projet -->
+            <!-- Project Parameters -->
             <div class="card">
-                <div class="card-title">Paramètres du projet</div>
+                <div class="card-header">
+                    <div class="card-icon green">📊</div>
+                    <div>
+                        <div class="card-title">Paramètres du projet</div>
+                        <div class="card-subtitle">Configuration de base</div>
+                    </div>
+                </div>
 
                 <div class="input-group">
-                    <label>Nombre de ménages <span class="value" id="val-menages">116,258</span></label>
+                    <label>Nombre de ménages <span class="value" id="val-menages">116 258</span></label>
                     <input type="range" id="nb-menages" min="10000" max="1000000" step="1000" value="116258" oninput="onParamChange()">
                 </div>
 
                 <div class="input-group">
-                    <label>Taille ménage (pers) <span class="value" id="val-taille">2.18</span></label>
+                    <label>Taille du ménage (pers.) <span class="value" id="val-taille">2.18</span></label>
                     <input type="range" id="taille-menage" min="1.5" max="4" step="0.01" value="2.18" oninput="onParamChange()">
                 </div>
 
                 <div class="input-group">
-                    <label>LPCD (L/pers/jour) <span class="value" id="val-lpcd">236</span></label>
+                    <label>Consommation (L/pers/jour) <span class="value" id="val-lpcd">236</span></label>
                     <input type="range" id="lpcd" min="150" max="450" step="1" value="236" oninput="onParamChange()">
                 </div>
 
                 <div class="input-group">
-                    <label>Horizon d'analyse (ans) <span class="value" id="val-horizon">20</span></label>
+                    <label>Horizon d'analyse (années) <span class="value" id="val-horizon">20</span></label>
                     <input type="range" id="horizon" min="10" max="30" step="1" value="20" oninput="onParamChange()">
                 </div>
 
@@ -416,72 +729,90 @@
                 </div>
             </div>
 
-            <!-- Coûts du compteur -->
+            <!-- Meter Costs -->
             <div class="card">
-                <div class="card-title">Coûts du compteur</div>
+                <div class="card-header">
+                    <div class="card-icon purple">💧</div>
+                    <div>
+                        <div class="card-title">Technologie de comptage</div>
+                        <div class="card-subtitle">Coûts et installation</div>
+                    </div>
+                </div>
 
                 <div class="input-group">
                     <label>Type de compteur</label>
                     <select id="type-compteur" onchange="onParamChange()">
-                        <option value="ami">AMI (intelligent)</option>
-                        <option value="amr">AMR (lecture auto)</option>
-                        <option value="manuel">Manuel</option>
+                        <option value="ami">AMI — Intelligent (temps réel)</option>
+                        <option value="amr">AMR — Lecture automatique</option>
+                        <option value="manuel">Manuel — Relevé traditionnel</option>
                     </select>
                 </div>
 
                 <div class="input-group">
-                    <label>Coût compteur ($) <span class="value" id="val-cout-compteur">250</span></label>
+                    <label>Coût unitaire du compteur <span class="value" id="val-cout-compteur">250 $</span></label>
                     <input type="range" id="cout-compteur" min="50" max="600" step="10" value="250" oninput="onParamChange()">
                 </div>
 
                 <div class="input-group">
-                    <label>Heures installation <span class="value" id="val-heures">3.0</span></label>
+                    <label>Heures d'installation <span class="value" id="val-heures">3.0 h</span></label>
                     <input type="range" id="heures-install" min="0.5" max="8" step="0.5" value="3" oninput="onParamChange()">
                 </div>
 
                 <div class="input-group">
-                    <label>Taux horaire ($/h) <span class="value" id="val-taux-horaire">125</span></label>
+                    <label>Taux horaire installation <span class="value" id="val-taux-horaire">125 $/h</span></label>
                     <input type="range" id="taux-horaire" min="75" max="200" step="5" value="125" oninput="onParamChange()">
                 </div>
 
                 <div class="input-group" id="cout-reseau-group">
-                    <label>Coût réseau/compteur ($) <span class="value" id="val-cout-reseau">50</span></label>
+                    <label>Infrastructure réseau <span class="value" id="val-cout-reseau">50 $/u</span></label>
                     <input type="range" id="cout-reseau" min="0" max="200" step="10" value="50" oninput="onParamChange()">
                 </div>
             </div>
 
-            <!-- Comportement & Fuites -->
+            <!-- Behavior & Leaks -->
             <div class="card">
-                <div class="card-title">Comportement & Fuites</div>
+                <div class="card-header">
+                    <div class="card-icon orange">🔧</div>
+                    <div>
+                        <div class="card-title">Comportement & Fuites</div>
+                        <div class="card-subtitle">Paramètres d'économies</div>
+                    </div>
+                </div>
 
                 <div class="input-group">
-                    <label>Réduction comportementale (%) <span class="value" id="val-reduction">8.0</span></label>
+                    <label>Réduction comportementale <span class="value" id="val-reduction">8.0 %</span></label>
                     <input type="range" id="reduction-comportement" min="0" max="15" step="0.5" value="8" oninput="onParamChange()">
                 </div>
 
                 <div class="input-group">
                     <label>Scénario de persistance</label>
                     <select id="persistance" onchange="onParamChange()">
-                        <option value="optimiste">Optimiste (effet constant)</option>
-                        <option value="realiste" selected>Réaliste (plateau 2.5%)</option>
-                        <option value="pessimiste">Pessimiste (fadeout 10 ans)</option>
-                        <option value="ultra">Ultra-pessimiste (aucun effet)</option>
+                        <option value="optimiste">Optimiste — Effet constant (α = 8%)</option>
+                        <option value="realiste" selected>Réaliste — Plateau à 2.5%</option>
+                        <option value="pessimiste">Pessimiste — Fadeout sur 10 ans</option>
+                        <option value="ultra">Ultra-pessimiste — Aucun effet</option>
                     </select>
                 </div>
 
                 <div class="input-group">
                     <label>Scénario de fuites</label>
                     <select id="scenario-fuites" onchange="onParamChange()">
-                        <option value="standard">Standard (20%, 35 m³/an)</option>
+                        <option value="standard">Standard (20% prévalence, 35 m³/an)</option>
                         <option value="quebec">Contexte Québec (35%, 35 m³/an)</option>
-                        <option value="deux_stocks" selected>Deux-stocks Québec</option>
+                        <option value="deux_stocks" selected>Deux stocks différenciés (QC)</option>
                     </select>
                 </div>
             </div>
 
-            <!-- Paramètres économiques -->
+            <!-- Economic Parameters -->
             <div class="card">
-                <div class="card-title">Paramètres économiques</div>
+                <div class="card-header">
+                    <div class="card-icon blue">💰</div>
+                    <div>
+                        <div class="card-title">Paramètres économiques</div>
+                        <div class="card-subtitle">Valorisation de l'eau</div>
+                    </div>
+                </div>
 
                 <div class="toggle-container">
                     <div class="toggle" id="mode-toggle" onclick="toggleMode()"></div>
@@ -489,124 +820,192 @@
                 </div>
 
                 <div class="input-group">
-                    <label>Valeur sociale eau ($/m³) <span class="value" id="val-valeur-sociale">4.69</span></label>
+                    <label>Valeur sociale de l'eau <span class="value" id="val-valeur-sociale">4.69 $/m³</span></label>
                     <input type="range" id="valeur-sociale" min="1" max="12" step="0.1" value="4.69" oninput="onParamChange()">
                 </div>
 
                 <div class="input-group">
-                    <label>Coût variable ($/m³) <span class="value" id="val-cout-variable">0.50</span></label>
+                    <label>Coût variable de production <span class="value" id="val-cout-variable">0.50 $/m³</span></label>
                     <input type="range" id="cout-variable" min="0.1" max="2" step="0.05" value="0.5" oninput="onParamChange()">
                 </div>
             </div>
         </div>
 
         <div class="main">
-            <!-- Métriques principales -->
+            <!-- Metrics -->
             <div class="metrics-grid">
-                <div class="metric-card highlight">
+                <div class="metric-card primary">
+                    <div class="metric-label">Valeur Actualisée Nette</div>
                     <div class="metric-value" id="metric-van">—</div>
-                    <div class="metric-label">VAN (20 ans)</div>
+                    <div class="metric-change">sur 20 ans</div>
                 </div>
-                <div class="metric-card positive">
+                <div class="metric-card" id="rbc-card">
+                    <div class="metric-label">Ratio Bénéfices/Coûts</div>
                     <div class="metric-value" id="metric-rbc">—</div>
-                    <div class="metric-label">Ratio B/C</div>
+                    <div class="metric-change">seuil: 1.00</div>
                 </div>
                 <div class="metric-card">
+                    <div class="metric-label">Période de récupération</div>
                     <div class="metric-value" id="metric-payback">—</div>
-                    <div class="metric-label">Récupération (ans)</div>
+                    <div class="metric-change">années</div>
                 </div>
                 <div class="metric-card">
+                    <div class="metric-label">LCSW</div>
                     <div class="metric-value" id="metric-lcsw">—</div>
-                    <div class="metric-label">LCSW ($/m³)</div>
+                    <div class="metric-change">$/m³ économisé</div>
                 </div>
                 <div class="metric-card">
+                    <div class="metric-label">Investissement total</div>
                     <div class="metric-value" id="metric-invest">—</div>
-                    <div class="metric-label">Investissement</div>
+                    <div class="metric-change">initial</div>
                 </div>
                 <div class="metric-card">
+                    <div class="metric-label">Économies d'eau</div>
                     <div class="metric-value" id="metric-economies">—</div>
-                    <div class="metric-label">Économies (m³/mén/an)</div>
+                    <div class="metric-change">m³/ménage/an</div>
                 </div>
             </div>
 
-            <!-- Recommandation -->
+            <!-- Recommendation -->
             <div class="recommendation positive" id="recommendation">
-                Chargement...
+                <div class="recommendation-icon">✓</div>
+                <div class="recommendation-text">Chargement de l'analyse...</div>
             </div>
 
-            <!-- Graphiques -->
+            <!-- Charts Row 1 -->
             <div class="charts-grid">
-                <div class="chart-container">
-                    <h3>VAN Cumulative</h3>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">VAN Cumulative</div>
+                            <div class="chart-subtitle">Évolution sur l'horizon d'analyse</div>
+                        </div>
+                    </div>
                     <div class="chart-wrapper">
                         <canvas id="chart-van"></canvas>
                     </div>
                 </div>
 
-                <div class="chart-container">
-                    <h3>Comparaison Types de Compteurs</h3>
-                    <div class="chart-wrapper">
-                        <canvas id="chart-types"></canvas>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Sensibilité des Paramètres (Tornado)</div>
+                            <div class="chart-subtitle">Impact d'une variation de ±10%</div>
+                        </div>
                     </div>
-                </div>
-
-                <div class="chart-container">
-                    <h3>Scénarios de Persistance</h3>
-                    <div class="chart-wrapper">
-                        <canvas id="chart-persistance"></canvas>
-                    </div>
-                </div>
-
-                <div class="chart-container">
-                    <h3>Sensibilité des Paramètres</h3>
                     <div class="chart-wrapper">
                         <canvas id="chart-sensitivity"></canvas>
                     </div>
                 </div>
 
-                <div class="chart-container">
-                    <h3>Courbe α Comportement</h3>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Comparaison des Technologies</div>
+                            <div class="chart-subtitle">VAN selon le type de compteur</div>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-types"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Scénarios de Persistance</div>
+                            <div class="chart-subtitle">Impact du maintien des comportements</div>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-persistance"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Courbe α — Effet Comportemental</div>
+                            <div class="chart-subtitle">Évolution du coefficient de réduction</div>
+                        </div>
+                    </div>
                     <div class="chart-wrapper">
                         <canvas id="chart-alpha"></canvas>
                     </div>
                 </div>
 
-                <div class="chart-container">
-                    <h3>Économique vs Financier</h3>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Économique vs Financier</div>
+                            <div class="chart-subtitle">Comparaison des perspectives d'analyse</div>
+                        </div>
+                    </div>
                     <div class="chart-wrapper">
                         <canvas id="chart-perspectives"></canvas>
                     </div>
                 </div>
             </div>
 
-            <!-- Détail des flux -->
-            <div class="card">
-                <div class="card-title">Détail des flux (calculés par Python)</div>
-                <table class="breakdown-table">
-                    <thead>
-                        <tr>
-                            <th>Composante</th>
-                            <th>Valeur</th>
-                        </tr>
-                    </thead>
-                    <tbody id="breakdown-body">
-                    </tbody>
-                </table>
+            <!-- Detail Tables -->
+            <div class="detail-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon green">📋</div>
+                        <div>
+                            <div class="card-title">Détail des flux financiers</div>
+                            <div class="card-subtitle">Valeurs actualisées</div>
+                        </div>
+                    </div>
+                    <table class="breakdown-table">
+                        <thead>
+                            <tr>
+                                <th>Composante</th>
+                                <th>Montant</th>
+                            </tr>
+                        </thead>
+                        <tbody id="breakdown-body">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon blue">💧</div>
+                        <div>
+                            <div class="card-title">Économies d'eau détaillées</div>
+                            <div class="card-subtitle">Par ménage et par an</div>
+                        </div>
+                    </div>
+                    <table class="breakdown-table">
+                        <thead>
+                            <tr>
+                                <th>Source d'économie</th>
+                                <th>Volume</th>
+                            </tr>
+                        </thead>
+                        <tbody id="water-breakdown">
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 
     <div class="footer">
-        Modèle développé par Enzo Simier (HEC Montréal) — Projet Mitacs / Réseau Environnement<br>
-        Backend Python v3.10 — <a href="https://github.com/EnzoSim/compteurs.QC">GitHub</a>
+        <div>
+            Modèle développé par <strong>Enzo Simier</strong> — HEC Montréal<br>
+            Projet Mitacs / Réseau Environnement Québec • 2026
+        </div>
+        <div style="margin-top: 0.75rem;">
+            <a href="https://github.com/EnzoSim/compteurs.QC">Code source</a> •
+            <a href="#">Documentation</a> •
+            <a href="#">Méthodologie</a>
+        </div>
     </div>
 
     <script>
-        // ============================================================
-        // CONFIGURATION
-        // ============================================================
-
-        // URL de l'API
+        // Configuration
         const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
             ? `http://${window.location.hostname}:8000`
             : 'https://compteurs-qc.onrender.com';
@@ -615,32 +1014,26 @@
         let debounceTimer = null;
         let charts = {};
 
-        // ============================================================
-        // INITIALISATION
-        // ============================================================
-
+        // Initialization
         document.addEventListener('DOMContentLoaded', async () => {
             initCharts();
+            updateLabels();
             await checkApiHealth();
             await updateModel();
         });
 
         async function checkApiHealth() {
             try {
-                const response = await fetch(`${API_URL}/api/health`);
+                const response = await fetch(`${API_URL}/api/health`, { timeout: 5000 });
                 if (response.ok) {
-                    document.getElementById('api-status').textContent = 'API: Connecté';
+                    document.getElementById('api-status').textContent = 'API Connectée';
                     document.getElementById('api-status').className = 'api-status connected';
                 }
             } catch (e) {
-                document.getElementById('api-status').textContent = 'API: Déconnecté';
+                document.getElementById('api-status').textContent = 'API Déconnectée';
                 document.getElementById('api-status').className = 'api-status disconnected';
             }
         }
-
-        // ============================================================
-        // COLLECTE DES PARAMÈTRES
-        // ============================================================
 
         function collectParams() {
             return {
@@ -662,10 +1055,6 @@
                 cout_variable: parseFloat(document.getElementById('cout-variable').value),
             };
         }
-
-        // ============================================================
-        // APPELS API
-        // ============================================================
 
         async function apiCall(endpoint, data = null) {
             const loading = document.getElementById('loading');
@@ -689,16 +1078,9 @@
             }
         }
 
-        // ============================================================
-        // MISE À JOUR DU MODÈLE
-        // ============================================================
-
         function onParamChange() {
-            // Debounce pour éviter trop d'appels API
             clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(updateModel, 150);
-
-            // Mise à jour immédiate des labels
+            debounceTimer = setTimeout(updateModel, 200);
             updateLabels();
         }
 
@@ -708,15 +1090,14 @@
             document.getElementById('val-lpcd').textContent = document.getElementById('lpcd').value;
             document.getElementById('val-horizon').textContent = document.getElementById('horizon').value;
             document.getElementById('val-taux').textContent = parseFloat(document.getElementById('taux-actualisation').value).toFixed(1);
-            document.getElementById('val-cout-compteur').textContent = document.getElementById('cout-compteur').value;
-            document.getElementById('val-heures').textContent = parseFloat(document.getElementById('heures-install').value).toFixed(1);
-            document.getElementById('val-taux-horaire').textContent = document.getElementById('taux-horaire').value;
-            document.getElementById('val-cout-reseau').textContent = document.getElementById('cout-reseau').value;
-            document.getElementById('val-reduction').textContent = parseFloat(document.getElementById('reduction-comportement').value).toFixed(1);
-            document.getElementById('val-valeur-sociale').textContent = parseFloat(document.getElementById('valeur-sociale').value).toFixed(2);
-            document.getElementById('val-cout-variable').textContent = parseFloat(document.getElementById('cout-variable').value).toFixed(2);
+            document.getElementById('val-cout-compteur').textContent = document.getElementById('cout-compteur').value + ' $';
+            document.getElementById('val-heures').textContent = parseFloat(document.getElementById('heures-install').value).toFixed(1) + ' h';
+            document.getElementById('val-taux-horaire').textContent = document.getElementById('taux-horaire').value + ' $/h';
+            document.getElementById('val-cout-reseau').textContent = document.getElementById('cout-reseau').value + ' $/u';
+            document.getElementById('val-reduction').textContent = parseFloat(document.getElementById('reduction-comportement').value).toFixed(1) + ' %';
+            document.getElementById('val-valeur-sociale').textContent = parseFloat(document.getElementById('valeur-sociale').value).toFixed(2) + ' $/m³';
+            document.getElementById('val-cout-variable').textContent = parseFloat(document.getElementById('cout-variable').value).toFixed(2) + ' $/m³';
 
-            // Afficher/masquer coût réseau selon type compteur
             document.getElementById('cout-reseau-group').style.display =
                 document.getElementById('type-compteur').value === 'ami' ? 'block' : 'none';
         }
@@ -724,12 +1105,9 @@
         async function updateModel() {
             try {
                 const params = collectParams();
-
-                // Appel principal
                 const result = await apiCall('/api/calculate', params);
                 updateDisplay(result);
 
-                // Appels secondaires en parallèle
                 const [sensitivity, meters, persistence] = await Promise.all([
                     apiCall('/api/sensitivity', params),
                     apiCall('/api/compare_meters', params),
@@ -742,25 +1120,26 @@
                 await updatePerspectivesChart(params);
 
             } catch (e) {
-                document.getElementById('recommendation').className = 'recommendation negative';
-                document.getElementById('recommendation').innerHTML =
-                    `<strong>Erreur de connexion à l'API</strong><br>Vérifiez que le serveur Python est lancé: <code>uvicorn api:app --reload</code>`;
+                const recEl = document.getElementById('recommendation');
+                recEl.className = 'recommendation negative';
+                recEl.innerHTML = `
+                    <div class="recommendation-icon">⚠</div>
+                    <div class="recommendation-text">
+                        <strong>Erreur de connexion</strong><br>
+                        Vérifiez que le serveur API est en cours d'exécution.
+                    </div>
+                `;
             }
         }
 
-        // ============================================================
-        // AFFICHAGE DES RÉSULTATS
-        // ============================================================
-
         function formatMoney(value) {
-            if (Math.abs(value) >= 1e9) return (value / 1e9).toFixed(1) + ' G$';
+            if (Math.abs(value) >= 1e9) return (value / 1e9).toFixed(2) + ' G$';
             if (Math.abs(value) >= 1e6) return (value / 1e6).toFixed(1) + ' M$';
             if (Math.abs(value) >= 1e3) return (value / 1e3).toFixed(0) + ' k$';
             return value.toFixed(0) + ' $';
         }
 
         function updateDisplay(result) {
-            // Métriques
             document.getElementById('metric-van').textContent = formatMoney(result.van);
             document.getElementById('metric-rbc').textContent = result.rbc.toFixed(2);
             document.getElementById('metric-payback').textContent = result.payback ? result.payback.toFixed(1) : '>20';
@@ -768,45 +1147,60 @@
             document.getElementById('metric-invest').textContent = formatMoney(result.investissement_initial);
             document.getElementById('metric-economies').textContent = result.economie_totale_menage.toFixed(1);
 
-            // Couleur RBC
-            const rbcCard = document.getElementById('metric-rbc').parentElement;
-            rbcCard.className = 'metric-card ' + (result.rbc >= 1 ? 'positive' : 'negative');
+            const rbcCard = document.getElementById('rbc-card');
+            rbcCard.className = 'metric-card ' + (result.rbc >= 1 ? 'success' : 'danger');
 
-            // Recommandation
             const recEl = document.getElementById('recommendation');
             if (result.viable) {
                 recEl.className = 'recommendation positive';
-                recEl.innerHTML = `<strong>PROJET VIABLE</strong> — ${result.recommandation}`;
+                recEl.innerHTML = `
+                    <div class="recommendation-icon">✓</div>
+                    <div class="recommendation-text">
+                        <strong>PROJET ÉCONOMIQUEMENT VIABLE</strong><br>
+                        ${result.recommandation}
+                    </div>
+                `;
             } else if (result.van > 0) {
                 recEl.className = 'recommendation warning';
-                recEl.innerHTML = `<strong>PROJET MARGINAL</strong> — ${result.recommandation}`;
+                recEl.innerHTML = `
+                    <div class="recommendation-icon">!</div>
+                    <div class="recommendation-text">
+                        <strong>PROJET MARGINAL</strong><br>
+                        ${result.recommandation}
+                    </div>
+                `;
             } else {
                 recEl.className = 'recommendation negative';
-                recEl.innerHTML = `<strong>PROJET NON RENTABLE</strong> — ${result.recommandation}`;
+                recEl.innerHTML = `
+                    <div class="recommendation-icon">✗</div>
+                    <div class="recommendation-text">
+                        <strong>PROJET NON RENTABLE</strong><br>
+                        ${result.recommandation}
+                    </div>
+                `;
             }
 
-            // Graphique VAN cumulative
             charts.van.data.labels = result.annees;
             charts.van.data.datasets[0].data = result.van_cumulative.map(v => v / 1e6);
             charts.van.update('none');
 
-            // Graphique Alpha
             charts.alpha.data.labels = result.annees;
             charts.alpha.data.datasets[0].data = result.serie_alpha;
             charts.alpha.update('none');
 
-            // Tableau de détail
             document.getElementById('breakdown-body').innerHTML = `
-                <tr><td>Bénéfices eau (VA)</td><td>${formatMoney(result.va_benefices)}</td></tr>
+                <tr><td>Bénéfices actualisés</td><td>${formatMoney(result.va_benefices)}</td></tr>
                 <tr><td>Investissement initial</td><td>${formatMoney(-result.investissement_initial)}</td></tr>
-                <tr><td>Coûts exploitation (VA)</td><td>${formatMoney(-result.va_couts_exploitation)}</td></tr>
-                <tr><td>Économie comportement/ménage</td><td>${result.economie_comportement_menage.toFixed(2)} m³/an</td></tr>
-                <tr><td>Économie fuites/ménage</td><td>${result.economie_fuite_menage.toFixed(2)} m³/an</td></tr>
-                <tr><td>Usage base/ménage</td><td>${result.usage_base_menage.toFixed(1)} m³/an</td></tr>
-                <tr><td>Coût par compteur</td><td>${result.cout_par_compteur.toFixed(0)} $</td></tr>
-                <tr style="font-weight:600;border-top:2px solid var(--primary)">
-                    <td>Valeur Actualisée Nette</td><td>${formatMoney(result.van)}</td>
-                </tr>
+                <tr><td>Coûts d'exploitation (VA)</td><td>${formatMoney(-result.va_couts_exploitation)}</td></tr>
+                <tr><td>Coût par compteur installé</td><td>${result.cout_par_compteur.toFixed(0)} $</td></tr>
+                <tr><td><strong>Valeur Actualisée Nette</strong></td><td><strong>${formatMoney(result.van)}</strong></td></tr>
+            `;
+
+            document.getElementById('water-breakdown').innerHTML = `
+                <tr><td>Usage de base annuel</td><td>${result.usage_base_menage.toFixed(1)} m³</td></tr>
+                <tr><td>Économie comportementale</td><td>${result.economie_comportement_menage.toFixed(2)} m³</td></tr>
+                <tr><td>Économie détection fuites</td><td>${result.economie_fuite_menage.toFixed(2)} m³</td></tr>
+                <tr><td><strong>Total économies/ménage</strong></td><td><strong>${result.economie_totale_menage.toFixed(1)} m³/an</strong></td></tr>
             `;
         }
 
@@ -818,17 +1212,12 @@
         }
 
         function updateMetersChart(data) {
-            charts.types.data.datasets[0].data = [
-                data.ami.van / 1e6,
-                data.amr.van / 1e6,
-                data.manuel.van / 1e6
-            ];
+            charts.types.data.datasets[0].data = [data.ami.van / 1e6, data.amr.van / 1e6, data.manuel.van / 1e6];
             charts.types.update('none');
         }
 
         function updatePersistenceChart(data, currentResult) {
-            const years = currentResult.annees;
-            charts.persistance.data.labels = years;
+            charts.persistance.data.labels = currentResult.annees;
             charts.persistance.data.datasets[0].data = data.optimiste.van_cumulative.map(v => v / 1e6);
             charts.persistance.data.datasets[1].data = data.realiste.van_cumulative.map(v => v / 1e6);
             charts.persistance.data.datasets[2].data = data.pessimiste.van_cumulative.map(v => v / 1e6);
@@ -836,30 +1225,15 @@
         }
 
         async function updatePerspectivesChart(params) {
-            const paramsEco = { ...params, mode_economique: true };
-            const paramsFin = { ...params, mode_economique: false };
-
             const [resEco, resFin] = await Promise.all([
-                apiCall('/api/calculate', paramsEco),
-                apiCall('/api/calculate', paramsFin),
+                apiCall('/api/calculate', { ...params, mode_economique: true }),
+                apiCall('/api/calculate', { ...params, mode_economique: false }),
             ]);
 
-            charts.perspectives.data.datasets[0].data = [
-                resEco.va_benefices / 1e6,
-                resEco.va_couts_totaux / 1e6,
-                resEco.van / 1e6
-            ];
-            charts.perspectives.data.datasets[1].data = [
-                resFin.va_benefices / 1e6,
-                resFin.va_couts_totaux / 1e6,
-                resFin.van / 1e6
-            ];
+            charts.perspectives.data.datasets[0].data = [resEco.va_benefices / 1e6, resEco.va_couts_totaux / 1e6, resEco.van / 1e6];
+            charts.perspectives.data.datasets[1].data = [resFin.va_benefices / 1e6, resFin.va_couts_totaux / 1e6, resFin.van / 1e6];
             charts.perspectives.update('none');
         }
-
-        // ============================================================
-        // PRESETS ET TOGGLE
-        // ============================================================
 
         async function loadPreset(ville) {
             const presets = {
@@ -876,7 +1250,6 @@
             document.getElementById('taille-menage').value = preset.taille_menage;
             document.getElementById('lpcd').value = preset.lpcd;
 
-            // Update buttons
             document.querySelectorAll('.preset-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.textContent.toLowerCase().includes(ville));
             });
@@ -887,145 +1260,178 @@
 
         function toggleMode() {
             modeEconomique = !modeEconomique;
-            const toggle = document.getElementById('mode-toggle');
-            const label = document.getElementById('mode-label');
-
-            toggle.classList.toggle('active', !modeEconomique);
-            label.textContent = modeEconomique
+            document.getElementById('mode-toggle').classList.toggle('active', !modeEconomique);
+            document.getElementById('mode-label').textContent = modeEconomique
                 ? 'Mode Économique (valeur sociale)'
                 : 'Mode Financier (coût variable)';
-
             updateModel();
         }
 
-        // ============================================================
-        // INITIALISATION DES GRAPHIQUES
-        // ============================================================
-
         function initCharts() {
-            // VAN Cumulative
+            const chartColors = {
+                primary: '#0f4c75',
+                primaryLight: '#3282b8',
+                secondary: '#00b4d8',
+                success: '#06d6a0',
+                warning: '#ffd166',
+                danger: '#ef476f',
+                grid: '#e2e8f0'
+            };
+
+            const defaultOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            font: { family: 'Inter', size: 11 },
+                            usePointStyle: true,
+                            padding: 20
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: chartColors.grid, drawBorder: false },
+                        ticks: { font: { family: 'Inter', size: 11 } }
+                    },
+                    y: {
+                        grid: { color: chartColors.grid, drawBorder: false },
+                        ticks: { font: { family: 'Inter', size: 11 } }
+                    }
+                }
+            };
+
             charts.van = new Chart(document.getElementById('chart-van').getContext('2d'), {
                 type: 'line',
                 data: {
                     labels: [],
                     datasets: [{
-                        label: 'VAN Cumulative',
+                        label: 'VAN Cumulative (M$)',
                         data: [],
-                        borderColor: '#1a5f7a',
-                        backgroundColor: 'rgba(26, 95, 122, 0.1)',
+                        borderColor: chartColors.primary,
+                        backgroundColor: 'rgba(15, 76, 117, 0.1)',
                         fill: true,
                         tension: 0.4,
-                        pointRadius: 2
+                        pointRadius: 3,
+                        pointHoverRadius: 6,
+                        borderWidth: 3
                     }]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
+                    ...defaultOptions,
+                    plugins: { ...defaultOptions.plugins, legend: { display: false } },
                     scales: {
-                        x: { title: { display: true, text: 'Année' } },
-                        y: { title: { display: true, text: 'M$' } }
+                        ...defaultOptions.scales,
+                        x: { ...defaultOptions.scales.x, title: { display: true, text: 'Année', font: { family: 'Inter', weight: 600 } } },
+                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'M$', font: { family: 'Inter', weight: 600 } } }
                     }
                 }
             });
 
-            // Types de compteurs
-            charts.types = new Chart(document.getElementById('chart-types').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: ['AMI', 'AMR', 'Manuel'],
-                    datasets: [{
-                        data: [],
-                        backgroundColor: ['#1a5f7a', '#2d8bba', '#57c5b6']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: { y: { title: { display: true, text: 'VAN (M$)' } } }
-                }
-            });
-
-            // Persistance
-            charts.persistance = new Chart(document.getElementById('chart-persistance').getContext('2d'), {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [
-                        { label: 'Optimiste', data: [], borderColor: '#10b981', tension: 0.4, pointRadius: 0 },
-                        { label: 'Réaliste', data: [], borderColor: '#3b82f6', tension: 0.4, pointRadius: 0 },
-                        { label: 'Pessimiste', data: [], borderColor: '#ef4444', tension: 0.4, pointRadius: 0 }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: { title: { display: true, text: 'Année' } },
-                        y: { title: { display: true, text: 'VAN (M$)' } }
-                    }
-                }
-            });
-
-            // Sensibilité
             charts.sensitivity = new Chart(document.getElementById('chart-sensitivity').getContext('2d'), {
                 type: 'bar',
                 data: {
                     labels: [],
                     datasets: [
-                        { label: '-10%', data: [], backgroundColor: '#ef4444' },
-                        { label: '+10%', data: [], backgroundColor: '#10b981' }
+                        { label: '-10%', data: [], backgroundColor: chartColors.danger, borderRadius: 4 },
+                        { label: '+10%', data: [], backgroundColor: chartColors.success, borderRadius: 4 }
                     ]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
+                    ...defaultOptions,
                     indexAxis: 'y',
-                    scales: { x: { title: { display: true, text: 'Impact VAN (M$)' } } }
+                    scales: {
+                        x: { ...defaultOptions.scales.x, title: { display: true, text: 'Impact sur VAN (M$)', font: { family: 'Inter', weight: 600 } } },
+                        y: { ...defaultOptions.scales.y, ticks: { font: { family: 'Inter', size: 10 } } }
+                    }
                 }
             });
 
-            // Alpha
+            charts.types = new Chart(document.getElementById('chart-types').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['AMI (Intelligent)', 'AMR (Auto)', 'Manuel'],
+                    datasets: [{
+                        label: 'VAN (M$)',
+                        data: [],
+                        backgroundColor: [chartColors.primary, chartColors.primaryLight, chartColors.secondary],
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    ...defaultOptions,
+                    plugins: { ...defaultOptions.plugins, legend: { display: false } },
+                    scales: {
+                        ...defaultOptions.scales,
+                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'VAN (M$)', font: { family: 'Inter', weight: 600 } } }
+                    }
+                }
+            });
+
+            charts.persistance = new Chart(document.getElementById('chart-persistance').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'Optimiste', data: [], borderColor: chartColors.success, tension: 0.4, pointRadius: 0, borderWidth: 2.5 },
+                        { label: 'Réaliste', data: [], borderColor: chartColors.primary, tension: 0.4, pointRadius: 0, borderWidth: 2.5 },
+                        { label: 'Pessimiste', data: [], borderColor: chartColors.danger, tension: 0.4, pointRadius: 0, borderWidth: 2.5 }
+                    ]
+                },
+                options: {
+                    ...defaultOptions,
+                    scales: {
+                        ...defaultOptions.scales,
+                        x: { ...defaultOptions.scales.x, title: { display: true, text: 'Année', font: { family: 'Inter', weight: 600 } } },
+                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'VAN (M$)', font: { family: 'Inter', weight: 600 } } }
+                    }
+                }
+            });
+
             charts.alpha = new Chart(document.getElementById('chart-alpha').getContext('2d'), {
                 type: 'line',
                 data: {
                     labels: [],
                     datasets: [{
-                        label: 'α (%)',
+                        label: 'Coefficient α (%)',
                         data: [],
-                        borderColor: '#3b82f6',
+                        borderColor: chartColors.secondary,
+                        backgroundColor: 'rgba(0, 180, 216, 0.1)',
+                        fill: true,
                         tension: 0.4,
                         pointRadius: 0,
-                        fill: true,
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)'
+                        borderWidth: 3
                     }]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
+                    ...defaultOptions,
+                    plugins: { ...defaultOptions.plugins, legend: { display: false } },
                     scales: {
-                        x: { title: { display: true, text: 'Année' } },
-                        y: { title: { display: true, text: 'α (%)' }, min: 0 }
+                        ...defaultOptions.scales,
+                        x: { ...defaultOptions.scales.x, title: { display: true, text: 'Année', font: { family: 'Inter', weight: 600 } } },
+                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'α (%)', font: { family: 'Inter', weight: 600 } }, min: 0 }
                     }
                 }
             });
 
-            // Perspectives
             charts.perspectives = new Chart(document.getElementById('chart-perspectives').getContext('2d'), {
                 type: 'bar',
                 data: {
                     labels: ['Bénéfices', 'Coûts', 'VAN'],
                     datasets: [
-                        { label: 'Économique', data: [], backgroundColor: '#1a5f7a' },
-                        { label: 'Financier', data: [], backgroundColor: '#57c5b6' }
+                        { label: 'Économique', data: [], backgroundColor: chartColors.primary, borderRadius: 6 },
+                        { label: 'Financier', data: [], backgroundColor: chartColors.secondary, borderRadius: 6 }
                     ]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: { y: { title: { display: true, text: 'M$' } } }
+                    ...defaultOptions,
+                    scales: {
+                        ...defaultOptions.scales,
+                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'M$', font: { family: 'Inter', weight: 600 } } }
+                    }
                 }
             });
         }
