@@ -1491,8 +1491,8 @@
         }
 
         function updateDetailedCharts(data) {
-            // Graphique dynamique des fuites
-            charts.fuites.data.labels = data.annees;
+            // Graphique dynamique des fuites (avec année 0 = stock initial)
+            charts.fuites.data.labels = data.annees_fuites || data.annees;
             charts.fuites.data.datasets[0].data = data.stock_fuites_pct;
             charts.fuites.update('none');
 

@@ -578,7 +578,7 @@ async def detailed_series(req: CalculRequest):
         # Équilibre à long terme
         stock_equilibre = taux_nouvelles / taux_correction if taux_correction > 0 else stock_initial
 
-        stock_fuites = []
+        stock_fuites = [stock_initial]  # Année 0: stock initial
         for t in range(1, req.horizon + 1):
             # Décroissance exponentielle vers l'équilibre
             stock_t = stock_equilibre + (stock_initial - stock_equilibre) * math.exp(-taux_correction * t)
@@ -608,7 +608,8 @@ async def detailed_series(req: CalculRequest):
         }
 
         return {
-            "annees": list(range(1, req.horizon + 1)),
+            "annees": list(range(1, req.horizon + 1)),  # 1 à horizon pour économies
+            "annees_fuites": list(range(0, req.horizon + 1)),  # 0 à horizon pour stock fuites
             # Économies par ménage par année
             "economies_comportement_m3": economies_comportement_par_an,
             "economies_fuites_m3": economies_fuites_par_an,
