@@ -1364,18 +1364,24 @@
                 const result = await apiCall('/api/calculate', params);
                 updateDisplay(result);
 
-                const [sensitivity, meters, persistence, detailed] = await Promise.all([
+                const [sensitivity, meters, persistence] = await Promise.all([
                     apiCall('/api/sensitivity', params),
                     apiCall('/api/compare_meters', params),
                     apiCall('/api/compare_persistence', params),
-                    apiCall('/api/detailed_series', params),
                 ]);
 
                 updateSensitivityChart(sensitivity);
                 updateMetersChart(meters);
                 updatePersistenceChart(persistence, result);
-                updateDetailedCharts(detailed);
-                updateParamsTables(detailed);
+
+                // Fetch detailed series (new endpoint, may not be deployed yet)
+                try {
+                    const detailed = await apiCall('/api/detailed_series', params);
+                    updateDetailedCharts(detailed);
+                    updateParamsTables(detailed);
+                } catch (e) {
+                    console.warn('detailed_series endpoint not available yet:', e);
+                }
                 await updatePerspectivesChart(params);
 
             } catch (e) {
