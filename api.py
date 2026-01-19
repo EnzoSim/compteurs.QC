@@ -34,6 +34,8 @@ from analyse_compteurs_eau import (
     ModeRepartitionCouts,
     executer_modele,
     calculer_alpha_comportement,
+    calculer_dynamique_fuites,
+    calculer_economies_fuites_menage,
     PERSISTANCE_OPTIMISTE,
     PERSISTANCE_REALISTE,
     PERSISTANCE_PESSIMISTE,
@@ -89,8 +91,24 @@ class CalculRequest(BaseModel):
     reduction_comportement: float = Field(8.0, ge=0, le=20, description="Réduction comportementale (%)")
     persistance: str = Field("realiste", description="Scénario: optimiste, realiste, pessimiste, ultra")
 
-    # Paramètres fuites
-    scenario_fuites: str = Field("deux_stocks", description="Scénario: standard, quebec, deux_stocks")
+    # Paramètres fuites - scénario prédéfini
+    scenario_fuites: str = Field("deux_stocks", description="Scénario: standard, quebec, deux_stocks, custom")
+
+    # === PARAMÈTRES AVANCÉS FUITES (utilisés si scenario_fuites = "custom") ===
+    # Prévalence petites fuites (toilettes, gouttes)
+    prevalence_petites_pct: float = Field(30.0, ge=0, le=50, description="% ménages avec petite fuite")
+    debit_petites_m3: float = Field(10.0, ge=1, le=30, description="Débit petites fuites (m³/an)")
+    # Prévalence grosses fuites (conduites)
+    prevalence_grosses_pct: float = Field(6.0, ge=0, le=20, description="% ménages avec grosse fuite")
+    debit_grosses_m3: float = Field(50.0, ge=20, le=150, description="Débit grosses fuites (m³/an)")
+    # Taux de réparation et détection
+    taux_reparation_pct: float = Field(85.0, ge=50, le=100, description="% fuites réparées après détection")
+    taux_detection_pct: float = Field(90.0, ge=50, le=100, description="% fuites détectées par AMI")
+    delai_detection_mois: float = Field(1.0, ge=0.5, le=6, description="Délai détection (mois)")
+    # Nouvelles fuites annuelles
+    taux_nouvelles_fuites_pct: float = Field(5.0, ge=0, le=15, description="% ménages avec nouvelle fuite/an")
+    # Fuites persistantes (jamais réparées)
+    part_persistantes_pct: float = Field(5.0, ge=0, le=20, description="% fuites jamais réparées")
 
     # Mode d'analyse
     mode_economique: bool = Field(True, description="True=économique, False=financier")
@@ -187,7 +205,7 @@ def get_persistance(nom: str, alpha_initial: float) -> ParametresPersistance:
         )
 
 
-def get_fuites(nom: str) -> ParametresFuites:
+def get_fuites(nom: str, req: CalculRequest = None) -> ParametresFuites:
     """Récupérer les paramètres de fuites selon le scénario."""
 
     if nom == "standard":
@@ -205,6 +223,22 @@ def get_fuites(nom: str) -> ParametresFuites:
             taux_reparation_pct=85.0,
             mode_repartition=ModeRepartitionCouts.SANS_COUT,
             utiliser_prevalence_differenciee=False,
+        )
+    elif nom == "custom" and req is not None:
+        # Utiliser les paramètres avancés personnalisés
+        return ParametresFuites(
+            utiliser_prevalence_differenciee=True,
+            part_menages_fuite_any_pct=req.prevalence_petites_pct,
+            debit_fuite_any_m3_an=req.debit_petites_m3,
+            part_menages_fuite_significative_pct=req.prevalence_grosses_pct,
+            debit_fuite_significative_m3_an=req.debit_grosses_m3,
+            taux_reparation_pct=req.taux_reparation_pct,
+            taux_detection_pct=req.taux_detection_pct,
+            delai_detection_mois=req.delai_detection_mois,
+            taux_nouvelles_fuites_pct=req.taux_nouvelles_fuites_pct,
+            part_fuites_persistantes_pct=req.part_persistantes_pct,
+            mode_repartition=ModeRepartitionCouts.SANS_COUT,
+            nom="Personnalisé",
         )
     else:  # deux_stocks
         return FUITES_QUEBEC_DEUX_STOCKS
@@ -282,7 +316,7 @@ async def calculate(req: CalculRequest):
         # Créer les autres paramètres
         compteur = get_compteur(req)
         persistance = get_persistance(req.persistance, req.reduction_comportement)
-        fuites = get_fuites(req.scenario_fuites)
+        fuites = get_fuites(req.scenario_fuites, req)
 
         # Mode d'analyse
         mode = ModeCompte.ECONOMIQUE if req.mode_economique else ModeCompte.FINANCIER
@@ -477,6 +511,116 @@ async def compare_persistence(req: CalculRequest):
         }
 
     return results
+
+
+@app.post("/api/detailed_series")
+async def detailed_series(req: CalculRequest):
+    """
+    Retourner les séries détaillées pour les graphiques avancés.
+
+    Inclut:
+    - Dynamique des fuites (stock restant par année)
+    - Décomposition des économies (comportement vs fuites)
+    - Paramètres de fuites utilisés
+    """
+    try:
+        # Créer les paramètres
+        params = ParametresModele(
+            nb_menages=req.nb_menages,
+            taille_menage=req.taille_menage,
+            lpcd=req.lpcd,
+            horizon_analyse=req.horizon,
+            taux_actualisation_pct=req.taux_actualisation,
+            reduction_comportement_pct=req.reduction_comportement,
+        )
+
+        persistance = get_persistance(req.persistance, req.reduction_comportement)
+        fuites = get_fuites(req.scenario_fuites, req)
+
+        # Calculer la dynamique des fuites
+        resultats_fuites = calculer_dynamique_fuites(
+            params_fuites=fuites,
+            nb_menages=req.nb_menages,
+            horizon=req.horizon,
+        )
+
+        # Générer la série alpha (comportement)
+        serie_alpha = [
+            calculer_alpha_comportement(t, persistance) * 100
+            for t in range(1, req.horizon + 1)
+        ]
+
+        # Calculer les économies comportementales par année
+        usage_base = params.taille_menage * params.lpcd * 365.25 / 1000  # m³/an/ménage
+        economies_comportement_par_an = [
+            usage_base * (alpha / 100)
+            for alpha in serie_alpha
+        ]
+
+        # Économies fuites par ménage par année (approximation basée sur les économies totales)
+        economies_fuites_par_an = list(resultats_fuites.economies_eau_par_an / req.nb_menages)
+
+        # Stock de fuites restant (pourcentage du stock initial)
+        # Calcul simplifié: le stock diminue avec les réparations
+        stock_initial = (fuites.part_menages_fuite_any_pct if fuites.utiliser_prevalence_differenciee
+                        else fuites.part_menages_fuite_pct)
+
+        # Estimation de l'évolution du stock
+        taux_correction = (fuites.taux_detection_pct / 100) * (fuites.taux_reparation_pct / 100)
+        taux_nouvelles = fuites.taux_nouvelles_fuites_pct / 100
+
+        stock_fuites = []
+        stock_courant = stock_initial
+        for t in range(1, req.horizon + 1):
+            # Stock diminue par les réparations mais augmente par les nouvelles fuites
+            # Équilibre vers: nouvelles / (réparations + naturelles)
+            stock_courant = stock_courant * (1 - taux_correction * 0.8) + taux_nouvelles * 100
+            stock_courant = max(taux_nouvelles * 100 / taux_correction if taux_correction > 0 else stock_initial * 0.2,
+                               stock_courant)
+            stock_fuites.append(stock_courant)
+
+        # Paramètres de fuites utilisés (pour affichage)
+        params_fuites_info = {
+            "scenario": req.scenario_fuites,
+            "mode_deux_stocks": fuites.utiliser_prevalence_differenciee,
+            "prevalence_petites_pct": fuites.part_menages_fuite_any_pct if fuites.utiliser_prevalence_differenciee else fuites.part_menages_fuite_pct,
+            "debit_petites_m3": fuites.debit_fuite_any_m3_an if fuites.utiliser_prevalence_differenciee else fuites.debit_fuite_m3_an,
+            "prevalence_grosses_pct": fuites.part_menages_fuite_significative_pct if fuites.utiliser_prevalence_differenciee else 0,
+            "debit_grosses_m3": fuites.debit_fuite_significative_m3_an if fuites.utiliser_prevalence_differenciee else 0,
+            "taux_detection_pct": fuites.taux_detection_pct,
+            "taux_reparation_pct": fuites.taux_reparation_pct,
+            "delai_detection_mois": fuites.delai_detection_mois,
+            "taux_nouvelles_fuites_pct": fuites.taux_nouvelles_fuites_pct,
+            "part_persistantes_pct": fuites.part_fuites_persistantes_pct,
+        }
+
+        # Info persistance comportementale
+        params_persistance_info = {
+            "scenario": req.persistance,
+            "alpha_initial_pct": req.reduction_comportement,
+            "alpha_plateau_pct": persistance.alpha_plateau * 100 if hasattr(persistance, 'alpha_plateau') else req.reduction_comportement,
+            "mode": persistance.mode.value if hasattr(persistance.mode, 'value') else str(persistance.mode),
+        }
+
+        return {
+            "annees": list(range(1, req.horizon + 1)),
+            # Économies par ménage par année
+            "economies_comportement_m3": economies_comportement_par_an,
+            "economies_fuites_m3": economies_fuites_par_an,
+            # Stock de fuites (% ménages avec fuite active)
+            "stock_fuites_pct": stock_fuites,
+            # Série alpha
+            "serie_alpha_pct": serie_alpha,
+            # Paramètres utilisés
+            "params_fuites": params_fuites_info,
+            "params_persistance": params_persistance_info,
+            # Totaux
+            "total_reparations": int(resultats_fuites.total_reparations),
+            "economies_eau_total_m3": float(resultats_fuites.economies_eau_total),
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # =============================================================================

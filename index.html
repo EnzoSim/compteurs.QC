@@ -645,6 +645,88 @@
         ::-webkit-scrollbar-track { background: var(--bg); }
         ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* Advanced Parameters Section */
+        .advanced-params {
+            margin-top: 1rem;
+            border-top: 1px solid var(--border);
+            padding-top: 1rem;
+        }
+
+        .advanced-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            padding: 0.75rem;
+            background: var(--bg);
+            border-radius: var(--radius-sm);
+            font-weight: 500;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            transition: background 0.2s;
+        }
+
+        .advanced-header:hover {
+            background: var(--bg-dark);
+        }
+
+        .chevron {
+            transition: transform 0.3s;
+            font-size: 0.7rem;
+        }
+
+        .chevron.open {
+            transform: rotate(180deg);
+        }
+
+        .advanced-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .advanced-content.open {
+            max-height: 1000px;
+        }
+
+        .param-section {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: rgba(15, 76, 117, 0.03);
+            border-radius: var(--radius-sm);
+            border-left: 3px solid var(--primary-light);
+        }
+
+        .section-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.75rem;
+        }
+
+        .param-section .input-group {
+            margin-bottom: 0.75rem;
+        }
+
+        .param-section .input-group:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Info badge for leak params */
+        .info-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            background: linear-gradient(135deg, #e0f2fe, #bae6fd);
+            border-radius: var(--radius-sm);
+            font-size: 0.75rem;
+            color: #0369a1;
+            margin-top: 0.5rem;
+        }
     </style>
 </head>
 <body>
@@ -796,11 +878,70 @@
 
                 <div class="input-group">
                     <label>Scénario de fuites</label>
-                    <select id="scenario-fuites" onchange="onParamChange()">
+                    <select id="scenario-fuites" onchange="onScenarioFuitesChange()">
                         <option value="standard">Standard (20% prévalence, 35 m³/an)</option>
                         <option value="quebec">Contexte Québec (35%, 35 m³/an)</option>
                         <option value="deux_stocks" selected>Deux stocks différenciés (QC)</option>
+                        <option value="custom">Personnalisé...</option>
                     </select>
+                </div>
+
+                <!-- Paramètres avancés fuites (collapsible) -->
+                <div class="advanced-params" id="advanced-fuites" style="display: none;">
+                    <div class="advanced-header" onclick="toggleAdvanced()">
+                        <span>Paramètres avancés des fuites</span>
+                        <span class="chevron" id="chevron-fuites">▼</span>
+                    </div>
+                    <div class="advanced-content" id="content-fuites">
+                        <div class="param-section">
+                            <div class="section-title">Petites fuites (toilettes, gouttes)</div>
+                            <div class="input-group">
+                                <label>Prévalence <span class="value" id="val-prevalence-petites">30 %</span></label>
+                                <input type="range" id="prevalence-petites" min="5" max="50" step="1" value="30" oninput="onParamChange()">
+                            </div>
+                            <div class="input-group">
+                                <label>Débit moyen <span class="value" id="val-debit-petites">10 m³/an</span></label>
+                                <input type="range" id="debit-petites" min="1" max="30" step="1" value="10" oninput="onParamChange()">
+                            </div>
+                        </div>
+                        <div class="param-section">
+                            <div class="section-title">Grosses fuites (conduites)</div>
+                            <div class="input-group">
+                                <label>Prévalence <span class="value" id="val-prevalence-grosses">6 %</span></label>
+                                <input type="range" id="prevalence-grosses" min="0" max="20" step="0.5" value="6" oninput="onParamChange()">
+                            </div>
+                            <div class="input-group">
+                                <label>Débit moyen <span class="value" id="val-debit-grosses">50 m³/an</span></label>
+                                <input type="range" id="debit-grosses" min="20" max="150" step="5" value="50" oninput="onParamChange()">
+                            </div>
+                        </div>
+                        <div class="param-section">
+                            <div class="section-title">Détection & Réparation</div>
+                            <div class="input-group">
+                                <label>Taux de détection AMI <span class="value" id="val-taux-detection">90 %</span></label>
+                                <input type="range" id="taux-detection" min="50" max="100" step="1" value="90" oninput="onParamChange()">
+                            </div>
+                            <div class="input-group">
+                                <label>Taux de réparation <span class="value" id="val-taux-reparation">85 %</span></label>
+                                <input type="range" id="taux-reparation" min="50" max="100" step="1" value="85" oninput="onParamChange()">
+                            </div>
+                            <div class="input-group">
+                                <label>Délai détection <span class="value" id="val-delai-detection">1.0 mois</span></label>
+                                <input type="range" id="delai-detection" min="0.5" max="6" step="0.5" value="1" oninput="onParamChange()">
+                            </div>
+                        </div>
+                        <div class="param-section">
+                            <div class="section-title">Dynamique temporelle</div>
+                            <div class="input-group">
+                                <label>Nouvelles fuites/an <span class="value" id="val-nouvelles-fuites">5 %</span></label>
+                                <input type="range" id="nouvelles-fuites" min="0" max="15" step="0.5" value="5" oninput="onParamChange()">
+                            </div>
+                            <div class="input-group">
+                                <label>Fuites persistantes <span class="value" id="val-persistantes">5 %</span></label>
+                                <input type="range" id="persistantes" min="0" max="20" step="1" value="5" oninput="onParamChange()">
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -945,6 +1086,30 @@
                         <canvas id="chart-perspectives"></canvas>
                     </div>
                 </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Dynamique des Fuites</div>
+                            <div class="chart-subtitle">Évolution du stock de fuites actives</div>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-fuites"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Décomposition des Économies</div>
+                            <div class="chart-subtitle">Comportement vs Détection fuites (m³/ménage/an)</div>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-decomposition"></canvas>
+                    </div>
+                </div>
             </div>
 
             <!-- Detail Tables -->
@@ -985,6 +1150,49 @@
                             </tr>
                         </thead>
                         <tbody id="water-breakdown">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Leak Parameters Detail -->
+            <div class="detail-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon orange">🔍</div>
+                        <div>
+                            <div class="card-title">Paramètres Fuites Utilisés</div>
+                            <div class="card-subtitle">Configuration du modèle</div>
+                        </div>
+                    </div>
+                    <table class="breakdown-table">
+                        <thead>
+                            <tr>
+                                <th>Paramètre</th>
+                                <th>Valeur</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fuites-params-body">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon purple">📉</div>
+                        <div>
+                            <div class="card-title">Persistance Comportementale</div>
+                            <div class="card-subtitle">Modèle de décroissance</div>
+                        </div>
+                    </div>
+                    <table class="breakdown-table">
+                        <thead>
+                            <tr>
+                                <th>Paramètre</th>
+                                <th>Valeur</th>
+                            </tr>
+                        </thead>
+                        <tbody id="persistance-params-body">
                         </tbody>
                     </table>
                 </div>
@@ -1036,7 +1244,7 @@
         }
 
         function collectParams() {
-            return {
+            const params = {
                 nb_menages: parseInt(document.getElementById('nb-menages').value),
                 taille_menage: parseFloat(document.getElementById('taille-menage').value),
                 lpcd: parseInt(document.getElementById('lpcd').value),
@@ -1054,6 +1262,43 @@
                 valeur_sociale: parseFloat(document.getElementById('valeur-sociale').value),
                 cout_variable: parseFloat(document.getElementById('cout-variable').value),
             };
+
+            // Ajouter les paramètres avancés si mode custom
+            if (params.scenario_fuites === 'custom') {
+                params.prevalence_petites_pct = parseFloat(document.getElementById('prevalence-petites').value);
+                params.debit_petites_m3 = parseFloat(document.getElementById('debit-petites').value);
+                params.prevalence_grosses_pct = parseFloat(document.getElementById('prevalence-grosses').value);
+                params.debit_grosses_m3 = parseFloat(document.getElementById('debit-grosses').value);
+                params.taux_detection_pct = parseFloat(document.getElementById('taux-detection').value);
+                params.taux_reparation_pct = parseFloat(document.getElementById('taux-reparation').value);
+                params.delai_detection_mois = parseFloat(document.getElementById('delai-detection').value);
+                params.taux_nouvelles_fuites_pct = parseFloat(document.getElementById('nouvelles-fuites').value);
+                params.part_persistantes_pct = parseFloat(document.getElementById('persistantes').value);
+            }
+
+            return params;
+        }
+
+        function onScenarioFuitesChange() {
+            const scenario = document.getElementById('scenario-fuites').value;
+            const advancedSection = document.getElementById('advanced-fuites');
+
+            if (scenario === 'custom') {
+                advancedSection.style.display = 'block';
+                document.getElementById('content-fuites').classList.add('open');
+                document.getElementById('chevron-fuites').classList.add('open');
+            } else {
+                advancedSection.style.display = 'none';
+            }
+
+            onParamChange();
+        }
+
+        function toggleAdvanced() {
+            const content = document.getElementById('content-fuites');
+            const chevron = document.getElementById('chevron-fuites');
+            content.classList.toggle('open');
+            chevron.classList.toggle('open');
         }
 
         async function apiCall(endpoint, data = null) {
@@ -1098,6 +1343,17 @@
             document.getElementById('val-valeur-sociale').textContent = parseFloat(document.getElementById('valeur-sociale').value).toFixed(2) + ' $/m³';
             document.getElementById('val-cout-variable').textContent = parseFloat(document.getElementById('cout-variable').value).toFixed(2) + ' $/m³';
 
+            // Labels paramètres avancés fuites
+            document.getElementById('val-prevalence-petites').textContent = document.getElementById('prevalence-petites').value + ' %';
+            document.getElementById('val-debit-petites').textContent = document.getElementById('debit-petites').value + ' m³/an';
+            document.getElementById('val-prevalence-grosses').textContent = document.getElementById('prevalence-grosses').value + ' %';
+            document.getElementById('val-debit-grosses').textContent = document.getElementById('debit-grosses').value + ' m³/an';
+            document.getElementById('val-taux-detection').textContent = document.getElementById('taux-detection').value + ' %';
+            document.getElementById('val-taux-reparation').textContent = document.getElementById('taux-reparation').value + ' %';
+            document.getElementById('val-delai-detection').textContent = parseFloat(document.getElementById('delai-detection').value).toFixed(1) + ' mois';
+            document.getElementById('val-nouvelles-fuites').textContent = document.getElementById('nouvelles-fuites').value + ' %';
+            document.getElementById('val-persistantes').textContent = document.getElementById('persistantes').value + ' %';
+
             document.getElementById('cout-reseau-group').style.display =
                 document.getElementById('type-compteur').value === 'ami' ? 'block' : 'none';
         }
@@ -1108,18 +1364,22 @@
                 const result = await apiCall('/api/calculate', params);
                 updateDisplay(result);
 
-                const [sensitivity, meters, persistence] = await Promise.all([
+                const [sensitivity, meters, persistence, detailed] = await Promise.all([
                     apiCall('/api/sensitivity', params),
                     apiCall('/api/compare_meters', params),
                     apiCall('/api/compare_persistence', params),
+                    apiCall('/api/detailed_series', params),
                 ]);
 
                 updateSensitivityChart(sensitivity);
                 updateMetersChart(meters);
                 updatePersistenceChart(persistence, result);
+                updateDetailedCharts(detailed);
+                updateParamsTables(detailed);
                 await updatePerspectivesChart(params);
 
             } catch (e) {
+                console.error('Model update error:', e);
                 const recEl = document.getElementById('recommendation');
                 recEl.className = 'recommendation negative';
                 recEl.innerHTML = `
@@ -1222,6 +1482,60 @@
             charts.persistance.data.datasets[1].data = data.realiste.van_cumulative.map(v => v / 1e6);
             charts.persistance.data.datasets[2].data = data.pessimiste.van_cumulative.map(v => v / 1e6);
             charts.persistance.update('none');
+        }
+
+        function updateDetailedCharts(data) {
+            // Graphique dynamique des fuites
+            charts.fuites.data.labels = data.annees;
+            charts.fuites.data.datasets[0].data = data.stock_fuites_pct;
+            charts.fuites.update('none');
+
+            // Graphique décomposition des économies
+            charts.decomposition.data.labels = data.annees;
+            charts.decomposition.data.datasets[0].data = data.economies_comportement_m3;
+            charts.decomposition.data.datasets[1].data = data.economies_fuites_m3;
+            charts.decomposition.update('none');
+        }
+
+        function updateParamsTables(data) {
+            const pf = data.params_fuites;
+            const pp = data.params_persistance;
+
+            // Table paramètres fuites
+            const fuitesHtml = pf.mode_deux_stocks ? `
+                <tr><td>Mode</td><td>Deux stocks (petites + grosses)</td></tr>
+                <tr><td>Petites fuites</td><td>${pf.prevalence_petites_pct.toFixed(0)}% à ${pf.debit_petites_m3.toFixed(0)} m³/an</td></tr>
+                <tr><td>Grosses fuites</td><td>${pf.prevalence_grosses_pct.toFixed(1)}% à ${pf.debit_grosses_m3.toFixed(0)} m³/an</td></tr>
+                <tr><td>Taux détection AMI</td><td>${pf.taux_detection_pct.toFixed(0)}%</td></tr>
+                <tr><td>Taux réparation</td><td>${pf.taux_reparation_pct.toFixed(0)}%</td></tr>
+                <tr><td>Délai détection</td><td>${pf.delai_detection_mois.toFixed(1)} mois</td></tr>
+                <tr><td>Nouvelles fuites/an</td><td>${pf.taux_nouvelles_fuites_pct.toFixed(1)}%</td></tr>
+                <tr><td>Fuites persistantes</td><td>${pf.part_persistantes_pct.toFixed(0)}%</td></tr>
+                <tr><td><strong>Total réparations</strong></td><td><strong>${data.total_reparations.toLocaleString('fr-CA')}</strong></td></tr>
+            ` : `
+                <tr><td>Mode</td><td>Stock unique agrégé</td></tr>
+                <tr><td>Prévalence</td><td>${pf.prevalence_petites_pct.toFixed(0)}%</td></tr>
+                <tr><td>Débit moyen</td><td>${pf.debit_petites_m3.toFixed(0)} m³/an</td></tr>
+                <tr><td>Taux réparation</td><td>${pf.taux_reparation_pct.toFixed(0)}%</td></tr>
+                <tr><td><strong>Total réparations</strong></td><td><strong>${data.total_reparations.toLocaleString('fr-CA')}</strong></td></tr>
+            `;
+            document.getElementById('fuites-params-body').innerHTML = fuitesHtml;
+
+            // Table paramètres persistance
+            const modeNames = {
+                'CONSTANT': 'Constant (optimiste)',
+                'EXPONENTIEL_PLATEAU': 'Exponentiel avec plateau (réaliste)',
+                'FADEOUT_LINEAIRE': 'Fadeout linéaire (pessimiste)',
+            };
+            const modeName = modeNames[pp.mode] || pp.mode;
+
+            document.getElementById('persistance-params-body').innerHTML = `
+                <tr><td>Scénario</td><td>${pp.scenario}</td></tr>
+                <tr><td>Mode mathématique</td><td>${modeName}</td></tr>
+                <tr><td>α initial (année 1)</td><td>${pp.alpha_initial_pct.toFixed(1)}%</td></tr>
+                <tr><td>α plateau (long terme)</td><td>${pp.alpha_plateau_pct.toFixed(1)}%</td></tr>
+                <tr><td><strong>Économies eau totales</strong></td><td><strong>${(data.economies_eau_total_m3 / 1e6).toFixed(2)} Mm³</strong></td></tr>
+            `;
         }
 
         async function updatePerspectivesChart(params) {
@@ -1439,6 +1753,65 @@
                     scales: {
                         ...defaultOptions.scales,
                         y: { ...defaultOptions.scales.y, title: { display: true, text: 'M$', font: { family: 'Inter', weight: 600 } } }
+                    }
+                }
+            });
+
+            // Graphique dynamique des fuites
+            charts.fuites = new Chart(document.getElementById('chart-fuites').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '% ménages avec fuite active',
+                        data: [],
+                        borderColor: chartColors.danger,
+                        backgroundColor: 'rgba(239, 71, 111, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 2,
+                        borderWidth: 2.5
+                    }]
+                },
+                options: {
+                    ...defaultOptions,
+                    plugins: { ...defaultOptions.plugins, legend: { display: false } },
+                    scales: {
+                        ...defaultOptions.scales,
+                        x: { ...defaultOptions.scales.x, title: { display: true, text: 'Année', font: { family: 'Inter', weight: 600 } } },
+                        y: { ...defaultOptions.scales.y, title: { display: true, text: '% ménages', font: { family: 'Inter', weight: 600 } }, min: 0 }
+                    }
+                }
+            });
+
+            // Graphique décomposition des économies
+            charts.decomposition = new Chart(document.getElementById('chart-decomposition').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Comportement',
+                            data: [],
+                            backgroundColor: chartColors.primary,
+                            borderRadius: 4,
+                            stack: 'stack0'
+                        },
+                        {
+                            label: 'Détection fuites',
+                            data: [],
+                            backgroundColor: chartColors.secondary,
+                            borderRadius: 4,
+                            stack: 'stack0'
+                        }
+                    ]
+                },
+                options: {
+                    ...defaultOptions,
+                    scales: {
+                        ...defaultOptions.scales,
+                        x: { ...defaultOptions.scales.x, stacked: true, title: { display: true, text: 'Année', font: { family: 'Inter', weight: 600 } } },
+                        y: { ...defaultOptions.scales.y, stacked: true, title: { display: true, text: 'm³/ménage/an', font: { family: 'Inter', weight: 600 } } }
                     }
                 }
             });
