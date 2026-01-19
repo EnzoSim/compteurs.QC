@@ -606,12 +606,10 @@
         // CONFIGURATION
         // ============================================================
 
-        // URL de l'API - À MODIFIER selon le déploiement
-        // Local: 'http://localhost:8000'
-        // Render: 'https://votre-app.onrender.com'
+        // URL de l'API
         const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
             ? `http://${window.location.hostname}:8000`
-            : '';  // Même origine si déployé ensemble
+            : 'https://compteurs-qc.onrender.com';
 
         let modeEconomique = true;
         let debounceTimer = null;
