@@ -20,6 +20,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from typing import Optional, List
 import numpy as np
+import math
 
 # Import du modèle
 from analyse_compteurs_eau import (
@@ -561,23 +562,27 @@ async def detailed_series(req: CalculRequest):
         economies_fuites_par_an = list(resultats_fuites.economies_eau_par_an / req.nb_menages)
 
         # Stock de fuites restant (pourcentage du stock initial)
-        # Calcul simplifié: le stock diminue avec les réparations
-        stock_initial = (fuites.part_menages_fuite_any_pct if fuites.utiliser_prevalence_differenciee
-                        else fuites.part_menages_fuite_pct)
+        # Modèle: dL/dt = nouvelles - (détection × réparation) × L
+        # Solution: L(t) = L_eq + (L_0 - L_eq) × exp(-λt)
+        # où L_eq = nouvelles / λ et λ = taux_correction
 
-        # Estimation de l'évolution du stock
+        if fuites.utiliser_prevalence_differenciee:
+            # Deux stocks: petites + grosses
+            stock_initial = fuites.part_menages_fuite_any_pct + fuites.part_menages_fuite_significative_pct
+        else:
+            stock_initial = fuites.part_menages_fuite_pct
+
         taux_correction = (fuites.taux_detection_pct / 100) * (fuites.taux_reparation_pct / 100)
-        taux_nouvelles = fuites.taux_nouvelles_fuites_pct / 100
+        taux_nouvelles = fuites.taux_nouvelles_fuites_pct  # En % par an
+
+        # Équilibre à long terme
+        stock_equilibre = taux_nouvelles / taux_correction if taux_correction > 0 else stock_initial
 
         stock_fuites = []
-        stock_courant = stock_initial
         for t in range(1, req.horizon + 1):
-            # Stock diminue par les réparations mais augmente par les nouvelles fuites
-            # Équilibre vers: nouvelles / (réparations + naturelles)
-            stock_courant = stock_courant * (1 - taux_correction * 0.8) + taux_nouvelles * 100
-            stock_courant = max(taux_nouvelles * 100 / taux_correction if taux_correction > 0 else stock_initial * 0.2,
-                               stock_courant)
-            stock_fuites.append(stock_courant)
+            # Décroissance exponentielle vers l'équilibre
+            stock_t = stock_equilibre + (stock_initial - stock_equilibre) * math.exp(-taux_correction * t)
+            stock_fuites.append(stock_t)
 
         # Paramètres de fuites utilisés (pour affichage)
         params_fuites_info = {
