@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Viewer — Analyse Coûts-Bénéfices Compteurs d'Eau (Python Source)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #1a5f7a;
+            --primary-light: #2d8bba;
+            --secondary: #57c5b6;
+            --accent: #159895;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --border: #e2e8f0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            color: white;
+            padding: 1.5rem 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 1.75rem;
+            font-weight: 600;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 0.95rem;
+            margin-top: 0.25rem;
+        }
+
+        .badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin-top: 0.5rem;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 1.5rem;
+            padding: 1.5rem;
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 1200px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: 1px solid var(--border);
+        }
+
+        .card-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card-title::before {
+            content: '';
+            width: 4px;
+            height: 16px;
+            background: var(--secondary);
+            border-radius: 2px;
+        }
+
+        .input-group {
+            margin-bottom: 1rem;
+        }
+
+        .input-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-light);
+            margin-bottom: 0.35rem;
+        }
+
+        select {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background: white;
+            cursor: pointer;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(26,95,122,0.1);
+        }
+
+        .main {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .metric-card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 1.25rem;
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .metric-card.highlight {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            color: white;
+            border: none;
+        }
+
+        .metric-card.highlight .metric-label {
+            color: rgba(255,255,255,0.85);
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .metric-label {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 0.25rem;
+        }
+
+        .metric-card.positive .metric-value { color: var(--success); }
+        .metric-card.negative .metric-value { color: var(--danger); }
+        .metric-card.warning .metric-value { color: var(--warning); }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 1000px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .chart-container {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 1.25rem;
+            border: 1px solid var(--border);
+        }
+
+        .chart-container h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text);
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+        }
+
+        .recommendation {
+            padding: 1rem 1.25rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            font-size: 0.95rem;
+        }
+
+        .recommendation.positive {
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            color: #065f46;
+        }
+
+        .recommendation.negative {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+        }
+
+        .recommendation.warning {
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            color: #92400e;
+        }
+
+        .breakdown-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            margin-top: 1rem;
+        }
+
+        .breakdown-table th,
+        .breakdown-table td {
+            padding: 0.5rem 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .breakdown-table th {
+            background: var(--bg);
+            font-weight: 600;
+            color: var(--text-light);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+
+        .breakdown-table td:last-child {
+            text-align: right;
+            font-family: 'SF Mono', 'Consolas', monospace;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 1.5rem;
+            color: var(--text-light);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border);
+            margin-top: 1rem;
+        }
+
+        .footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: var(--text-light);
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0;
+        }
+
+        .toggle {
+            position: relative;
+            width: 48px;
+            height: 26px;
+            background: var(--border);
+            border-radius: 13px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle.active {
+            background: var(--primary);
+        }
+
+        .toggle::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .toggle.active::after {
+            transform: translateX(22px);
+        }
+
+        .toggle-label {
+            font-size: 0.85rem;
+            color: var(--text-light);
+        }
+
+        .info-box {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 8px;
+            padding: 0.75rem;
+            font-size: 0.8rem;
+            color: #0369a1;
+            margin-top: 0.5rem;
+        }
+
+        .scenario-key {
+            font-family: 'SF Mono', 'Consolas', monospace;
+            font-size: 0.75rem;
+            color: var(--text-light);
+            background: var(--bg);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            margin-top: 0.5rem;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Viewer — Analyse Coûts-Bénéfices Compteurs d'Eau</h1>
+        <p>Résultats précalculés par le modèle Python v3.10</p>
+        <div class="badge">Option A: Python = Source unique de vérité</div>
+    </div>
+
+    <div class="container">
+        <div class="sidebar">
+            <!-- Sélecteurs -->
+            <div class="card">
+                <div class="card-title">Configuration du scénario</div>
+
+                <div class="input-group">
+                    <label>Ville</label>
+                    <select id="select-ville" onchange="updateDisplay()">
+                        <option value="longueuil">Longueuil</option>
+                        <option value="montreal">Montréal</option>
+                        <option value="quebec">Québec (ville)</option>
+                        <option value="winnipeg">Winnipeg</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label>Type de compteur</label>
+                    <select id="select-compteur" onchange="updateDisplay()">
+                        <option value="ami">AMI (intelligent)</option>
+                        <option value="amr">AMR (lecture auto)</option>
+                        <option value="manuel">Manuel</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label>Scénario de persistance</label>
+                    <select id="select-persistance" onchange="updateDisplay()">
+                        <option value="optimiste">Optimiste (effet constant)</option>
+                        <option value="realiste" selected>Réaliste (plateau 2.5%)</option>
+                        <option value="pessimiste">Pessimiste (fadeout 10 ans)</option>
+                        <option value="ultra">Ultra-pessimiste (aucun effet)</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label>Scénario de fuites</label>
+                    <select id="select-fuites" onchange="updateDisplay()">
+                        <option value="standard">Standard (20%, 35 m³/an)</option>
+                        <option value="quebec">Contexte Québec (35%, 35 m³/an)</option>
+                        <option value="deux_stocks" selected>Deux-stocks Québec</option>
+                    </select>
+                </div>
+
+                <div class="toggle-container">
+                    <div class="toggle" id="mode-toggle" onclick="toggleMode()"></div>
+                    <span class="toggle-label" id="mode-label">Mode Économique (valeur sociale)</span>
+                </div>
+
+                <div class="scenario-key" id="scenario-key">—</div>
+            </div>
+
+            <!-- Info ville -->
+            <div class="card">
+                <div class="card-title">Données de la ville</div>
+                <div id="ville-info">
+                    <p><strong>Ménages:</strong> <span id="info-menages">—</span></p>
+                    <p><strong>Taille moyenne:</strong> <span id="info-taille">—</span> pers.</p>
+                    <p><strong>LPCD:</strong> <span id="info-lpcd">—</span> L/pers/jour</p>
+                </div>
+            </div>
+
+            <!-- Info compteur -->
+            <div class="card">
+                <div class="card-title">Paramètres du compteur</div>
+                <div id="compteur-info">
+                    <p><strong>Coût unitaire:</strong> <span id="info-cout-compteur">—</span> $</p>
+                    <p><strong>Installation:</strong> <span id="info-install">—</span>h × <span id="info-taux">—</span>$/h</p>
+                    <p><strong>Coût réseau:</strong> <span id="info-reseau">—</span> $/compteur</p>
+                </div>
+            </div>
+
+            <!-- Métadonnées -->
+            <div class="card">
+                <div class="card-title">Métadonnées</div>
+                <div id="metadata-info">
+                    <p><strong>Version modèle:</strong> <span id="info-version">—</span></p>
+                    <p><strong>Généré le:</strong> <span id="info-date">—</span></p>
+                    <p><strong>Scénarios:</strong> <span id="info-nb-scenarios">—</span></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="main">
+            <!-- Loading -->
+            <div class="loading" id="loading">
+                Chargement des données...
+            </div>
+
+            <!-- Métriques principales -->
+            <div class="metrics-grid" id="metrics-grid" style="display: none;">
+                <div class="metric-card highlight">
+                    <div class="metric-value" id="metric-van">—</div>
+                    <div class="metric-label">VAN (20 ans)</div>
+                </div>
+                <div class="metric-card positive">
+                    <div class="metric-value" id="metric-rbc">—</div>
+                    <div class="metric-label">Ratio B/C</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="metric-payback">—</div>
+                    <div class="metric-label">Récupération (ans)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="metric-lcsw">—</div>
+                    <div class="metric-label">LCSW ($/m³)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="metric-invest">—</div>
+                    <div class="metric-label">Investissement</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="metric-economies">—</div>
+                    <div class="metric-label">Économies (m³/ménage/an)</div>
+                </div>
+            </div>
+
+            <!-- Recommandation -->
+            <div class="recommendation positive" id="recommendation" style="display: none;">
+                —
+            </div>
+
+            <!-- Graphiques -->
+            <div class="charts-grid" id="charts-grid" style="display: none;">
+                <div class="chart-container">
+                    <h3>VAN Cumulative</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-van"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <h3>Comparaison Types de Compteurs</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-types"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <h3>Scénarios de Persistance</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-persistance"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <h3>Sensibilité des Paramètres (Tornado)</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-sensitivity"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <h3>Courbes α Comportement</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-alpha"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <h3>Économique vs Financier</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-perspectives"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Détail des flux -->
+            <div class="card" id="breakdown-card" style="display: none;">
+                <div class="card-title">Détail des flux (calculés par Python)</div>
+                <table class="breakdown-table">
+                    <thead>
+                        <tr>
+                            <th>Composante</th>
+                            <th>Valeur</th>
+                        </tr>
+                    </thead>
+                    <tbody id="breakdown-body">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Modèle développé par Enzo Simier (HEC Montréal) — Projet Mitacs / Réseau Environnement<br>
+        <strong>Option A:</strong> Résultats précalculés par Python — HTML = Viewer seulement<br>
+        Sources: SQEEP 2023, Davies (2014), AWE (2023), Allcott & Rogers (2014)
+    </div>
+
+    <script>
+        // ============================================================
+        // STATE & DATA
+        // ============================================================
+
+        let data = null;
+        let modeEconomique = true;
+
+        let chartVAN, chartTypes, chartPersistance, chartSensitivity, chartAlpha, chartPerspectives;
+
+        // ============================================================
+        // DATA LOADING
+        // ============================================================
+
+        async function loadData() {
+            try {
+                const response = await fetch('scenarios_output.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                data = await response.json();
+                console.log('Data loaded:', Object.keys(data.scenarios).length, 'scenarios');
+
+                // Update metadata
+                document.getElementById('info-version').textContent = data.metadata.model_version;
+                document.getElementById('info-date').textContent = new Date(data.metadata.generated_at).toLocaleDateString('fr-CA');
+                document.getElementById('info-nb-scenarios').textContent = Object.keys(data.scenarios).length;
+
+                // Hide loading, show content
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('metrics-grid').style.display = 'grid';
+                document.getElementById('recommendation').style.display = 'block';
+                document.getElementById('charts-grid').style.display = 'grid';
+                document.getElementById('breakdown-card').style.display = 'block';
+
+                // Initialize charts
+                initCharts();
+
+                // Initial display
+                updateDisplay();
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('loading').textContent =
+                    'Erreur: Impossible de charger scenarios_output.json. Exécutez d\'abord: python generate_scenarios_json.py';
+            }
+        }
+
+        // ============================================================
+        // DISPLAY FUNCTIONS
+        // ============================================================
+
+        function formatMoney(value) {
+            if (Math.abs(value) >= 1e9) {
+                return (value / 1e9).toFixed(1) + ' G$';
+            } else if (Math.abs(value) >= 1e6) {
+                return (value / 1e6).toFixed(1) + ' M$';
+            } else if (Math.abs(value) >= 1e3) {
+                return (value / 1e3).toFixed(0) + ' k$';
+            }
+            return value.toFixed(0) + ' $';
+        }
+
+        function getScenarioKey() {
+            const ville = document.getElementById('select-ville').value;
+            const compteur = document.getElementById('select-compteur').value;
+            const persistance = document.getElementById('select-persistance').value;
+            const fuites = document.getElementById('select-fuites').value;
+            const mode = modeEconomique ? 'eco' : 'fin';
+
+            return `${ville}_${compteur}_${persistance}_${fuites}_${mode}`;
+        }
+
+        function updateDisplay() {
+            if (!data) return;
+
+            const key = getScenarioKey();
+            document.getElementById('scenario-key').textContent = key;
+
+            const scenario = data.scenarios[key];
+            if (!scenario) {
+                console.error('Scenario not found:', key);
+                return;
+            }
+
+            // Update ville info
+            const ville = document.getElementById('select-ville').value;
+            const villeInfo = data.presets.villes[ville];
+            if (villeInfo) {
+                document.getElementById('info-menages').textContent = villeInfo.nb_menages.toLocaleString('fr-CA');
+                document.getElementById('info-taille').textContent = villeInfo.taille_menage.toFixed(2);
+                document.getElementById('info-lpcd').textContent = villeInfo.lpcd;
+            }
+
+            // Update compteur info
+            const compteur = document.getElementById('select-compteur').value;
+            const compteurInfo = data.presets.compteurs[compteur];
+            if (compteurInfo) {
+                document.getElementById('info-cout-compteur').textContent = compteurInfo.cout_compteur;
+                document.getElementById('info-install').textContent = compteurInfo.heures_installation;
+                document.getElementById('info-taux').textContent = compteurInfo.taux_horaire;
+                document.getElementById('info-reseau').textContent = compteurInfo.cout_reseau;
+            }
+
+            // Update metrics
+            document.getElementById('metric-van').textContent = formatMoney(scenario.van);
+            document.getElementById('metric-rbc').textContent = scenario.rbc.toFixed(2);
+            document.getElementById('metric-payback').textContent = scenario.payback ? scenario.payback.toFixed(1) : '>20';
+            document.getElementById('metric-lcsw').textContent = scenario.lcsw.toFixed(2);
+            document.getElementById('metric-invest').textContent = formatMoney(scenario.investissement_initial);
+            document.getElementById('metric-economies').textContent = scenario.economie_totale_menage.toFixed(1);
+
+            // Update RBC card color
+            const rbcCard = document.getElementById('metric-rbc').parentElement;
+            rbcCard.className = 'metric-card ' + (scenario.rbc >= 1 ? 'positive' : 'negative');
+
+            // Update recommendation
+            const recEl = document.getElementById('recommendation');
+            if (scenario.van > 0 && scenario.rbc > 1) {
+                recEl.className = 'recommendation positive';
+                recEl.innerHTML = `<strong>PROJET ÉCONOMIQUEMENT VIABLE</strong> — Les bénéfices dépassent les coûts.
+                    Le projet génère une valeur nette positive de ${formatMoney(scenario.van)} sur 20 ans
+                    avec un retour sur investissement en ${scenario.payback ? scenario.payback.toFixed(1) : '>20'} ans.`;
+            } else if (scenario.van > 0) {
+                recEl.className = 'recommendation warning';
+                recEl.innerHTML = `<strong>PROJET MARGINAL</strong> — La VAN est positive mais le ratio B/C est faible.
+                    Attention aux risques et aux hypothèses.`;
+            } else {
+                recEl.className = 'recommendation negative';
+                recEl.innerHTML = `<strong>PROJET NON RENTABLE</strong> — La VAN est négative (${formatMoney(scenario.van)}).
+                    Considérer: augmenter la valeur de l'eau, réduire les coûts, ou revoir les hypothèses.`;
+            }
+
+            // Update breakdown table
+            const tbody = document.getElementById('breakdown-body');
+            tbody.innerHTML = `
+                <tr><td>Bénéfices eau (VA)</td><td>${formatMoney(scenario.va_benefices)}</td></tr>
+                <tr><td>Investissement initial</td><td>${formatMoney(-scenario.investissement_initial)}</td></tr>
+                <tr><td>Coûts exploitation (VA)</td><td>${formatMoney(-scenario.va_couts_exploitation)}</td></tr>
+                <tr><td>Économie comportement/ménage</td><td>${scenario.economie_comportement_menage.toFixed(2)} m³/an</td></tr>
+                <tr><td>Économie fuites/ménage</td><td>${scenario.economie_fuite_menage.toFixed(2)} m³/an</td></tr>
+                <tr><td>Usage base/ménage</td><td>${scenario.usage_base_menage.toFixed(1)} m³/an</td></tr>
+                <tr><td>Coût par compteur</td><td>${scenario.cout_par_compteur.toFixed(0)} $</td></tr>
+                <tr style="font-weight:600;border-top:2px solid var(--primary)">
+                    <td>Valeur Actualisée Nette</td><td>${formatMoney(scenario.van)}</td>
+                </tr>
+            `;
+
+            // Update charts
+            updateCharts();
+        }
+
+        function toggleMode() {
+            modeEconomique = !modeEconomique;
+            const toggle = document.getElementById('mode-toggle');
+            const label = document.getElementById('mode-label');
+
+            if (modeEconomique) {
+                toggle.classList.remove('active');
+                label.textContent = 'Mode Économique (valeur sociale)';
+            } else {
+                toggle.classList.add('active');
+                label.textContent = 'Mode Financier (coût variable)';
+            }
+
+            updateDisplay();
+        }
+
+        // ============================================================
+        // CHARTS
+        // ============================================================
+
+        function initCharts() {
+            // 1. VAN Cumulative
+            chartVAN = new Chart(document.getElementById('chart-van').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'VAN Cumulative',
+                        data: [],
+                        borderColor: '#1a5f7a',
+                        backgroundColor: 'rgba(26, 95, 122, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { title: { display: true, text: 'Année' } },
+                        y: { title: { display: true, text: 'M$' }, grid: { color: 'rgba(0,0,0,0.05)' } }
+                    }
+                }
+            });
+
+            // 2. Comparaison Types de Compteurs
+            chartTypes = new Chart(document.getElementById('chart-types').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['AMI', 'AMR', 'Manuel'],
+                    datasets: [
+                        { label: 'VAN (M$)', data: [], backgroundColor: ['#1a5f7a', '#2d8bba', '#57c5b6'] }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: ctx => `VAN: ${ctx.parsed.y.toFixed(1)} M$` } }
+                    },
+                    scales: {
+                        y: { title: { display: true, text: 'VAN (M$)' }, grid: { color: 'rgba(0,0,0,0.05)' } }
+                    }
+                }
+            });
+
+            // 3. Scénarios de Persistance
+            chartPersistance = new Chart(document.getElementById('chart-persistance').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'Optimiste', data: [], borderColor: '#10b981', tension: 0.4, pointRadius: 0, borderWidth: 2 },
+                        { label: 'Réaliste', data: [], borderColor: '#3b82f6', tension: 0.4, pointRadius: 0, borderWidth: 2 },
+                        { label: 'Pessimiste', data: [], borderColor: '#ef4444', tension: 0.4, pointRadius: 0, borderWidth: 2 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: 'Année' } },
+                        y: { title: { display: true, text: 'VAN (M$)' }, grid: { color: 'rgba(0,0,0,0.05)' } }
+                    }
+                }
+            });
+
+            // 4. Sensibilité (Tornado)
+            chartSensitivity = new Chart(document.getElementById('chart-sensitivity').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: '-10%', data: [], backgroundColor: '#ef4444' },
+                        { label: '+10%', data: [], backgroundColor: '#10b981' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => `${ctx.dataset.label}: ${ctx.parsed.x >= 0 ? '+' : ''}${ctx.parsed.x.toFixed(1)} M$`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { title: { display: true, text: 'Impact sur VAN (M$)' }, grid: { color: 'rgba(0,0,0,0.05)' } }
+                    }
+                }
+            });
+
+            // 5. Courbes Alpha
+            chartAlpha = new Chart(document.getElementById('chart-alpha').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'Optimiste', data: [], borderColor: '#10b981', tension: 0.4, pointRadius: 0 },
+                        { label: 'Réaliste', data: [], borderColor: '#3b82f6', tension: 0.4, pointRadius: 0 },
+                        { label: 'Pessimiste', data: [], borderColor: '#ef4444', tension: 0.4, pointRadius: 0 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: 'Année' } },
+                        y: { title: { display: true, text: 'α (%)' }, min: 0, max: 10, grid: { color: 'rgba(0,0,0,0.05)' } }
+                    }
+                }
+            });
+
+            // 6. Économique vs Financier
+            chartPerspectives = new Chart(document.getElementById('chart-perspectives').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['Bénéfices', 'Coûts', 'VAN'],
+                    datasets: [
+                        { label: 'Économique', data: [], backgroundColor: '#1a5f7a' },
+                        { label: 'Financier', data: [], backgroundColor: '#57c5b6' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)} M$` } }
+                    },
+                    scales: {
+                        y: { title: { display: true, text: 'M$' }, grid: { color: 'rgba(0,0,0,0.05)' } }
+                    }
+                }
+            });
+        }
+
+        function updateCharts() {
+            if (!data) return;
+
+            const ville = document.getElementById('select-ville').value;
+            const compteur = document.getElementById('select-compteur').value;
+            const persistance = document.getElementById('select-persistance').value;
+            const fuites = document.getElementById('select-fuites').value;
+            const mode = modeEconomique ? 'eco' : 'fin';
+
+            const key = `${ville}_${compteur}_${persistance}_${fuites}_${mode}`;
+            const scenario = data.scenarios[key];
+
+            if (!scenario) return;
+
+            // 1. VAN Cumulative
+            chartVAN.data.labels = scenario.annees;
+            chartVAN.data.datasets[0].data = scenario.van_cumulative.map(v => v / 1e6);
+            chartVAN.update('none');
+
+            // 2. Comparaison Types de Compteurs
+            const meterTypes = ['ami', 'amr', 'manuel'];
+            const meterVANs = meterTypes.map(type => {
+                const k = `${ville}_${type}_${persistance}_${fuites}_${mode}`;
+                return (data.scenarios[k]?.van || 0) / 1e6;
+            });
+            chartTypes.data.datasets[0].data = meterVANs;
+            chartTypes.update('none');
+
+            // 3. Scénarios de Persistance
+            const persistScenarios = ['optimiste', 'realiste', 'pessimiste'];
+            persistScenarios.forEach((scen, idx) => {
+                const k = `${ville}_${compteur}_${scen}_${fuites}_${mode}`;
+                const s = data.scenarios[k];
+                if (s) {
+                    chartPersistance.data.labels = s.annees;
+                    chartPersistance.data.datasets[idx].data = s.van_cumulative.map(v => v / 1e6);
+                }
+            });
+            chartPersistance.update('none');
+
+            // 4. Sensibilité
+            const sensitivity = data.sensibilite.parametres;
+            chartSensitivity.data.labels = sensitivity.map(s => s.nom);
+            chartSensitivity.data.datasets[0].data = sensitivity.map(s => s.impact_low / 1e6);
+            chartSensitivity.data.datasets[1].data = sensitivity.map(s => s.impact_high / 1e6);
+            chartSensitivity.update('none');
+
+            // 5. Courbes Alpha
+            const years = Array.from({length: 20}, (_, i) => i + 1);
+            chartAlpha.data.labels = years;
+            ['optimiste', 'realiste', 'pessimiste'].forEach((scen, idx) => {
+                const alphas = data.courbes_alpha[scen]?.map(a => a * 100) || [];
+                chartAlpha.data.datasets[idx].data = alphas;
+            });
+            chartAlpha.update('none');
+
+            // 6. Économique vs Financier
+            const keyEco = `${ville}_${compteur}_${persistance}_${fuites}_eco`;
+            const keyFin = `${ville}_${compteur}_${persistance}_${fuites}_fin`;
+            const sEco = data.scenarios[keyEco];
+            const sFin = data.scenarios[keyFin];
+            if (sEco && sFin) {
+                chartPerspectives.data.datasets[0].data = [sEco.va_benefices / 1e6, sEco.va_couts_totaux / 1e6, sEco.van / 1e6];
+                chartPerspectives.data.datasets[1].data = [sFin.va_benefices / 1e6, sFin.va_couts_totaux / 1e6, sFin.van / 1e6];
+            }
+            chartPerspectives.update('none');
+        }
+
+        // ============================================================
+        // INITIALIZATION
+        // ============================================================
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+        });
+    </script>
+</body>
+</html>
