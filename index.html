@@ -1336,16 +1336,24 @@
                 data: {
                     labels: [],
                     datasets: [
-                        { label: '-10%', data: [], backgroundColor: chartColors.danger, borderRadius: 4 },
-                        { label: '+10%', data: [], backgroundColor: chartColors.success, borderRadius: 4 }
+                        { label: '-10%', data: [], backgroundColor: chartColors.danger, borderRadius: 4, barPercentage: 0.8, categoryPercentage: 0.9 },
+                        { label: '+10%', data: [], backgroundColor: chartColors.success, borderRadius: 4, barPercentage: 0.8, categoryPercentage: 0.9 }
                     ]
                 },
                 options: {
                     ...defaultOptions,
                     indexAxis: 'y',
                     scales: {
-                        x: { ...defaultOptions.scales.x, title: { display: true, text: 'Impact sur VAN (M$)', font: { family: 'Inter', weight: 600 } } },
-                        y: { ...defaultOptions.scales.y, ticks: { font: { family: 'Inter', size: 10 } } }
+                        x: {
+                            ...defaultOptions.scales.x,
+                            stacked: true,
+                            title: { display: true, text: 'Impact sur VAN (M$)', font: { family: 'Inter', weight: 600 } }
+                        },
+                        y: {
+                            ...defaultOptions.scales.y,
+                            stacked: true,
+                            ticks: { font: { family: 'Inter', size: 10 } }
+                        }
                     }
                 }
             });
