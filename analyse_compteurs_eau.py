@@ -899,18 +899,48 @@ class ParametresCompteur:
     facteur_efficacite_fuites: float = 1.0        # Multiplicateur détection fuites
 
     def __post_init__(self):
-        """Appliquer les facteurs d'efficacité par défaut selon le type de compteur."""
+        """Appliquer les facteurs d'efficacité par défaut selon le type de compteur.
+
+        Justification des facteurs (janvier 2026):
+        ------------------------------------------
+
+        AMI (référence = 1.0):
+        - Détection fuites en temps réel (horaire), alertes proactives aux clients
+        - EBMUD California: -20% consommation avec AMI (Water Online, 2024)
+        - AWE Study: fuites résolues 116h plus tôt avec alertes AMI
+        - American Water pilot: non-revenue water 25% → 12%
+
+        AMR (facteurs réduits vs estimations initiales):
+        - Lecture mensuelle/trimestrielle, PAS de détection temps réel
+        - Une fuite peut couler 30+ jours avant détection vs ~1 jour AMI
+        - Pas d'alertes proactives aux clients → moins de changement comportemental
+        - Sources:
+          * Badger Meter: "AMR systems aren't able to fully eliminate leaks"
+          * EPA WaterSense: AMI "quickly identify leaks" vs AMR periodic reads
+          * Texas Water Utilities: NRW 92%→38% seulement possible avec AMI
+
+        Manuel (facteurs les plus bas):
+        - Lecture annuelle/semestrielle, aucune détection proactive
+        - Client découvre fuite seulement via facture élevée (délai 3-6 mois)
+        - Aucun feedback comportemental entre les lectures
+        """
         # Ne pas écraser si des valeurs personnalisées ont été fournies
         if self.facteur_efficacite_comportement == 1.0 and self.facteur_efficacite_fuites == 1.0:
             if self.type_compteur == TypeCompteur.MANUEL:
-                # Manuel: ~5% réduction vs 8% AMI, ~65% détection vs 85% AMI
-                self.facteur_efficacite_comportement = 0.625
-                self.facteur_efficacite_fuites = 0.765
+                # Manuel: lecture annuelle, détection très tardive des fuites
+                # Comportement: 40% de l'effet AMI (pas de feedback régulier)
+                # Fuites: 30% de l'effet AMI (délai détection 3-6 mois vs 1 jour)
+                self.facteur_efficacite_comportement = 0.40
+                self.facteur_efficacite_fuites = 0.30
             elif self.type_compteur == TypeCompteur.AMR:
-                # AMR: ~7% réduction vs 8% AMI, ~77% détection vs 85% AMI
-                self.facteur_efficacite_comportement = 0.875
-                self.facteur_efficacite_fuites = 0.91
-            # AMI: facteurs = 1.0 (référence, pas de modification)
+                # AMR: lecture mensuelle, pas d'alertes temps réel
+                # Comportement: 60% de l'effet AMI (feedback mensuel vs continu)
+                # Fuites: 50% de l'effet AMI (délai détection ~30j vs 1j)
+                # Ratio basé sur: délai détection AMR/AMI ≈ 30j/1j, mais certaines
+                # fuites grosses détectées quand même → facteur 0.50 pas 0.03
+                self.facteur_efficacite_comportement = 0.60
+                self.facteur_efficacite_fuites = 0.50
+            # AMI: facteurs = 1.0 (référence, détection temps réel)
         if self.cout_opex_non_tech_ami < 0:
             raise ValueError("cout_opex_non_tech_ami doit être >= 0")
 
