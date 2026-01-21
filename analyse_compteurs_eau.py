@@ -270,59 +270,77 @@ class ParametresValeurEau:
     Paramètres de valorisation de l'eau selon la perspective d'analyse.
 
     Cette structure permet de séparer clairement:
-    - La valeur SOCIALE de l'eau (pour l'analyse économique)
-    - Le coût VARIABLE évité (pour l'analyse financière)
+    - Le COÛT COMPLET de fourniture (Full Financial Cost) pour l'analyse économique
+    - Le coût VARIABLE évité (pour l'analyse financière municipale)
 
     La distinction est cruciale car:
-    - Valeur sociale >> coût variable (externalités, rareté, infrastructure)
+    - Coût complet >> coût variable (inclut OPEX fixe + CAPEX)
     - Un projet peut être socialement rentable mais financièrement déficitaire
       (justifiant une subvention publique)
 
     Valeurs par défaut calibrées pour le Québec:
-    - Valeur sociale: 4.69 $/m³ (décomposition explicite ci-dessous)
+    - Coût complet: 4.69 $/m³ (source: MAMH/SQEEP 2019-2025)
     - Coût variable: 0.50 $/m³ (chimie, énergie, pompage - OPEX variable)
 
-    DÉCOMPOSITION DE LA VALEUR SOCIALE (v3.9):
-    ─────────────────────────────────────────────
-    La valeur sociale de 4.69 $/m³ se décompose en trois composantes:
+    DÉCOMPOSITION DU COÛT COMPLET (v3.11 - corrigé janvier 2026):
+    ───────────────────────────────────────────────────────────────
+    Le coût de 4.69 $/m³ est le COÛT FINANCIER COMPLET de fourniture
+    du service d'eau (Full Financial Cost), PAS une "valeur sociale"
+    avec externalités environnementales.
 
-    1. COÛT VARIABLE (0.50 $/m³)
+    Source: MAMH, Stratégie québécoise d'économie d'eau potable 2019-2025
+    https://www.quebec.ca/gouvernement/ministere/affaires-municipales/publications/strategie-economie-potable
+    "Le coût unitaire des services d'eau équivaut à 4,69 $/m³"
+    "Les besoins en investissements représentent 63% du coût total"
+
+    1. OPEX VARIABLE (0.50 $/m³) — 11% du coût total
        - Chimie de traitement eau potable et eaux usées
        - Énergie de pompage (distribution et collecte)
        - Consommables et coûts variables d'exploitation
-       Source: MAMH rapports financiers municipaux; Winnipeg water audit
+       Source: MAMH rapports financiers municipaux
 
-    2. COÛT INFRASTRUCTURE REPORTÉ (1.69 $/m³)
-       - Amortissement reporté des usines (eau potable + eaux usées)
+    2. OPEX FIXE (1.24 $/m³) — 26% du coût total
+       - Salaires des employés (cols bleus, ingénieurs, admin)
+       - Chauffage/entretien des usines de traitement
+       - Analyses laboratoire, frais administratifs
+       - Maintenance courante (non capitalisable)
+       Note: Coûts engagés peu importe le volume produit
+
+    3. CAPEX / COÛTS EN CAPITAL (2.95 $/m³) — 63% du coût total
+       - Amortissement des actifs (usines, conduites, réservoirs)
+       - Service de la dette municipale (eau/égout)
+       - Déficit d'entretien accumulé (rattrapage infrastructures)
        - Capacité évitée dans les agrandissements futurs
-       - Réduction des pointes (dimensionnement des réservoirs/conduites)
-       Source: Coût moyen pondéré d'infrastructure eau/égout au Québec
+       Source: MAMH "63% du coût total = besoins en investissements"
 
-    3. EXTERNALITÉS ENVIRONNEMENTALES (2.50 $/m³)
-       - Valeur de non-usage des ressources hydriques
-       - Coût carbone de traitement/pompage évité (~50g CO2/m³ × 150$/t)
-       - Services écosystémiques (qualité des cours d'eau récepteurs)
-       - Résilience climatique (adaptation aux sécheresses)
-       Source: MELCCFP méthodologie évaluation environnementale
+    TOTAL: 0.50 + 1.24 + 2.95 = 4.69 $/m³
 
-    TOTAL: 0.50 + 1.69 + 2.50 = 4.69 $/m³
+    NOTE MÉTHODOLOGIQUE:
+    ────────────────────
+    Ce 4.69 $ n'inclut PAS d'externalités environnementales explicites.
+    C'est le coût comptable réel pour les municipalités. L'argument
+    économique est: "Chaque m³ économisé = 4.69 $ de coûts évités pour
+    la ville, libérant des fonds pour d'autres services publics."
+
+    Si vous souhaitez ajouter des externalités environnementales
+    (carbone, écosystèmes), utilisez VALEUR_EAU_RARETE qui inclut
+    une prime de rareté/environnement.
     """
-    # === ANALYSE ÉCONOMIQUE ===
-    # Valeur sociale = coût variable + infrastructure + externalités
-    # Voir décomposition ci-dessus pour les sources et justifications
+    # === COÛT COMPLET DE FOURNITURE (Full Financial Cost) ===
+    # Voir décomposition MAMH/SQEEP ci-dessus
 
-    # Composante 1: Coûts variables de production
+    # Composante 1: OPEX Variable (11%)
     cout_variable_m3: float = 0.50  # $/m³ — chimie, énergie, consommables
 
-    # Composante 2: Coût d'infrastructure reporté (CAPEX amorti évité)
-    cout_infrastructure_m3: float = 1.69  # $/m³ — amortissement, capacité évitée
+    # Composante 2: OPEX Fixe (26%)
+    cout_opex_fixe_m3: float = 1.24  # $/m³ — salaires, admin, maintenance courante
 
-    # Composante 3: Externalités environnementales
-    valeur_externalites_m3: float = 2.50  # $/m³ — environnement, carbone, résilience
+    # Composante 3: CAPEX / Coûts en capital (63%)
+    cout_capex_m3: float = 2.95  # $/m³ — amortissement, dette, déficit entretien
 
-    # Valeur sociale totale (somme des composantes)
+    # Coût complet total (somme des composantes)
     # Note: Peut être surchargée directement si on a une valeur calibrée différente
-    valeur_sociale_m3: float = 4.69  # $/m³ — cout_variable + infra + externalités
+    valeur_sociale_m3: float = 4.69  # $/m³ — OPEX var + OPEX fixe + CAPEX
 
     # Prix indicatif hors modèle (non utilisé sans tarification volumétrique)
     # Conservé pour compatibilité si une analyse tarifaire est ajoutée plus tard.
@@ -407,69 +425,90 @@ class ParametresValeurEau:
         """
         return cout * self.facteur_mcf(mode)
 
+    # === ALIAS DE RÉTROCOMPATIBILITÉ (v3.11) ===
+    # Ces propriétés permettent au code existant utilisant les anciens noms
+    # de continuer à fonctionner après la correction de nomenclature.
+
+    @property
+    def cout_infrastructure_m3(self) -> float:
+        """Alias rétrocompatible pour cout_capex_m3."""
+        return self.cout_capex_m3
+
+    @property
+    def valeur_externalites_m3(self) -> float:
+        """Alias rétrocompatible pour cout_opex_fixe_m3.
+
+        Note: L'ancien nom était incorrect - ce n'était pas des externalités
+        environnementales mais des coûts fixes opérationnels.
+        """
+        return self.cout_opex_fixe_m3
+
 
 # =============================================================================
 # PRESETS DE VALEURS D'EAU
 # =============================================================================
 
-# Valeurs par défaut (Québec, basées sur la littérature)
+# Valeurs par défaut (Québec, MAMH/SQEEP 2019-2025)
 VALEUR_EAU_QUEBEC = ParametresValeurEau(
-    # Décomposition de la valeur sociale (voir documentation ParametresValeurEau)
-    cout_variable_m3=0.50,       # OPEX variable (chimie, énergie, consommables)
-    cout_infrastructure_m3=1.69, # CAPEX amorti évité (usines, conduites)
-    valeur_externalites_m3=2.50, # Environnement, carbone, résilience
-    valeur_sociale_m3=4.69,      # Total = 0.50 + 1.69 + 2.50
-    prix_vente_m3=2.50,          # Prix indicatif hors modèle (non utilisé sans tarification)
-    mcf=0.20,                    # MCF Canada (Treasury Board 2007) — disponible pour sensibilité
-    appliquer_mcf=False,         # Désactivé par défaut (voir note dans ParametresValeurEau)
-    nom="Québec standard",
-    description="Valeurs calibrées pour les municipalités québécoises (MCF désactivé)",
+    # Décomposition du coût complet (voir documentation ParametresValeurEau)
+    # Source: MAMH "coût unitaire des services d'eau = 4,69 $/m³"
+    # Source: MAMH "63% du coût total = besoins en investissements (CAPEX)"
+    cout_variable_m3=0.50,       # OPEX variable (11%) — chimie, énergie
+    cout_opex_fixe_m3=1.24,      # OPEX fixe (26%) — salaires, admin
+    cout_capex_m3=2.95,          # CAPEX (63%) — amortissement, dette, déficit
+    valeur_sociale_m3=4.69,      # Total = 0.50 + 1.24 + 2.95
+    prix_vente_m3=2.50,          # Prix indicatif hors modèle
+    mcf=0.20,                    # MCF Canada (Treasury Board 2007)
+    appliquer_mcf=False,         # Désactivé par défaut
+    nom="Québec MAMH",
+    description="Coût complet MAMH/SQEEP 2019-2025 (4,69 $/m³)",
 )
 
-# Scénario conservateur (valeur sociale basse)
+# Scénario conservateur (coût complet bas)
 VALEUR_EAU_CONSERVATEUR = ParametresValeurEau(
-    cout_variable_m3=0.25,       # Coût variable très bas
-    cout_infrastructure_m3=1.00, # Infrastructure minimale
-    valeur_externalites_m3=1.25, # Externalités prudentes
-    valeur_sociale_m3=2.50,      # Total = 0.25 + 1.00 + 1.25
+    cout_variable_m3=0.25,       # OPEX variable bas
+    cout_opex_fixe_m3=0.75,      # OPEX fixe réduit
+    cout_capex_m3=1.50,          # CAPEX minimal
+    valeur_sociale_m3=2.50,      # Total = 0.25 + 0.75 + 1.50
     prix_vente_m3=2.00,
     mcf=0.20,
     appliquer_mcf=False,
     nom="Conservateur",
-    description="Hypothèses prudentes pour l'analyse de sensibilité",
+    description="Hypothèses prudentes pour analyse de sensibilité",
 )
 
 # Scénario avec rareté (zones de stress hydrique)
+# Note: Ce scénario INCLUT une prime de rareté/externalité environnementale
 VALEUR_EAU_RARETE = ParametresValeurEau(
-    cout_variable_m3=2.50,       # Coûts plus élevés (pompage, traitement)
-    cout_infrastructure_m3=2.00, # Infrastructure coûteuse (nappe profonde)
-    valeur_externalites_m3=3.50, # Externalités élevées (rareté, écosystèmes)
-    valeur_sociale_m3=8.00,      # Total = 2.50 + 2.00 + 3.50
+    cout_variable_m3=1.50,       # OPEX variable élevé (pompage profond)
+    cout_opex_fixe_m3=1.50,      # OPEX fixe (traitement avancé)
+    cout_capex_m3=3.00,          # CAPEX (infrastructure coûteuse)
+    valeur_sociale_m3=8.00,      # Total inclut prime rareté +2.00 $/m³
     prix_vente_m3=4.00,
-    mcf=0.25,                    # MCF plus élevé (infrastructure critique)
+    mcf=0.25,                    # MCF plus élevé
     appliquer_mcf=False,
     nom="Rareté hydrique",
-    description="Zones de stress hydrique ou ressource limitée",
+    description="Zones de stress hydrique — inclut prime environnementale",
 )
 
-# Scénario sans MCF (pour comparaison) — OBSOLÈTE, utiliser VALEUR_EAU_QUEBEC
+# Scénario sans MCF (rétrocompatibilité)
 VALEUR_EAU_SANS_MCF = ParametresValeurEau(
     cout_variable_m3=0.50,
-    cout_infrastructure_m3=1.69,
-    valeur_externalites_m3=2.50,
+    cout_opex_fixe_m3=1.24,
+    cout_capex_m3=2.95,
     valeur_sociale_m3=4.69,
     prix_vente_m3=2.50,
     mcf=0.0,
     appliquer_mcf=False,
     nom="Sans MCF",
-    description="Analyse économique sans ajustement MCF (identique à Québec standard)",
+    description="Identique à Québec MAMH (MCF=0)",
 )
 
 # Scénario Québec AVEC MCF (pour analyse de sensibilité)
 VALEUR_EAU_QUEBEC_AVEC_MCF = ParametresValeurEau(
     cout_variable_m3=0.50,
-    cout_infrastructure_m3=1.69,
-    valeur_externalites_m3=2.50,
+    cout_opex_fixe_m3=1.24,
+    cout_capex_m3=2.95,
     valeur_sociale_m3=4.69,
     prix_vente_m3=2.50,
     mcf=0.20,                    # Treasury Board Canada (2007)
