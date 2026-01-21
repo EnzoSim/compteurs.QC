@@ -600,9 +600,9 @@ async def detailed_series(req: CalculRequest):
             "debit_grosses_m3": fuites.debit_fuite_significative_m3_an if fuites.utiliser_prevalence_differenciee else 0,
             "taux_detection_pct": fuites.taux_detection_pct,
             "taux_reparation_pct": fuites.taux_reparation_pct,
-            "delai_detection_mois": fuites.delai_detection_mois,
             "taux_nouvelles_fuites_pct": fuites.taux_nouvelles_fuites_pct,
             "part_persistantes_pct": fuites.part_fuites_persistantes_pct,
+            "cout_reparation_moyen": fuites.cout_reparation_moyen,
         }
 
         # Info persistance comportementale
