@@ -42,7 +42,13 @@ from analyse_compteurs_eau import (
     PERSISTANCE_PESSIMISTE,
     FUITES_SANS_COUT,
     FUITES_QUEBEC_DEUX_STOCKS,
+    FUITES_CONTEXTE_QUEBEC,
     VALEUR_EAU_QUEBEC,
+    # Monte Carlo
+    ParametresMonteCarlo,
+    ResultatsMonteCarlo,
+    simuler_monte_carlo,
+    DISTRIBUTIONS_DEFAUT,
 )
 
 # =============================================================================
@@ -627,6 +633,149 @@ async def detailed_series(req: CalculRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/compare_fuites")
+async def compare_fuites(req: CalculRequest):
+    """
+    Comparer les trois scénarios de fuites.
+
+    Retourne la VAN cumulative pour chaque scénario de fuites.
+    """
+    results = {}
+
+    scenarios = [
+        ("standard", "Standard (20%, 35 m³/an)"),
+        ("quebec", "Québec (35%, 35 m³/an)"),
+        ("deux_stocks", "Deux stocks QC"),
+    ]
+
+    for scenario_key, scenario_nom in scenarios:
+        req_copy = req.model_copy()
+        req_copy.scenario_fuites = scenario_key
+        result = await calculate(req_copy)
+        results[scenario_key] = {
+            "nom": scenario_nom,
+            "van": result.van,
+            "rbc": result.rbc,
+            "payback": result.payback,
+            "van_cumulative": result.van_cumulative,
+            "economie_fuite_menage": result.economie_fuite_menage,
+        }
+
+    return results
+
+
+@app.post("/api/monte_carlo")
+async def monte_carlo(req: CalculRequest, n_simulations: int = 500):
+    """
+    Exécuter une simulation Monte Carlo.
+
+    Retourne la distribution de la VAN et les statistiques associées.
+    """
+    try:
+        # Créer les paramètres de base
+        params = ParametresModele(
+            nb_menages=req.nb_menages,
+            taille_menage=req.taille_menage,
+            lpcd=req.lpcd,
+            horizon_analyse=req.horizon,
+            taux_actualisation_pct=req.taux_actualisation,
+            reduction_comportement_pct=req.reduction_comportement,
+        )
+
+        compteur = get_compteur(req)
+        persistance = get_persistance(req.persistance, req.reduction_comportement)
+        fuites = get_fuites(req.scenario_fuites, req)
+
+        mode = ModeCompte.ECONOMIQUE if req.mode_economique else ModeCompte.FINANCIER
+        valeur_eau = ParametresValeurEau(
+            valeur_sociale_m3=req.valeur_sociale,
+            cout_variable_m3=req.cout_variable,
+        )
+
+        # Configuration Monte Carlo
+        config_mc = ParametresMonteCarlo(
+            distributions=DISTRIBUTIONS_DEFAUT,
+            n_simulations=min(n_simulations, 1000),  # Limiter pour performance
+            seed=42,
+        )
+
+        # Exécuter Monte Carlo
+        resultats_mc = simuler_monte_carlo(
+            params_base=params,
+            compteur_base=compteur,
+            config_mc=config_mc,
+            mode_compte=mode,
+            valeur_eau=valeur_eau,
+            afficher_progression=False,
+            persistance=persistance,
+            params_fuites=fuites,
+        )
+
+        # Calculer l'histogramme pour le frontend
+        van_values = resultats_mc.van_simulations
+        hist, bin_edges = np.histogram(van_values, bins=30)
+        bin_centers = [(bin_edges[i] + bin_edges[i+1]) / 2 for i in range(len(hist))]
+
+        return {
+            "n_simulations": resultats_mc.n_simulations,
+            "van_moyenne": float(resultats_mc.van_moyenne),
+            "van_mediane": float(resultats_mc.van_mediane),
+            "van_std": float(resultats_mc.van_ecart_type),
+            "prob_van_positive": float(resultats_mc.prob_van_positive),
+            "percentiles": {
+                "p5": float(resultats_mc.percentile_5),
+                "p25": float(resultats_mc.percentile_25),
+                "p50": float(resultats_mc.van_mediane),
+                "p75": float(resultats_mc.percentile_75),
+                "p95": float(resultats_mc.percentile_95),
+            },
+            "histogram": {
+                "counts": hist.tolist(),
+                "bin_centers": [float(x) for x in bin_centers],
+                "bin_edges": [float(x) for x in bin_edges],
+            },
+            "correlations": [
+                {"param": k, "correlation": float(v)}
+                for k, v in sorted(
+                    resultats_mc.correlations.items(),
+                    key=lambda x: abs(x[1]),
+                    reverse=True
+                )[:8]  # Top 8 paramètres
+            ] if resultats_mc.correlations else [],
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/scenario_name")
+async def get_scenario_name(persistance: str = "realiste", fuites: str = "deux_stocks"):
+    """Retourner le nom complet du scénario."""
+
+    persistance_noms = {
+        "optimiste": "Optimiste",
+        "realiste": "Réaliste",
+        "pessimiste": "Pessimiste",
+        "ultra": "Ultra-pessimiste",
+    }
+
+    fuites_noms = {
+        "standard": "Standard",
+        "quebec": "Québec",
+        "deux_stocks": "Deux-stocks QC",
+        "custom": "Personnalisé",
+    }
+
+    p_nom = persistance_noms.get(persistance, persistance)
+    f_nom = fuites_noms.get(fuites, fuites)
+
+    return {
+        "nom_complet": f"{p_nom} + {f_nom}",
+        "persistance": p_nom,
+        "fuites": f_nom,
+    }
 
 
 # =============================================================================

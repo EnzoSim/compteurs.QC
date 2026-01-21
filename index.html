@@ -727,6 +727,132 @@
             color: #0369a1;
             margin-top: 0.5rem;
         }
+
+        /* Scenario Badge */
+        .scenario-badge {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 1.5rem;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 2px solid #0ea5e9;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
+
+        .scenario-icon {
+            font-size: 2rem;
+        }
+
+        .scenario-info {
+            flex: 1;
+        }
+
+        .scenario-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .scenario-name {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--primary);
+            letter-spacing: -0.5px;
+        }
+
+        .scenario-details {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .tag {
+            padding: 0.375rem 0.75rem;
+            border-radius: 50px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .tag-persistance {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .tag-fuites {
+            background: #fef3c7;
+            color: #b45309;
+        }
+
+        .tag-mode {
+            background: #d1fae5;
+            color: #047857;
+        }
+
+        /* Monte Carlo Stats Grid */
+        .mc-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        @media (max-width: 1200px) {
+            .mc-stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        .mc-stat-card {
+            background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+            border: 1px solid #c4b5fd;
+            border-radius: var(--radius-sm);
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .mc-stat-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #6d28d9;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.25rem;
+        }
+
+        .mc-stat-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #5b21b6;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+        }
+
+        /* Monte Carlo Button */
+        .btn-mc {
+            padding: 0.5rem 1rem;
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-mc:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+        }
+
+        .btn-mc:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-mc.loading {
+            background: #a78bfa;
+        }
     </style>
 </head>
 <body>
@@ -1007,10 +1133,44 @@
                 </div>
             </div>
 
+            <!-- Scenario Badge -->
+            <div class="scenario-badge" id="scenario-badge">
+                <div class="scenario-icon">📊</div>
+                <div class="scenario-info">
+                    <div class="scenario-label">Scénario actuel</div>
+                    <div class="scenario-name" id="scenario-name">Réaliste + Deux-stocks QC</div>
+                </div>
+                <div class="scenario-details" id="scenario-details">
+                    <span class="tag tag-persistance">Réaliste</span>
+                    <span class="tag tag-fuites">Deux-stocks</span>
+                    <span class="tag tag-mode">Économique</span>
+                </div>
+            </div>
+
             <!-- Recommendation -->
             <div class="recommendation positive" id="recommendation">
                 <div class="recommendation-icon">✓</div>
                 <div class="recommendation-text">Chargement de l'analyse...</div>
+            </div>
+
+            <!-- Monte Carlo Stats -->
+            <div class="mc-stats-grid" id="mc-stats" style="display: none;">
+                <div class="mc-stat-card">
+                    <div class="mc-stat-label">P(VAN > 0)</div>
+                    <div class="mc-stat-value" id="mc-prob">—</div>
+                </div>
+                <div class="mc-stat-card">
+                    <div class="mc-stat-label">VAN Médiane</div>
+                    <div class="mc-stat-value" id="mc-median">—</div>
+                </div>
+                <div class="mc-stat-card">
+                    <div class="mc-stat-label">IC 90% (P5-P95)</div>
+                    <div class="mc-stat-value" id="mc-ic">—</div>
+                </div>
+                <div class="mc-stat-card">
+                    <div class="mc-stat-label">Écart-type</div>
+                    <div class="mc-stat-value" id="mc-std">—</div>
+                </div>
             </div>
 
             <!-- Charts Row 1 -->
@@ -1108,6 +1268,43 @@
                     </div>
                     <div class="chart-wrapper">
                         <canvas id="chart-decomposition"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Comparaison Scénarios Fuites</div>
+                            <div class="chart-subtitle">Impact du modèle de prévalence</div>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-fuites-scenarios"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Monte Carlo — Distribution VAN</div>
+                            <div class="chart-subtitle">Simulation stochastique (500 tirages)</div>
+                        </div>
+                        <button class="btn-mc" id="btn-run-mc" onclick="runMonteCarlo()">▶ Lancer</button>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-monte-carlo"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Monte Carlo — Drivers de Risque</div>
+                            <div class="chart-subtitle">Corrélations avec la VAN</div>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-mc-drivers"></canvas>
                     </div>
                 </div>
             </div>
@@ -1363,6 +1560,7 @@
                 const params = collectParams();
                 const result = await apiCall('/api/calculate', params);
                 updateDisplay(result);
+                updateScenarioBadge();
 
                 const [sensitivity, meters, persistence] = await Promise.all([
                     apiCall('/api/sensitivity', params),
@@ -1374,7 +1572,7 @@
                 updateMetersChart(meters);
                 updatePersistenceChart(persistence, result);
 
-                // Fetch detailed series (new endpoint, may not be deployed yet)
+                // Fetch detailed series and fuites comparison
                 try {
                     const detailed = await apiCall('/api/detailed_series', params);
                     updateDetailedCharts(detailed);
@@ -1382,6 +1580,10 @@
                 } catch (e) {
                     console.warn('detailed_series endpoint not available yet:', e);
                 }
+
+                // Comparaison scénarios fuites
+                await updateFuitesComparison(params, result);
+
                 await updatePerspectivesChart(params);
 
             } catch (e) {
@@ -1821,6 +2023,183 @@
                     }
                 }
             });
+
+            // Graphique comparaison scénarios fuites
+            charts.fuitesScenarios = new Chart(document.getElementById('chart-fuites-scenarios').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'Standard (20%)', data: [], borderColor: '#3b82f6', tension: 0.4, pointRadius: 0, borderWidth: 2.5 },
+                        { label: 'Québec (35%)', data: [], borderColor: '#f59e0b', tension: 0.4, pointRadius: 0, borderWidth: 2.5 },
+                        { label: 'Deux-stocks QC', data: [], borderColor: '#10b981', tension: 0.4, pointRadius: 0, borderWidth: 2.5 }
+                    ]
+                },
+                options: {
+                    ...defaultOptions,
+                    scales: {
+                        ...defaultOptions.scales,
+                        x: { ...defaultOptions.scales.x, title: { display: true, text: 'Année', font: { family: 'Inter', weight: 600 } } },
+                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'VAN (M$)', font: { family: 'Inter', weight: 600 } } }
+                    }
+                }
+            });
+
+            // Graphique Monte Carlo distribution
+            charts.monteCarlo = new Chart(document.getElementById('chart-monte-carlo').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Fréquence',
+                        data: [],
+                        backgroundColor: 'rgba(139, 92, 246, 0.6)',
+                        borderColor: '#8b5cf6',
+                        borderWidth: 1,
+                        borderRadius: 2,
+                    }]
+                },
+                options: {
+                    ...defaultOptions,
+                    plugins: {
+                        ...defaultOptions.plugins,
+                        legend: { display: false },
+                        annotation: {
+                            annotations: {}
+                        }
+                    },
+                    scales: {
+                        ...defaultOptions.scales,
+                        x: { ...defaultOptions.scales.x, title: { display: true, text: 'VAN (M$)', font: { family: 'Inter', weight: 600 } } },
+                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'Fréquence', font: { family: 'Inter', weight: 600 } } }
+                    }
+                }
+            });
+
+            // Graphique Monte Carlo drivers
+            charts.mcDrivers = new Chart(document.getElementById('chart-mc-drivers').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Corrélation',
+                        data: [],
+                        backgroundColor: [],
+                        borderRadius: 4,
+                    }]
+                },
+                options: {
+                    ...defaultOptions,
+                    indexAxis: 'y',
+                    plugins: { ...defaultOptions.plugins, legend: { display: false } },
+                    scales: {
+                        ...defaultOptions.scales,
+                        x: { ...defaultOptions.scales.x, min: -1, max: 1, title: { display: true, text: 'Corrélation', font: { family: 'Inter', weight: 600 } } },
+                        y: { ...defaultOptions.scales.y }
+                    }
+                }
+            });
+        }
+
+        // Mise à jour du bandeau scénario
+        function updateScenarioBadge() {
+            const persistance = document.getElementById('persistance').value;
+            const fuites = document.getElementById('scenario-fuites').value;
+            const mode = modeEconomique ? 'Économique' : 'Financier';
+
+            const persistanceNoms = {
+                'optimiste': 'Optimiste',
+                'realiste': 'Réaliste',
+                'pessimiste': 'Pessimiste',
+                'ultra': 'Ultra-pessimiste'
+            };
+
+            const fuitesNoms = {
+                'standard': 'Standard',
+                'quebec': 'Québec',
+                'deux_stocks': 'Deux-stocks',
+                'custom': 'Personnalisé'
+            };
+
+            const pNom = persistanceNoms[persistance] || persistance;
+            const fNom = fuitesNoms[fuites] || fuites;
+
+            document.getElementById('scenario-name').textContent = `${pNom} + ${fNom}`;
+            document.getElementById('scenario-details').innerHTML = `
+                <span class="tag tag-persistance">${pNom}</span>
+                <span class="tag tag-fuites">${fNom}</span>
+                <span class="tag tag-mode">${mode}</span>
+            `;
+        }
+
+        // Comparaison des scénarios de fuites
+        async function updateFuitesComparison(params, currentResult) {
+            try {
+                const fuitesData = await apiCall('/api/compare_fuites', params);
+
+                charts.fuitesScenarios.data.labels = currentResult.annees;
+                charts.fuitesScenarios.data.datasets[0].data = fuitesData.standard.van_cumulative.map(v => v / 1e6);
+                charts.fuitesScenarios.data.datasets[1].data = fuitesData.quebec.van_cumulative.map(v => v / 1e6);
+                charts.fuitesScenarios.data.datasets[2].data = fuitesData.deux_stocks.van_cumulative.map(v => v / 1e6);
+                charts.fuitesScenarios.update('none');
+            } catch (e) {
+                console.warn('Erreur compare_fuites:', e);
+            }
+        }
+
+        // Monte Carlo
+        let mcRunning = false;
+
+        async function runMonteCarlo() {
+            if (mcRunning) return;
+
+            const btn = document.getElementById('btn-run-mc');
+            btn.disabled = true;
+            btn.classList.add('loading');
+            btn.textContent = '⏳ Simulation...';
+            mcRunning = true;
+
+            try {
+                const params = collectParams();
+                const mcResult = await apiCall('/api/monte_carlo', params);
+
+                // Afficher les stats
+                document.getElementById('mc-stats').style.display = 'grid';
+                document.getElementById('mc-prob').textContent = (mcResult.prob_van_positive * 100).toFixed(1) + '%';
+                document.getElementById('mc-median').textContent = formatMoney(mcResult.van_mediane);
+                document.getElementById('mc-ic').textContent = `[${formatMoney(mcResult.percentiles.p5)}, ${formatMoney(mcResult.percentiles.p95)}]`;
+                document.getElementById('mc-std').textContent = formatMoney(mcResult.van_std);
+
+                // Mettre à jour l'histogramme
+                charts.monteCarlo.data.labels = mcResult.histogram.bin_centers.map(v => (v / 1e6).toFixed(0));
+                charts.monteCarlo.data.datasets[0].data = mcResult.histogram.counts;
+
+                // Colorer les barres selon positif/négatif
+                const colors = mcResult.histogram.bin_centers.map(v =>
+                    v >= 0 ? 'rgba(16, 185, 129, 0.7)' : 'rgba(239, 71, 111, 0.7)'
+                );
+                charts.monteCarlo.data.datasets[0].backgroundColor = colors;
+                charts.monteCarlo.update('none');
+
+                // Mettre à jour les drivers
+                if (mcResult.correlations && mcResult.correlations.length > 0) {
+                    charts.mcDrivers.data.labels = mcResult.correlations.map(c => c.param);
+                    charts.mcDrivers.data.datasets[0].data = mcResult.correlations.map(c => c.correlation);
+                    charts.mcDrivers.data.datasets[0].backgroundColor = mcResult.correlations.map(c =>
+                        c.correlation >= 0 ? '#10b981' : '#ef4444'
+                    );
+                    charts.mcDrivers.update('none');
+                }
+
+            } catch (e) {
+                console.error('Erreur Monte Carlo:', e);
+                alert('Erreur lors de la simulation Monte Carlo. Vérifiez la console.');
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('loading');
+                btn.textContent = '▶ Lancer';
+                mcRunning = false;
+            }
         }
     </script>
 </body>

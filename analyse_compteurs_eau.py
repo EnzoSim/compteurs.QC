@@ -11,13 +11,50 @@ Fonctionnalités:
 - Valeur Actuelle Nette (VAN) et Ratio Bénéfices-Coûts (RBC)
 - Période de récupération actualisée
 - Coût nivelé de l'eau économisée (LCSW)
-- Revenus récupérés (correction sous-facturation)
 - Report d'infrastructure (optionnel)
 - Fuites réseau (optionnel) avec trajectoire et coûts
 - Analyses de sensibilité complètes
 
 Auteur: Modèle consolidé pour thèse
-Version: 3.10.0 - Modèle deux-stocks fuites + SQEEP 2023 (janvier 2026)
+Version: 3.11.0 - Monte Carlo, MCF, Segmentation, OPEX AMI (janvier 2026)
+
+Changelog v3.11.0:
+- NOUVEAU: Module Monte Carlo — Simulation stochastique
+  - DistributionParametre: distributions triangulaires, normales, uniformes
+  - ParametresMonteCarlo: configuration N simulations, seed reproductibilité
+  - ResultatsMonteCarlo: P(VAN>0), percentiles, corrélations drivers
+  - simuler_monte_carlo(): exécution N tirages avec analyse sensibilité
+  - graphique_distribution_van(): histogramme avec P(VAN>0)
+  - graphique_tornado_mc(): graphique tornado des drivers
+  - DISTRIBUTIONS_DEFAUT: alpha0, lpcd, valeur_eau, cout_compteur, prevalence_fuites
+- NOUVEAU: MCF (Coût Marginal des Fonds publics)
+  - ParametresValeurEau.mcf: 0.20 pour sensibilité (désactivé par défaut)
+  - ParametresValeurEau.appliquer_mcf: activer/désactiver
+  - ParametresValeurEau.facteur_mcf(): retourne (1+mcf) en mode économique
+  - actualiser_series(): applique MCF aux dépenses publiques (I0, OPEX, ponctuels)
+  - VALEUR_EAU_SANS_MCF: préréglage pour comparaison
+- NOUVEAU: Module Coûts Non Techniques AMI
+  - VentilationOPEX: cybersécurité, licences, stockage, service client, intégration SI
+  - VENTILATION_OPEX_STANDARD, VENTILATION_OPEX_SECURITE_ELEVEE, VENTILATION_OPEX_CLOUD
+  - afficher_ventilation_opex(): tableau détaillé
+- NOUVEAU: Module Segmentation Résidentielle
+  - TypeLogement: UNIFAMILIAL, MULTIPLEX, MULTILOGEMENT
+  - ParametresSegment: caractéristiques par type de logement
+  - SEGMENT_UNIFAMILIAL, SEGMENT_MULTIPLEX (Québec SQEEP 2023)
+  - Note: MULTILOGEMENT exclu par défaut (effet comportemental non modélisable)
+  - executer_modele_segmente(): analyse multi-segments avec agrégation
+  - afficher_resultats_segmentes(), graphique_segmentation()
+- NOUVEAU: 8 tests de validation (Tests 45-52)
+  - VentilationOPEX, MCF, Segmentation, Monte Carlo
+
+Changelog v3.10.1:
+- CORRECTION 4.2: Économies d'échelle calculées sur H × A_max (adoption effective)
+  - Évite surestimation du rabais volume si adoption partielle (<100%)
+- CORRECTION 4.4: taux_correction_effectif_avec_persistance utilisé dans calculer_economies_eau()
+  - Intègre la fraction de fuites jamais réparées (longue traîne)
+- CORRECTION 4.5: volume_fuite_moyen_pondere utilisé si mode deux-stocks
+  - Pondération correcte any/significatives pour calcul usage_reductible
+- NOUVEAU: 3 tests de validation ajoutés (Tests 42-44)
 
 Changelog v3.10.0:
 - SQEEP 2023: DEFAUTS_LONGUEUIL mis à jour (116,258 ménages, 2.18 pers/ménage, 236 LPCD)
@@ -112,8 +149,8 @@ Changelog v3.4.0:
 - generer_trajectoires() accepte mode_compte et valeur_eau
 - actualiser_series() et calculer_van_cumulative() distinguent les coûts
 - executer_modele() accepte mode_compte et valeur_eau
-- Analyse économique: valeur sociale, revenus exclus, tous les coûts
-- Analyse financière: coût variable, revenus inclus, coûts ville seulement
+- Analyse économique: valeur sociale, sans tarification, tous les coûts
+- Analyse financière: coût variable évité, sans tarification, coûts ville seulement
 
 Changelog v3.3.0:
 - NOUVEAU: Module fuites avec coûts de réparation
@@ -189,14 +226,14 @@ class TypeCompteur(Enum):
 #    - Perspective: société dans son ensemble
 #    - Question: "Ce projet améliore-t-il le bien-être collectif?"
 #    - Valorisation de l'eau: coût d'opportunité social (externalités incluses)
-#    - Transferts: neutres (revenus récupérés = transfert, pas un bénéfice net)
+#    - Transferts: neutres (pas de module tarification dans ce modèle)
 #    - Coûts: tous les coûts réels (peu importe qui paie)
 #
 # 2. ANALYSE FINANCIÈRE (budget municipal / cash flow)
 #    - Perspective: service d'eau municipal
 #    - Question: "Ce projet est-il viable pour le budget de la ville?"
 #    - Valorisation de l'eau: coût variable évité (chimie, énergie, pompage)
-#    - Revenus: inclus car ce sont des entrées réelles de trésorerie
+#    - Bénéfices: économies d'eau × coût variable (pas de tarification volumétrique)
 #    - Coûts: seulement ceux supportés par la ville
 #
 # Références théoriques:
@@ -212,15 +249,16 @@ class ModeCompte(Enum):
 
     ECONOMIQUE: Analyse de bien-être social (welfare economics)
         - Utilise la valeur sociale de l'eau (coût d'opportunité + externalités)
-        - Les transferts (revenus récupérés) sont neutres ou exclus
         - Tous les coûts sont comptés (peu importe qui paie)
         - Répond à: "Ce projet améliore-t-il le bien-être collectif?"
 
     FINANCIER: Analyse budgétaire municipale
         - Utilise le coût variable évité (OPEX réel de la ville)
-        - Les revenus récupérés sont inclus (vraie recette)
         - Seuls les coûts supportés par la ville sont comptés
         - Répond à: "Ce projet est-il viable financièrement pour la ville?"
+
+    Note: Ce modèle ne comprend pas de module tarification volumétrique.
+    Les bénéfices proviennent des économies d'eau (comportement + fuites).
     """
     ECONOMIQUE = "economique"
     FINANCIER = "financier"
@@ -241,24 +279,86 @@ class ParametresValeurEau:
       (justifiant une subvention publique)
 
     Valeurs par défaut calibrées pour le Québec:
-    - Valeur sociale: 4.69 $/m³ (coût complet incluant externalités)
+    - Valeur sociale: 4.69 $/m³ (décomposition explicite ci-dessous)
     - Coût variable: 0.50 $/m³ (chimie, énergie, pompage - OPEX variable)
+
+    DÉCOMPOSITION DE LA VALEUR SOCIALE (v3.9):
+    ─────────────────────────────────────────────
+    La valeur sociale de 4.69 $/m³ se décompose en trois composantes:
+
+    1. COÛT VARIABLE (0.50 $/m³)
+       - Chimie de traitement eau potable et eaux usées
+       - Énergie de pompage (distribution et collecte)
+       - Consommables et coûts variables d'exploitation
+       Source: MAMH rapports financiers municipaux; Winnipeg water audit
+
+    2. COÛT INFRASTRUCTURE REPORTÉ (1.69 $/m³)
+       - Amortissement reporté des usines (eau potable + eaux usées)
+       - Capacité évitée dans les agrandissements futurs
+       - Réduction des pointes (dimensionnement des réservoirs/conduites)
+       Source: Coût moyen pondéré d'infrastructure eau/égout au Québec
+
+    3. EXTERNALITÉS ENVIRONNEMENTALES (2.50 $/m³)
+       - Valeur de non-usage des ressources hydriques
+       - Coût carbone de traitement/pompage évité (~50g CO2/m³ × 150$/t)
+       - Services écosystémiques (qualité des cours d'eau récepteurs)
+       - Résilience climatique (adaptation aux sécheresses)
+       Source: MELCCFP méthodologie évaluation environnementale
+
+    TOTAL: 0.50 + 1.69 + 2.50 = 4.69 $/m³
     """
     # === ANALYSE ÉCONOMIQUE ===
-    # Valeur sociale = coût d'opportunité + externalités environnementales
-    # Inclut: coût marginal de production, rareté, infrastructure, environnement
-    valeur_sociale_m3: float = 4.69
+    # Valeur sociale = coût variable + infrastructure + externalités
+    # Voir décomposition ci-dessus pour les sources et justifications
 
-    # === ANALYSE FINANCIÈRE ===
-    # Coût variable = OPEX réellement évité quand on économise 1 m³
-    # Inclut: chimie de traitement, énergie de pompage, coûts variables
-    # Exclut: coûts fixes (personnel, amortissement, dette)
-    # Source: Winnipeg water audit ~0.12 $/m³ production; 0.50 $/m³ conservateur
-    cout_variable_m3: float = 0.50
+    # Composante 1: Coûts variables de production
+    cout_variable_m3: float = 0.50  # $/m³ — chimie, énergie, consommables
 
-    # Prix de vente au consommateur (si tarification volumétrique)
-    # Utilisé pour calculer l'élasticité-prix
+    # Composante 2: Coût d'infrastructure reporté (CAPEX amorti évité)
+    cout_infrastructure_m3: float = 1.69  # $/m³ — amortissement, capacité évitée
+
+    # Composante 3: Externalités environnementales
+    valeur_externalites_m3: float = 2.50  # $/m³ — environnement, carbone, résilience
+
+    # Valeur sociale totale (somme des composantes)
+    # Note: Peut être surchargée directement si on a une valeur calibrée différente
+    valeur_sociale_m3: float = 4.69  # $/m³ — cout_variable + infra + externalités
+
+    # Prix indicatif hors modèle (non utilisé sans tarification volumétrique)
+    # Conservé pour compatibilité si une analyse tarifaire est ajoutée plus tard.
     prix_vente_m3: float = 2.50
+
+    # === COÛT MARGINAL DES FONDS PUBLICS (MCF) ===
+    # Le MCF représente le coût social de lever 1$ de taxes pour financer
+    # une dépense publique. Il capture les distorsions économiques causées
+    # par la taxation (perte sèche, coûts administratifs, effets comportementaux).
+    #
+    # Sources:
+    # - Treasury Board of Canada (2007): MCF = 0.20 (recommandation officielle)
+    # - Dahlby (2008) "The Marginal Cost of Public Funds": 0.15-0.30 selon pays
+    # - Boardman et al. (2018): 0.20-0.25 pour le Canada
+    #
+    # Application: en mode ÉCONOMIQUE, les dépenses publiques sont multipliées
+    # par (1 + mcf) pour refléter le vrai coût social du financement public.
+    mcf: float = 0.20
+
+    # Activer/désactiver l'application du MCF
+    #
+    # NOTE MÉTHODOLOGIQUE — DÉSACTIVÉ PAR DÉFAUT POUR LE QUÉBEC
+    # ─────────────────────────────────────────────────────────────
+    # Le MCF n'est pas appliqué par défaut pour les raisons suivantes:
+    # 1. Pas de standard provincial établi pour les projets municipaux québécois
+    # 2. Le projet pourrait être autofinancé par les économies d'eau réalisées
+    #    et des arbitrages budgétaires internes, sans recours additionnel
+    #    à la taxation foncière
+    # 3. Simplifie l'interprétation des résultats pour les décideurs municipaux
+    #
+    # RECOMMANDATION: Pour une analyse de sensibilité rigoureuse, présenter
+    # les résultats AVEC et SANS MCF en parallèle. Utiliser:
+    #   - Scénario de base: appliquer_mcf=False
+    #   - Sensibilité: appliquer_mcf=True, mcf=0.20 (Treasury Board Canada)
+    # ─────────────────────────────────────────────────────────────
+    appliquer_mcf: bool = False
 
     # Métadonnées
     nom: str = "Valeurs par défaut Québec"
@@ -273,6 +373,8 @@ class ParametresValeurEau:
         if self.cout_variable_m3 > self.valeur_sociale_m3:
             # Warning: généralement le coût variable < valeur sociale
             pass  # On laisse passer, l'utilisateur peut avoir ses raisons
+        if not 0 <= self.mcf <= 1.0:
+            raise ValueError("mcf doit être entre 0 et 1 (typiquement 0.15-0.30)")
 
     def valeur_eau(self, mode: ModeCompte) -> float:
         """Retourner la valeur de l'eau selon le mode d'analyse."""
@@ -281,6 +383,30 @@ class ParametresValeurEau:
         else:
             return self.cout_variable_m3
 
+    def facteur_mcf(self, mode: ModeCompte) -> float:
+        """
+        Retourner le facteur multiplicatif pour les dépenses publiques.
+
+        En mode ÉCONOMIQUE avec MCF activé: (1 + mcf)
+        Sinon: 1.0 (pas de majoration)
+        """
+        if mode == ModeCompte.ECONOMIQUE and self.appliquer_mcf:
+            return 1.0 + self.mcf
+        return 1.0
+
+    def ajuster_cout_public(self, cout: float, mode: ModeCompte) -> float:
+        """
+        Ajuster un coût public pour refléter le MCF.
+
+        Paramètres:
+            cout: Coût brut ($)
+            mode: Mode de comptabilité
+
+        Retourne:
+            Coût ajusté = cout × (1 + mcf) en mode économique, cout sinon
+        """
+        return cout * self.facteur_mcf(mode)
+
 
 # =============================================================================
 # PRESETS DE VALEURS D'EAU
@@ -288,36 +414,77 @@ class ParametresValeurEau:
 
 # Valeurs par défaut (Québec, basées sur la littérature)
 VALEUR_EAU_QUEBEC = ParametresValeurEau(
-    valeur_sociale_m3=4.69,      # Coût complet (Winnipeg retail ~4.67 $/m³)
-    cout_variable_m3=0.50,       # OPEX variable conservateur (Winnipeg ~0.12 $/m³)
-    prix_vente_m3=2.50,          # Prix moyen si tarification volumétrique
+    # Décomposition de la valeur sociale (voir documentation ParametresValeurEau)
+    cout_variable_m3=0.50,       # OPEX variable (chimie, énergie, consommables)
+    cout_infrastructure_m3=1.69, # CAPEX amorti évité (usines, conduites)
+    valeur_externalites_m3=2.50, # Environnement, carbone, résilience
+    valeur_sociale_m3=4.69,      # Total = 0.50 + 1.69 + 2.50
+    prix_vente_m3=2.50,          # Prix indicatif hors modèle (non utilisé sans tarification)
+    mcf=0.20,                    # MCF Canada (Treasury Board 2007) — disponible pour sensibilité
+    appliquer_mcf=False,         # Désactivé par défaut (voir note dans ParametresValeurEau)
     nom="Québec standard",
-    description="Valeurs calibrées pour les municipalités québécoises",
+    description="Valeurs calibrées pour les municipalités québécoises (MCF désactivé)",
 )
 
 # Scénario conservateur (valeur sociale basse)
 VALEUR_EAU_CONSERVATEUR = ParametresValeurEau(
-    valeur_sociale_m3=2.50,      # Valeur sociale prudente
     cout_variable_m3=0.25,       # Coût variable très bas
+    cout_infrastructure_m3=1.00, # Infrastructure minimale
+    valeur_externalites_m3=1.25, # Externalités prudentes
+    valeur_sociale_m3=2.50,      # Total = 0.25 + 1.00 + 1.25
     prix_vente_m3=2.00,
+    mcf=0.20,
+    appliquer_mcf=False,
     nom="Conservateur",
     description="Hypothèses prudentes pour l'analyse de sensibilité",
 )
 
 # Scénario avec rareté (zones de stress hydrique)
 VALEUR_EAU_RARETE = ParametresValeurEau(
-    valeur_sociale_m3=8.00,      # Valeur élevée en zone de rareté
     cout_variable_m3=2.50,       # Coûts plus élevés (pompage, traitement)
+    cout_infrastructure_m3=2.00, # Infrastructure coûteuse (nappe profonde)
+    valeur_externalites_m3=3.50, # Externalités élevées (rareté, écosystèmes)
+    valeur_sociale_m3=8.00,      # Total = 2.50 + 2.00 + 3.50
     prix_vente_m3=4.00,
+    mcf=0.25,                    # MCF plus élevé (infrastructure critique)
+    appliquer_mcf=False,
     nom="Rareté hydrique",
     description="Zones de stress hydrique ou ressource limitée",
+)
+
+# Scénario sans MCF (pour comparaison) — OBSOLÈTE, utiliser VALEUR_EAU_QUEBEC
+VALEUR_EAU_SANS_MCF = ParametresValeurEau(
+    cout_variable_m3=0.50,
+    cout_infrastructure_m3=1.69,
+    valeur_externalites_m3=2.50,
+    valeur_sociale_m3=4.69,
+    prix_vente_m3=2.50,
+    mcf=0.0,
+    appliquer_mcf=False,
+    nom="Sans MCF",
+    description="Analyse économique sans ajustement MCF (identique à Québec standard)",
+)
+
+# Scénario Québec AVEC MCF (pour analyse de sensibilité)
+VALEUR_EAU_QUEBEC_AVEC_MCF = ParametresValeurEau(
+    cout_variable_m3=0.50,
+    cout_infrastructure_m3=1.69,
+    valeur_externalites_m3=2.50,
+    valeur_sociale_m3=4.69,
+    prix_vente_m3=2.50,
+    mcf=0.20,                    # Treasury Board Canada (2007)
+    appliquer_mcf=True,
+    nom="Québec avec MCF",
+    description="Sensibilité: MCF=20% appliqué aux dépenses publiques",
 )
 
 # Dictionnaire des préréglages
 PREREGLAGES_VALEUR_EAU = {
     "quebec": VALEUR_EAU_QUEBEC,
+    "quebec_mcf": VALEUR_EAU_QUEBEC_AVEC_MCF,
     "conservateur": VALEUR_EAU_CONSERVATEUR,
     "rarete": VALEUR_EAU_RARETE,
+    "sans_mcf": VALEUR_EAU_SANS_MCF,  # Rétrocompatibilité
 }
 
 # Alias rétrocompatible
@@ -330,15 +497,16 @@ def afficher_prereglages_valeur_eau() -> None:
     print(" " * 12 + "PRÉRÉGLAGES DE VALORISATION DE L'EAU")
     print("=" * 70)
 
-    print(f"\n{'Préréglage':<15} │ {'Val. sociale':<12} │ {'Coût var.':<10} │ {'Prix vente':<10}")
-    print("─" * 15 + "─┼─" + "─" * 12 + "─┼─" + "─" * 10 + "─┼─" + "─" * 10)
+    print(f"\n{'Préréglage':<15} │ {'Val. sociale':<12} │ {'Coût var.':<10} │ {'Infra':<10} │ {'External.':<10}")
+    print("─" * 15 + "─┼─" + "─" * 12 + "─┼─" + "─" * 10 + "─┼─" + "─" * 10 + "─┼─" + "─" * 10)
 
     for nom, prereglage in PREREGLAGES_VALEUR_EAU.items():
         print(f"{prereglage.nom:<15} │ {prereglage.valeur_sociale_m3:>10.2f} $ │ "
-              f"{prereglage.cout_variable_m3:>8.2f} $ │ {prereglage.prix_vente_m3:>8.2f} $")
+              f"{prereglage.cout_variable_m3:>8.2f} $ │ {prereglage.cout_infrastructure_m3:>8.2f} $ │ "
+              f"{prereglage.valeur_externalites_m3:>8.2f} $")
 
     print("=" * 70)
-    print("\nNote : Valeur sociale > Coût variable car inclut externalités et rareté")
+    print("\nNote : Valeur sociale = coût variable + report infra + externalités")
 
 
 def afficher_presets_valeur_eau() -> None:
@@ -364,6 +532,12 @@ class ConfigEconomiesEchelle:
     """
     activer: bool = False  # Interrupteur ON/OFF
 
+    # Intensité des économies d'échelle par composante (0 = aucune, 1 = pleine)
+    # Hypothèse conservatrice: la main-d'œuvre n'a pas (ou peu) d'économies d'échelle.
+    poids_compteur: float = 1.0
+    poids_reseau: float = 0.5
+    poids_installation: float = 0.0
+
     # Paliers de réduction (nb_compteurs: facteur)
     # facteur = 1.0 signifie pas de réduction
     paliers: dict = field(default_factory=lambda: {
@@ -379,6 +553,13 @@ class ConfigEconomiesEchelle:
     # Paramètres du modèle continu: facteur = 1 - elasticite * ln(nb/nb_ref)
     elasticite_echelle: float = 0.05  # ~5% réduction par doublement
     nb_reference: int = 10_000        # point de référence (facteur = 1.0)
+
+    def __post_init__(self):
+        """Valider les intensités d'échelle."""
+        for attr in ("poids_compteur", "poids_reseau", "poids_installation"):
+            valeur = getattr(self, attr)
+            if not 0.0 <= valeur <= 1.0:
+                raise ValueError(f"{attr} doit être entre 0 et 1")
 
 
 def calculer_facteur_echelle(
@@ -417,6 +598,16 @@ def calculer_facteur_echelle(
         return facteur
 
 
+def appliquer_facteur_echelle(facteur_base: float, poids: float) -> float:
+    """
+    Appliquer un facteur d'échelle partiel.
+
+    poids = 0.0 → aucune économie, poids = 1.0 → plein facteur.
+    """
+    poids_borne = max(0.0, min(1.0, poids))
+    return 1.0 - (1.0 - facteur_base) * poids_borne
+
+
 def afficher_table_economies_echelle(config: ConfigEconomiesEchelle = None) -> None:
     """Afficher la table des économies d'échelle."""
     if config is None:
@@ -427,6 +618,7 @@ def afficher_table_economies_echelle(config: ConfigEconomiesEchelle = None) -> N
     print("=" * 60)
     print(f"  Activé: {'OUI' if config.activer else 'NON'}")
     print(f"  Modèle: {'Continu (log)' if config.utiliser_modele_continu else 'Par paliers'}")
+    print(f"  Intensité: compteur={config.poids_compteur:.2f}, réseau={config.poids_reseau:.2f}, installation={config.poids_installation:.2f}")
     print()
 
     if not config.utiliser_modele_continu:
@@ -449,6 +641,189 @@ def afficher_table_economies_echelle(config: ConfigEconomiesEchelle = None) -> N
         reduction = (1 - facteur) * 100
         print(f"    {n:>7,} compteurs: {cout_ajuste:>6.0f}$ ({reduction:>5.1f}% réduction)")
     print("=" * 60 + "\n")
+
+
+def _configs_echelle_comparaison(
+    config_echelle: Optional[ConfigEconomiesEchelle],
+) -> list[tuple[str, ConfigEconomiesEchelle]]:
+    """
+    Construire les scénarios d'échelle pour les comparaisons.
+
+    Si config_echelle est fourni, retourne uniquement ce scénario.
+    Sinon, retourne deux scénarios: sans échelle et échelle activée.
+    """
+    if config_echelle is not None:
+        label = "Échelle activée" if config_echelle.activer else "Sans échelle"
+        return [(label, config_echelle)]
+
+    return [
+        ("Sans échelle", ConfigEconomiesEchelle(activer=False)),
+        ("Échelle activée", ConfigEconomiesEchelle(activer=True)),
+    ]
+
+
+# =============================================================================
+# VENTILATION OPEX AMI (COÛTS NON TECHNIQUES)
+# =============================================================================
+#
+# Les compteurs AMI génèrent des coûts d'exploitation au-delà de la maintenance
+# matérielle. Cette ventilation détaille les composantes OPEX typiques.
+#
+# Sources:
+# - AWWA (2019) Smart Water Metering Implementation Guidelines
+# - UK Water Industry Research (2020) AMI Operational Costs Study
+# - Itron (2022) Total Cost of Ownership Analysis
+#
+# =============================================================================
+
+@dataclass
+class VentilationOPEX:
+    """
+    Ventilation détaillée des coûts d'exploitation AMI.
+
+    Les pourcentages représentent la répartition du coût OPEX total
+    entre les différentes composantes non techniques.
+
+    Valeurs par défaut basées sur benchmarks industrie (2023):
+    - Cybersécurité: 15% (audits, patches, monitoring SOC)
+    - Licences logiciels: 20% (MDMS, analytics, portail client)
+    - Stockage données: 10% (cloud/on-premise, rétention 5-10 ans)
+    - Service client: 25% (support hotline, gestion alertes, réclamations)
+    - Intégration SI: 30% (interfaces ERP/SIG/CRM, maintenance API)
+    """
+    # Composantes en % du coût OPEX total
+    cybersecurite_pct: float = 0.15
+    licences_logiciels_pct: float = 0.20
+    stockage_donnees_pct: float = 0.10
+    service_client_pct: float = 0.25
+    integration_si_pct: float = 0.30
+
+    # Métadonnées
+    nom: str = "Ventilation OPEX par défaut"
+    description: str = ""
+
+    def __post_init__(self):
+        """Valider que les pourcentages somment à 100%."""
+        total = (
+            self.cybersecurite_pct
+            + self.licences_logiciels_pct
+            + self.stockage_donnees_pct
+            + self.service_client_pct
+            + self.integration_si_pct
+        )
+        if abs(total - 1.0) > 0.001:
+            raise ValueError(
+                f"Les pourcentages doivent sommer à 100%, obtenu {total*100:.1f}%"
+            )
+
+    def ventiler(self, cout_opex_total: float) -> dict:
+        """
+        Ventiler un coût OPEX total entre les composantes.
+
+        Paramètres:
+            cout_opex_total: Coût OPEX annuel total ($)
+
+        Retourne:
+            Dictionnaire avec le détail par composante
+        """
+        return {
+            "cybersecurite": cout_opex_total * self.cybersecurite_pct,
+            "licences_logiciels": cout_opex_total * self.licences_logiciels_pct,
+            "stockage_donnees": cout_opex_total * self.stockage_donnees_pct,
+            "service_client": cout_opex_total * self.service_client_pct,
+            "integration_si": cout_opex_total * self.integration_si_pct,
+            "total": cout_opex_total,
+        }
+
+    def to_dataframe(self, cout_opex_total: float) -> pd.DataFrame:
+        """Retourner la ventilation sous forme de DataFrame."""
+        ventilation = self.ventiler(cout_opex_total)
+        del ventilation["total"]
+        df = pd.DataFrame([
+            {"Composante": k.replace("_", " ").title(), "Coût ($)": v, "Part (%)": v/cout_opex_total*100}
+            for k, v in ventilation.items()
+        ])
+        return df
+
+
+# Préréglages de ventilation OPEX
+VENTILATION_OPEX_STANDARD = VentilationOPEX(
+    nom="Standard",
+    description="Répartition typique basée sur benchmarks industrie",
+)
+
+VENTILATION_OPEX_SECURITE_ELEVEE = VentilationOPEX(
+    cybersecurite_pct=0.25,
+    licences_logiciels_pct=0.20,
+    stockage_donnees_pct=0.10,
+    service_client_pct=0.20,
+    integration_si_pct=0.25,
+    nom="Sécurité élevée",
+    description="Infrastructure critique, exigences cybersécurité renforcées",
+)
+
+VENTILATION_OPEX_CLOUD = VentilationOPEX(
+    cybersecurite_pct=0.12,
+    licences_logiciels_pct=0.25,
+    stockage_donnees_pct=0.18,
+    service_client_pct=0.20,
+    integration_si_pct=0.25,
+    nom="Cloud-native",
+    description="Infrastructure cloud (SaaS), coûts stockage plus élevés",
+)
+
+PREREGLAGES_VENTILATION_OPEX = {
+    "standard": VENTILATION_OPEX_STANDARD,
+    "securite_elevee": VENTILATION_OPEX_SECURITE_ELEVEE,
+    "cloud": VENTILATION_OPEX_CLOUD,
+}
+
+
+def afficher_ventilation_opex(
+    cout_opex_annuel: float,
+    nb_compteurs: int = 1,
+    ventilation: VentilationOPEX = None
+) -> None:
+    """
+    Afficher la ventilation OPEX détaillée.
+
+    Paramètres:
+        cout_opex_annuel: Coût OPEX par compteur par an ($)
+        nb_compteurs: Nombre de compteurs (pour afficher le total)
+        ventilation: Configuration de ventilation (défaut: standard)
+    """
+    if ventilation is None:
+        ventilation = VENTILATION_OPEX_STANDARD
+
+    cout_total = cout_opex_annuel * nb_compteurs
+
+    print("\n" + "=" * 65)
+    print(" " * 15 + "VENTILATION OPEX AMI (COÛTS NON TECHNIQUES)")
+    print("=" * 65)
+    print(f"  Configuration: {ventilation.nom}")
+    print(f"  OPEX unitaire: {cout_opex_annuel:.2f} $/compteur/an")
+    print(f"  Nombre de compteurs: {nb_compteurs:,}")
+    print(f"  OPEX total annuel: {cout_total:,.0f} $")
+    print()
+
+    print(f"  {'Composante':<25} │ {'Part':<8} │ {'Unitaire':<12} │ {'Total':<12}")
+    print("  " + "─" * 25 + "─┼─" + "─" * 8 + "─┼─" + "─" * 12 + "─┼─" + "─" * 12)
+
+    details = ventilation.ventiler(cout_opex_annuel)
+    for composante, pct in [
+        ("Cybersécurité", ventilation.cybersecurite_pct),
+        ("Licences logiciels", ventilation.licences_logiciels_pct),
+        ("Stockage données", ventilation.stockage_donnees_pct),
+        ("Service client", ventilation.service_client_pct),
+        ("Intégration SI", ventilation.integration_si_pct),
+    ]:
+        cout_unit = cout_opex_annuel * pct
+        cout_tot = cout_unit * nb_compteurs
+        print(f"  {composante:<25} │ {pct*100:>6.1f}% │ {cout_unit:>10.2f} $ │ {cout_tot:>10,.0f} $")
+
+    print("  " + "─" * 25 + "─┼─" + "─" * 8 + "─┼─" + "─" * 12 + "─┼─" + "─" * 12)
+    print(f"  {'TOTAL':<25} │ {'100.0%':>7} │ {cout_opex_annuel:>10.2f} $ │ {cout_total:>10,.0f} $")
+    print("=" * 65 + "\n")
 
 
 # =============================================================================
@@ -485,9 +860,26 @@ class ParametresCompteur:
 
     # Coûts d'exploitation annuels par compteur
     cout_lecture_manuel: float = 25.0     # $/compteur/an (lecture manuelle)
-    cout_maintenance_ami: float = 5.0     # $/compteur/an
+    cout_maintenance_ami: float = 5.0     # $/compteur/an (maintenance terrain)
     cout_maintenance_amr: float = 8.0     # $/compteur/an
     cout_maintenance_manuel: float = 3.0  # $/compteur/an
+
+    # OPEX AMI non technique (cyber, logiciels, stockage, télécom, etc.)
+    # ─────────────────────────────────────────────────────────────────
+    # Ventilation typique pour 15$/compteur/an:
+    #   - Télécom/données cellulaires: ~5$/an
+    #   - Cybersécurité (Loi 25 QC): ~3$/an
+    #   - Licences MDMS/analytics: ~4$/an
+    #   - Stockage cloud/backup: ~2$/an
+    #   - Support client/portail: ~1$/an
+    #
+    # Fourchettes observées: 10$ (bas) — 15$ (médian) — 25$ (haut/Loi 25)
+    # Source: Winnipeg AMI business case, AWWA M6, estimations fournisseurs
+    # ─────────────────────────────────────────────────────────────────
+    cout_opex_non_tech_ami: float = 15.0  # $/compteur/an (défaut réaliste)
+    ventilation_opex_ami: VentilationOPEX = field(
+        default_factory=lambda: VENTILATION_OPEX_STANDARD
+    )
 
     # Frais de lecture AMR (tournées en véhicule)
     cout_lecture_amr: float = 8.0         # $/compteur/an
@@ -519,6 +911,8 @@ class ParametresCompteur:
                 self.facteur_efficacite_comportement = 0.875
                 self.facteur_efficacite_fuites = 0.91
             # AMI: facteurs = 1.0 (référence, pas de modification)
+        if self.cout_opex_non_tech_ami < 0:
+            raise ValueError("cout_opex_non_tech_ami doit être >= 0")
 
     @property
     def cout_installation(self) -> float:
@@ -537,11 +931,15 @@ class ParametresCompteur:
     def cout_exploitation_annuel(self) -> float:
         """Coût d'exploitation annuel par compteur."""
         if self.type_compteur == TypeCompteur.AMI:
-            return self.cout_maintenance_ami
+            return self.cout_maintenance_ami + self.cout_opex_non_tech_ami
         elif self.type_compteur == TypeCompteur.AMR:
             return self.cout_maintenance_amr + self.cout_lecture_amr
         else:  # MANUEL
             return self.cout_maintenance_manuel + self.cout_lecture_manuel
+
+    def opex_ami_non_tech_detail(self) -> dict:
+        """Détail de l'OPEX AMI non technique selon la ventilation."""
+        return self.ventilation_opex_ami.ventiler(self.cout_opex_non_tech_ami)
 
 
 @dataclass
@@ -556,6 +954,7 @@ class ParametresModele:
     """
     # Population et ménages
     nb_menages: int = 10_000
+    nb_compteurs: Optional[int] = None  # Nombre de compteurs (si différent des ménages)
     taille_menage: float = 2.1            # personnes/ménage
 
     # Consommation d'eau
@@ -570,24 +969,50 @@ class ParametresModele:
     reduction_comportement_pct: float = 8.0  # % réduction usage base
 
     # Valeur économique de l'eau
-    valeur_eau_m3: float = 4.69           # $/m³ (coût social/marginal)
+    valeur_eau_m3: float = 4.69           # $/m³ (coût social/long terme)
 
     # Report d'infrastructure (optionnel)
     benefice_report_infra_annuel: float = 0.0  # $/an (défaut = non utilisé)
+    benefice_report_infra_par_m3: float = 0.0  # $/m³ économisé (lié aux économies)
 
     # Paramètres financiers
-    taux_actualisation_pct: float = 3.0   # % (taux social)
+    # Taux d'actualisation: 3% réel (cohérent avec projets infrastructure long terme Québec)
+    # Sources: Guide d'analyse avantages-coûts MAMH; pratique courante projets municipaux
+    taux_actualisation_pct: float = 3.0   # % (taux social réel)
     horizon_analyse: int = 20             # années
+    part_ville_capex_pct: float = 100.0   # % du CAPEX payé par la ville (mode financier)
+    part_ville_opex_pct: float = 100.0    # % de l'OPEX payé par la ville (mode financier)
+
+    def __post_init__(self):
+        """Valider les paramètres financiers."""
+        if self.nb_compteurs is not None and self.nb_compteurs <= 0:
+            raise ValueError("nb_compteurs doit être > 0 si fourni")
+        if self.benefice_report_infra_annuel < 0:
+            raise ValueError("benefice_report_infra_annuel doit être >= 0")
+        if self.benefice_report_infra_par_m3 < 0:
+            raise ValueError("benefice_report_infra_par_m3 doit être >= 0")
+        if not 0 <= self.part_ville_capex_pct <= 100:
+            raise ValueError("part_ville_capex_pct doit être entre 0 et 100")
+        if not 0 <= self.part_ville_opex_pct <= 100:
+            raise ValueError("part_ville_opex_pct doit être entre 0 et 100")
 
     @property
     def nb_personnes(self) -> int:
         """Population totale."""
         return int(self.nb_menages * self.taille_menage)
 
+    @property
+    def nb_compteurs_effectif(self) -> int:
+        """Nombre effectif de compteurs (défaut = nb_menages)."""
+        if self.nb_compteurs is None:
+            return self.nb_menages
+        return int(self.nb_compteurs)
+
     def to_dict(self) -> dict:
         """Convertir en dictionnaire."""
         return {
             'nb_menages': self.nb_menages,
+            'nb_compteurs': self.nb_compteurs,
             'taille_menage': self.taille_menage,
             'lpcd': self.lpcd,
             'part_menages_fuite_pct': self.part_menages_fuite_pct,
@@ -596,8 +1021,11 @@ class ParametresModele:
             'reduction_comportement_pct': self.reduction_comportement_pct,
             'valeur_eau_m3': self.valeur_eau_m3,
             'benefice_report_infra_annuel': self.benefice_report_infra_annuel,
+            'benefice_report_infra_par_m3': self.benefice_report_infra_par_m3,
             'taux_actualisation_pct': self.taux_actualisation_pct,
             'horizon_analyse': self.horizon_analyse,
+            'part_ville_capex_pct': self.part_ville_capex_pct,
+            'part_ville_opex_pct': self.part_ville_opex_pct,
         }
 
 
@@ -607,6 +1035,7 @@ class ConfigAnalyse:
     delta_sensibilite: float = 10.0       # ±% pour sensibilité
 
     # Graphiques à afficher
+    afficher_cadre_quebec: bool = True
     afficher_cascade: bool = True
     afficher_tornade: bool = True
     afficher_araignee: bool = True
@@ -627,6 +1056,36 @@ DEFAUTS_LONGUEUIL = ParametresModele(
     taille_menage=2.18,   # SQEEP 2023: 253,629 pop / 116,258 ménages
     lpcd=236.0,           # SQEEP 2023: consommation résidentielle Longueuil
 )
+
+# Ordres de grandeur Québec (repères pour cadrer les scénarios)
+ORDRES_GRANDEUR_QUEBEC = {
+    "residentiel_lpcd": 245.0,        # L/p/j résidentiel moyen (Québec)
+    "total_distribue_lpcd": 467.0,    # L/p/j tous usages distribués
+    "cible_provinciale_lpcd": 458.0,  # L/p/j cible provinciale
+    "longueuil_residentiel_lpcd": 236.0,  # Longueuil résidentiel (SQEEP 2023)
+    "longueuil_tous_usages_lpcd": 567.0,  # Longueuil tous usages (sources internes 2024)
+    "longueuil_cible_lpcd": 184.0,        # Objectif Longueuil (sources internes)
+}
+
+
+def afficher_ordres_grandeur_quebec() -> None:
+    """Afficher un encadré des ordres de grandeur Québec pour cadrer LPCD."""
+    print("\n" + "=" * 80)
+    print(" " * 18 + "ORDRES DE GRANDEUR QUÉBEC (EAU POTABLE)")
+    print("=" * 80)
+
+    q = ORDRES_GRANDEUR_QUEBEC
+    print(f"  Résidentiel moyen Québec: {q['residentiel_lpcd']:.0f} L/p/j")
+    print(f"  Total distribué (tous usages): {q['total_distribue_lpcd']:.0f} L/p/j")
+    print(f"  Cible provinciale:        {q['cible_provinciale_lpcd']:.0f} L/p/j")
+    print(f"  Longueuil résidentiel:    {q['longueuil_residentiel_lpcd']:.0f} L/p/j")
+    print(f"  Longueuil tous usages:    {q['longueuil_tous_usages_lpcd']:.0f} L/p/j")
+    print(f"  Objectif Longueuil:       {q['longueuil_cible_lpcd']:.0f} L/p/j")
+
+    print("\n  Justification des scénarios:")
+    print("  - LPCD par défaut = 250 L/p/j (cohérent avec résidentiel Québec)")
+    print("  - Scénarios bas/haut cadrés par 180–350 L/p/j (Monte Carlo/sensibilités)")
+    print("=" * 80)
 
 # Preset pour scénario forte consommation (Montréal, villes non comptées)
 LPCD_MONTREAL_HAUT = 332.0  # Source: documents municipaux Montréal
@@ -653,6 +1112,44 @@ COMPTEUR_WINNIPEG = ParametresCompteur(
     cout_reseau_par_compteur=161.0,  # $135M / 221k = ~$611 total
 )
 
+# ─────────────────────────────────────────────────────────────────────────────
+# SCÉNARIOS OPEX AMI (sensibilité)
+# ─────────────────────────────────────────────────────────────────────────────
+# Ces scénarios permettent de tester la sensibilité aux coûts d'exploitation
+# non-techniques (télécom, cyber, licences, stockage, support).
+#
+# OPEX total AMI = cout_maintenance_ami (5$) + cout_opex_non_tech_ami
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Scénario OPEX bas: infrastructure mutualisée, contrats avantageux
+COMPTEUR_AMI_OPEX_BAS = ParametresCompteur(
+    type_compteur=TypeCompteur.AMI,
+    cout_compteur=250.0,
+    heures_installation=3.0,
+    taux_horaire_installation=125.0,
+    cout_reseau_par_compteur=50.0,
+    cout_opex_non_tech_ami=10.0,  # OPEX total: 15$/an
+)
+
+# Scénario OPEX médian: défaut réaliste (identique à COMPTEUR_LONGUEUIL_AMI)
+# cout_opex_non_tech_ami = 15.0 par défaut → OPEX total: 20$/an
+
+# Scénario OPEX haut: exigences Loi 25, cybersécurité renforcée, premium cloud
+COMPTEUR_AMI_OPEX_HAUT = ParametresCompteur(
+    type_compteur=TypeCompteur.AMI,
+    cout_compteur=250.0,
+    heures_installation=3.0,
+    taux_horaire_installation=125.0,
+    cout_reseau_par_compteur=50.0,
+    cout_opex_non_tech_ami=35.0,  # OPEX total: 40$/an
+)
+
+SCENARIOS_OPEX_AMI = {
+    "bas": COMPTEUR_AMI_OPEX_BAS,       # 15$/compteur/an
+    "median": COMPTEUR_LONGUEUIL_AMI,   # 20$/compteur/an (défaut)
+    "haut": COMPTEUR_AMI_OPEX_HAUT,     # 40$/compteur/an
+}
+
 
 # =============================================================================
 # RÉSULTATS DU MODÈLE
@@ -664,13 +1161,17 @@ class ResultatsModele:
     # Références
     params: ParametresModele
     compteur: ParametresCompteur
+    mode_compte: ModeCompte = ModeCompte.ECONOMIQUE
 
-    # Économies d'eau (par ménage, m³/an)
+    # Économies d'eau (par ménage, m³/an — année 1)
     usage_base_menage: float = 0.0
     economie_fuite_menage: float = 0.0
     economie_comportement_menage: float = 0.0
     economie_reseau_menage: float = 0.0
-    economie_totale_menage: float = 0.0
+    economie_totale_menage: float = 0.0  # Année 1 seulement
+
+    # Économies d'eau totales sur l'horizon (m³)
+    economies_totales_horizon_m3: float = 0.0  # Somme sur T années, tous ménages
 
     # Flux annuels totaux ($)
     investissement_initial: float = 0.0
@@ -681,6 +1182,11 @@ class ResultatsModele:
 
     # Valeurs actualisées ($)
     va_benefices: float = 0.0
+    va_benefices_eau: float = 0.0            # Valeur actualisée des économies d'eau (m³ × valeur)
+    va_benefices_report_infra: float = 0.0   # Valeur actualisée du report d'infra (paramètres dédiés)
+    va_benefices_cout_variable: float = 0.0  # Composante coût variable évité
+    va_benefices_infra_m3: float = 0.0       # Composante infrastructure (valeur sociale par m³)
+    va_benefices_externalites: float = 0.0   # Composante externalités (valeur sociale par m³)
     va_couts_exploitation: float = 0.0
     va_couts_totaux: float = 0.0
     van: float = 0.0
@@ -701,9 +1207,191 @@ class ResultatsModele:
     # Économies d'échelle
     economies_echelle_actives: bool = False
     facteur_echelle: float = 1.0
+    facteur_echelle_compteur: float = 1.0
+    facteur_echelle_installation: float = 1.0
+    facteur_echelle_reseau: float = 1.0
     cout_par_compteur_base: float = 0.0      # Avant économies d'échelle
     cout_par_compteur_ajuste: float = 0.0    # Après économies d'échelle
     economies_realisees: float = 0.0         # $ économisés grâce à l'échelle
+
+
+# =============================================================================
+# DÉCOMPOSITION PAR PAYEUR (v3.9)
+# =============================================================================
+
+@dataclass
+class ResultatsParPayeur:
+    """
+    Décomposition de la VAN par payeur: société, ville, ménages.
+
+    Cette structure permet de comprendre qui bénéficie (ou paie) le projet:
+    - VAN économique: bien-être social total (externalités incluses)
+    - VAN ville: perspective budget municipal (coûts/bénéfices ville)
+    - VAN ménages: perspective citoyens (coûts réparations, bénéfices directs non tarifaires)
+
+    Note: VAN_eco ≠ VAN_ville + VAN_menages car:
+    - VAN_eco inclut les externalités (environnement, infrastructure reportée)
+    - VAN_eco valorise l'eau à sa valeur sociale (4.69$/m³)
+    - VAN_ville et VAN_menages utilisent des valeurs financières différentes
+    """
+    # VAN globale économique (bien-être social)
+    van_economique: float = 0.0
+
+    # VAN ville (budget municipal)
+    # Inclut: CAPEX ville, OPEX ville, économies coût variable, coûts réparation ville
+    van_ville: float = 0.0
+    va_couts_ville: float = 0.0       # CAPEX + OPEX supportés par la ville
+    va_benefices_ville: float = 0.0   # Économies coût variable × m³ économisés
+
+    # VAN ménages (perspective citoyens)
+    # Inclut: CAPEX ménages, coûts réparation ménages, valeur économies (si tarif volumétrique)
+    van_menages: float = 0.0
+    va_couts_menages: float = 0.0     # CAPEX ménages + réparations
+    va_benefices_menages: float = 0.0 # Bénéfices directs (tarification hors périmètre)
+
+    # Externalités (incluses dans VAN_eco mais pas dans VAN_ville ni VAN_menages)
+    va_externalites: float = 0.0      # Environnement + infrastructure reportée
+
+    # Décomposition des bénéfices d'eau (VA, info)
+    va_benefices_cout_variable: float = 0.0
+    va_benefices_infra_m3: float = 0.0
+    va_benefices_externalites: float = 0.0
+    va_benefices_report_infra: float = 0.0
+
+    # Métadonnées
+    params: Optional[ParametresModele] = None
+
+
+def decomposer_par_payeur(
+    params: ParametresModele,
+    compteur: ParametresCompteur,
+    config_echelle: Optional[ConfigEconomiesEchelle] = None,
+    persistance: Optional[ParametresPersistance] = None,
+    params_fuites: Optional[ParametresFuites] = None,
+    valeur_eau: Optional[ParametresValeurEau] = None,
+    params_adoption: Optional[ParametresAdoption] = None,
+) -> ResultatsParPayeur:
+    """
+    Calculer la VAN décomposée par payeur: société, ville, ménages.
+
+    Cette fonction exécute le modèle deux fois (économique + financier) et
+    calcule la part de chaque acteur.
+
+    Paramètres:
+        params: Paramètres du modèle
+        compteur: Paramètres du compteur
+        config_echelle: Configuration économies d'échelle
+        persistance: Configuration persistance
+        params_fuites: Configuration fuites
+        valeur_eau: Paramètres valeur eau
+        params_adoption: Stratégie d'adoption
+
+    Retourne:
+        ResultatsParPayeur avec la décomposition complète
+    """
+    if valeur_eau is None:
+        valeur_eau = VALEUR_EAU_QUEBEC
+    if params_fuites is None:
+        params_fuites = FUITES_CONTEXTE_QUEBEC
+
+    # 1. Exécuter en mode ÉCONOMIQUE (bien-être social)
+    res_eco = executer_modele(
+        params, compteur, config_echelle, persistance, params_fuites,
+        mode_compte=ModeCompte.ECONOMIQUE, valeur_eau=valeur_eau,
+        params_adoption=params_adoption,
+    )
+
+    # 2. Exécuter en mode FINANCIER (perspective ville)
+    res_fin = executer_modele(
+        params, compteur, config_echelle, persistance, params_fuites,
+        mode_compte=ModeCompte.FINANCIER, valeur_eau=valeur_eau,
+        params_adoption=params_adoption,
+    )
+
+    # 3. Calculer les composantes
+    part_ville_capex = params.part_ville_capex_pct / 100.0
+    part_ville_opex = params.part_ville_opex_pct / 100.0
+
+    # Coûts ville = (CAPEX × part_ville) + (OPEX × part_ville)
+    va_capex_ville = res_eco.investissement_initial * part_ville_capex
+    va_opex_ville = res_eco.va_couts_exploitation * part_ville_opex
+    va_couts_ville = va_capex_ville + va_opex_ville
+
+    # Coûts ménages = (CAPEX × part_menages) + réparations ménages
+    va_capex_menages = res_eco.investissement_initial * (1 - part_ville_capex)
+    va_opex_menages = res_eco.va_couts_exploitation * (1 - part_ville_opex)
+    # Les coûts de réparation des ménages sont inclus dans va_opex si applicable
+    va_couts_menages = va_capex_menages + va_opex_menages
+
+    # Bénéfices ville = économies coût variable (VA, cohérent avec trajectoires)
+    va_benefices_ville = res_eco.va_benefices_cout_variable
+
+    # Bénéfices ménages = gains monétaires directs (tarification hors périmètre)
+    # Au Québec sans tarification volumétrique, les ménages ne bénéficient pas directement.
+    # Réservé à un module futur si la tarification résidentielle est ajoutée.
+    va_benefices_menages = 0.0  # Pas de tarification volumétrique au Québec
+
+    # VAN ville = bénéfices ville - coûts ville
+    van_ville = va_benefices_ville - va_couts_ville
+
+    # VAN ménages = bénéfices ménages - coûts ménages
+    van_menages = va_benefices_menages - va_couts_menages
+
+    # Externalités = composantes sociales + report d'infra explicite (VA)
+    va_externalites = (
+        res_eco.va_benefices_infra_m3 +
+        res_eco.va_benefices_externalites +
+        res_eco.va_benefices_report_infra
+    )
+
+    return ResultatsParPayeur(
+        van_economique=res_eco.van,
+        van_ville=van_ville,
+        va_couts_ville=va_couts_ville,
+        va_benefices_ville=va_benefices_ville,
+        van_menages=van_menages,
+        va_couts_menages=va_couts_menages,
+        va_benefices_menages=va_benefices_menages,
+        va_externalites=va_externalites,
+        va_benefices_cout_variable=res_eco.va_benefices_cout_variable,
+        va_benefices_infra_m3=res_eco.va_benefices_infra_m3,
+        va_benefices_externalites=res_eco.va_benefices_externalites,
+        va_benefices_report_infra=res_eco.va_benefices_report_infra,
+        params=params,
+    )
+
+
+def afficher_decomposition_payeurs(res: ResultatsParPayeur) -> None:
+    """Afficher un tableau de la décomposition par payeur."""
+    print("\n" + "=" * 70)
+    print(" " * 15 + "DÉCOMPOSITION DE LA VAN PAR PAYEUR")
+    print("=" * 70)
+
+    print(f"\n{'PERSPECTIVE':<25} │ {'VAN':<18} │ {'Coûts VA':<15} │ {'Bénéfices VA':<15}")
+    print("─" * 25 + "─┼─" + "─" * 18 + "─┼─" + "─" * 15 + "─┼─" + "─" * 15)
+
+    print(f"{'Économique (société)':<25} │ {fmt_argent(res.van_economique):>17} │ "
+          f"{'-':>14} │ {'-':>14}")
+    print(f"{'Ville (budget municipal)':<25} │ {fmt_argent(res.van_ville):>17} │ "
+          f"{fmt_argent(res.va_couts_ville):>14} │ {fmt_argent(res.va_benefices_ville):>14}")
+    print(f"{'Ménages (citoyens)':<25} │ {fmt_argent(res.van_menages):>17} │ "
+          f"{fmt_argent(res.va_couts_menages):>14} │ {fmt_argent(res.va_benefices_menages):>14}")
+    print("─" * 25 + "─┼─" + "─" * 18 + "─┼─" + "─" * 15 + "─┼─" + "─" * 15)
+    print(f"{'Externalités (non captées)':<25} │ {fmt_argent(res.va_externalites):>17} │ "
+          f"{'-':>14} │ {'-':>14}")
+
+    print("\n" + "─" * 70)
+    print("Notes:")
+    print("  - VAN économique = bien-être social total (externalités incluses)")
+    print("  - VAN ville = économies coût variable - (CAPEX + OPEX ville)")
+    print("  - VAN ménages = 0 au Québec (pas de tarification volumétrique)")
+    print("  - Externalités = infrastructure reportée + environnement")
+    print("\n  Décomposition VA (valeur sociale de l'eau):")
+    print(f"    • Coût variable évité:      {fmt_argent(res.va_benefices_cout_variable)}")
+    print(f"    • Report infra (valeur m³): {fmt_argent(res.va_benefices_infra_m3)}")
+    print(f"    • Externalités:             {fmt_argent(res.va_benefices_externalites)}")
+    print(f"    • Report infra (paramètres): {fmt_argent(res.va_benefices_report_infra)}")
+    print("=" * 70)
 
 
 # =============================================================================
@@ -1047,13 +1735,11 @@ class ParametresFuites:
     # Le compteur intelligent permet de détecter les fuites via
     # l'analyse du profil de consommation (débit continu 24h/24)
     taux_detection_pct: float = 90.0          # Taux de détection AMI (%)
-    delai_detection_mois: float = 1.0         # Délai moyen de détection (mois)
 
     # === RÉPARATION ===
     # Une fois détectée, la fuite doit être réparée par le ménage
     taux_reparation_pct: float = 85.0         # % des fuites détectées qui sont réparées
     cout_reparation_moyen: float = 200.0      # Coût moyen par réparation ($)
-    delai_reparation_mois: float = 2.0        # Délai moyen de réparation (mois)
 
     # === PARTAGE DES COÛTS ===
     # La ville peut subventionner les réparations pour encourager l'action
@@ -1098,6 +1784,12 @@ class ParametresFuites:
             raise ValueError("part_menages_fuite_significative_pct doit être entre 0 et 100")
         if not 0 <= self.part_fuites_persistantes_pct <= 100:
             raise ValueError("part_fuites_persistantes_pct doit être entre 0 et 100")
+        if self.utiliser_prevalence_differenciee:
+            if self.part_menages_fuite_significative_pct > self.part_menages_fuite_any_pct:
+                raise ValueError(
+                    "part_menages_fuite_significative_pct doit être <= part_menages_fuite_any_pct "
+                    "lorsque utiliser_prevalence_differenciee=True"
+                )
 
     @property
     def taux_correction_effectif(self) -> float:
@@ -1122,19 +1814,32 @@ class ParametresFuites:
         Volume moyen pondéré si prévalence différenciée est activée.
 
         Calcule le volume moyen par ménage avec fuite en pondérant les deux types.
+
+        IMPORTANT: p_sig ⊂ p_any (les fuites significatives sont un sous-ensemble
+        des fuites "any"). Donc p_any_excl = p_any - p_sig représente les petites
+        fuites uniquement.
+
+        Formule: (p_any_excl × vol_any + p_sig × vol_sig) / p_any
         """
         if not self.utiliser_prevalence_differenciee:
             return self.debit_fuite_m3_an
 
-        # Pondération par prévalence
+        # Prévalences (p_sig est inclus dans p_any)
         p_any = self.part_menages_fuite_any_pct
         p_sig = self.part_menages_fuite_significative_pct
-        if p_any + p_sig == 0:
+
+        if p_any <= 0:
             return 0.0
 
-        vol_any = self.debit_fuite_any_m3_an * p_any
-        vol_sig = self.debit_fuite_significative_m3_an * p_sig
-        return (vol_any + vol_sig) / (p_any + p_sig)
+        # p_any_excl = ménages avec petite fuite uniquement (exclusif)
+        p_any_excl = max(0.0, p_any - p_sig)
+
+        # Pondération correcte: petites fuites + grosses fuites
+        vol_petites = self.debit_fuite_any_m3_an * p_any_excl
+        vol_grosses = self.debit_fuite_significative_m3_an * p_sig
+
+        # Diviseur = p_any (total des ménages avec fuite)
+        return (vol_petites + vol_grosses) / p_any
 
 
 @dataclass
@@ -1341,6 +2046,9 @@ def calculer_dynamique_fuites(
             stock_any_comp_pers, any_comp_moy_pers = evoluer_stock(
                 stock_any_comp_pers, mu * long_tail_mult + k_any_pers, nouvelles_any_pers)
             eco_persist[t] += max(0.0, (any_base_moy_pers - any_comp_moy_pers) * debit_any)
+            rep_any_pers = k_any_pers * any_comp_moy_pers
+            rep_any[t] += rep_any_pers
+            cout_any_arr[t] += rep_any_pers * cout_any
 
             # SIG réparable
             stock_sig_base_rep, sig_base_moy_rep = evoluer_stock(
@@ -1358,6 +2066,9 @@ def calculer_dynamique_fuites(
             stock_sig_comp_pers, sig_comp_moy_pers = evoluer_stock(
                 stock_sig_comp_pers, mu * long_tail_mult + k_sig_pers, nouvelles_sig_pers)
             eco_persist[t] += max(0.0, (sig_base_moy_pers - sig_comp_moy_pers) * debit_sig)
+            rep_sig_pers = k_sig_pers * sig_comp_moy_pers
+            rep_sig[t] += rep_sig_pers
+            cout_sig_arr[t] += rep_sig_pers * cout_sig
 
         # Agrégation
         economies_eau = eco_any + eco_sig + eco_persist
@@ -1405,6 +2116,10 @@ def calculer_dynamique_fuites(
     C = params_fuites.cout_reparation_moyen if params_fuites.inclure_cout_reparation else 0.0
     debit = params_fuites.debit_fuite_m3_an
     k = d_eff * r_base
+    frac_persist = max(0.0, min(1.0, params_fuites.part_fuites_persistantes_pct / 100.0))
+    frac_repar = 1.0 - frac_persist
+    long_tail_factor = max(1.0, params_fuites.facteur_duree_longue_traine)
+    long_tail_mult = 1.0 / long_tail_factor
 
     # Taux de réparation naturelle
     if params_fuites.duree_moyenne_fuite_sans_compteur is not None:
@@ -1421,19 +2136,36 @@ def calculer_dynamique_fuites(
     cout_menages = np.zeros(T)
     economies_eau = np.zeros(T)
 
-    taux_base = mu
-    taux_compteur = mu + k
-    nouvelles_fuites = H * q
+    # Stocks réparables vs persistants (longue traîne)
+    stock_base_rep = H * p0 * frac_repar
+    stock_comp_rep = H * p0 * frac_repar
+    stock_base_pers = H * p0 * frac_persist
+    stock_comp_pers = H * p0 * frac_persist
 
-    stock_base = H * p0
-    stock_compteur = H * p0
+    nouvelles_rep = H * q * frac_repar
+    nouvelles_pers = H * q * frac_persist
+
+    taux_base_rep = mu
+    taux_comp_rep = mu + k
+    mu_pers = mu * long_tail_mult
+    k_pers = k * long_tail_mult
+    taux_base_pers = mu_pers
+    taux_comp_pers = mu_pers + k_pers
 
     for t in range(T):
-        stock_base, base_moy = evoluer_stock(stock_base, taux_base, nouvelles_fuites)
-        stock_compteur, compteur_moy = evoluer_stock(stock_compteur, taux_compteur, nouvelles_fuites)
+        # Réparable
+        stock_base_rep, base_moy_rep = evoluer_stock(stock_base_rep, taux_base_rep, nouvelles_rep)
+        stock_comp_rep, comp_moy_rep = evoluer_stock(stock_comp_rep, taux_comp_rep, nouvelles_rep)
 
-        economies_eau[t] = max(0.0, (base_moy - compteur_moy) * debit)
-        reparations_t = k * compteur_moy
+        # Persistant (taux réduit)
+        stock_base_pers, base_moy_pers = evoluer_stock(stock_base_pers, taux_base_pers, nouvelles_pers)
+        stock_comp_pers, comp_moy_pers = evoluer_stock(stock_comp_pers, taux_comp_pers, nouvelles_pers)
+
+        economie_rep = (base_moy_rep - comp_moy_rep) * debit
+        economie_pers = (base_moy_pers - comp_moy_pers) * debit
+        economies_eau[t] = max(0.0, economie_rep + economie_pers)
+
+        reparations_t = k * comp_moy_rep + k_pers * comp_moy_pers
         reparations[t] = reparations_t
         cout_total[t] = reparations_t * C
         cout_ville[t] = cout_total[t] * part_ville
@@ -1671,47 +2403,67 @@ def calculer_dynamique_fuites_reseau(
 # Scénario SANS_COUT: Modèle de base (ignorer les coûts de réparation)
 # Équivalent au modèle v3.1 - pour comparaison
 FUITES_SANS_COUT = ParametresFuites(
+    part_menages_fuite_pct=20.0,
+    debit_fuite_m3_an=35.0,
+    taux_detection_pct=90.0,
+    taux_reparation_pct=85.0,
+    part_fuites_persistantes_pct=5.0,
     mode_repartition=ModeRepartitionCouts.SANS_COUT,
     inclure_cout_reparation=False,
     duree_moyenne_fuite_sans_compteur=4.0,
     nom="Sans coût",
-    description="Modèle de base - coûts de réparation ignorés",
+    description="Borne basse: coûts réparation ignorés (prévalence 20%, durée 4 ans)",
 )
 
 # Scénario MENAGE_SEUL: Les ménages paient 100% des réparations
 # Hypothèse réaliste par défaut
 FUITES_MENAGE_SEUL = ParametresFuites(
+    part_menages_fuite_pct=20.0,
+    debit_fuite_m3_an=35.0,
+    taux_detection_pct=90.0,
+    taux_reparation_pct=85.0,
+    part_fuites_persistantes_pct=5.0,
     mode_repartition=ModeRepartitionCouts.MENAGE_SEUL,
     part_ville_pct=0.0,
     cout_reparation_moyen=200.0,
     inclure_cout_reparation=True,
     duree_moyenne_fuite_sans_compteur=4.0,
     nom="Ménage seul",
-    description="100% des coûts de réparation assumés par les ménages",
+    description="Prévalence 20%, durée 4 ans; détection 90%/réparation 85% (ménage 100%)",
 )
 
 # Scénario SUBVENTION_50: La ville subventionne 50% des réparations
 # Programme incitatif modéré
 FUITES_SUBVENTION_50 = ParametresFuites(
+    part_menages_fuite_pct=20.0,
+    debit_fuite_m3_an=35.0,
+    taux_detection_pct=90.0,
+    taux_reparation_pct=85.0,
+    part_fuites_persistantes_pct=5.0,
     mode_repartition=ModeRepartitionCouts.SUBVENTION_PARTIELLE,
     part_ville_pct=50.0,
     cout_reparation_moyen=200.0,
     inclure_cout_reparation=True,
     duree_moyenne_fuite_sans_compteur=4.0,
     nom="Subvention 50%",
-    description="La ville subventionne 50% des coûts de réparation",
+    description="Prévalence 20%, durée 4 ans; ville subventionne 50% (réparation 85%)",
 )
 
 # Scénario VILLE_SEULE: La ville paie 100% des réparations
 # Programme incitatif maximal (ex: programme de plomberie gratuite)
 FUITES_VILLE_SEULE = ParametresFuites(
+    part_menages_fuite_pct=20.0,
+    debit_fuite_m3_an=35.0,
+    taux_detection_pct=90.0,
+    taux_reparation_pct=85.0,
+    part_fuites_persistantes_pct=5.0,
     mode_repartition=ModeRepartitionCouts.VILLE_SEULE,
     part_ville_pct=100.0,
     cout_reparation_moyen=200.0,
     inclure_cout_reparation=True,
     duree_moyenne_fuite_sans_compteur=4.0,
     nom="Ville seule",
-    description="100% des coûts de réparation assumés par la ville",
+    description="Prévalence 20%, durée 4 ans; ville 100% (réparation 85%)",
 )
 
 # Scénario CONTEXTE_QUEBEC: prévalence de fuites PRIVÉES ajustée pour villes sans compteurs
@@ -1729,7 +2481,7 @@ FUITES_CONTEXTE_QUEBEC = ParametresFuites(
     inclure_cout_reparation=True,
     mode_repartition=ModeRepartitionCouts.MENAGE_SEUL,
     nom="Contexte Québec",
-    description="Prévalence 35% - ajustée pour ville sans compteurs historiques",
+    description="Prévalence 35%, durée 7 ans (ville sans compteurs); détection 90%/réparation 85%",
 )
 
 # Scénario QUÉBEC DEUX-STOCKS: prévalence plus élevée et coûts différenciés
@@ -1754,7 +2506,7 @@ FUITES_QUEBEC_DEUX_STOCKS = ParametresFuites(
     mode_repartition=ModeRepartitionCouts.MENAGE_SEUL,
     part_ville_pct=0.0,
     nom="Québec deux-stocks",
-    description="Prévalence 30% + fuites significatives 6% avec coûts différenciés",
+    description="Deux stocks: 30% petites + 6% significatives, coûts 150$/600$, durée 6 ans",
 )
 
 # Dictionnaire des scénarios
@@ -1766,6 +2518,10 @@ SCENARIOS_FUITES = {
     "quebec": FUITES_CONTEXTE_QUEBEC,
     "quebec_deux_stocks": FUITES_QUEBEC_DEUX_STOCKS,
 }
+
+# Note Québec: les taux 90% détection / 85% réparation supposent un minimum
+# d'accompagnement; sans tarification, les frictions (plombier, nuisance)
+# peuvent réduire ces taux (à tester en sensibilité).
 
 
 # =============================================================================
@@ -1873,23 +2629,33 @@ class ParametresAdoption:
     #                                   # Si False, CAPEX complet en t=0
 
     # === COÛTS INCITATIFS (NOUVEAU v3.8) ===
-    # Ces coûts représentent les rabais/subventions offerts pour encourager l'adoption
-    # Exemples: réduction de taxe d'eau, crédit sur facture, subvention installation
+    # Ces coûts représentent les crédits/subventions offerts pour encourager l'adoption
+    # Au Québec: crédit sur le compte de taxes foncières (forfait d'installation)
+    #
+    # CONTEXTE QUÉBÉCOIS:
+    #   - Pas de tarification volumétrique résidentielle (incitatifs non liés à l'usage)
+    #   - L'incitatif est un crédit de taxes / subvention d'installation forfaitaire
+    #   - Exemple: forfait 540$ par ménage, étalé sur 3 ans
     #
     # IMPORTANT - Traitement selon le mode d'analyse:
     #   - Mode ÉCONOMIQUE: EXCLUS (transferts neutres pour le bien-être social)
     #   - Mode FINANCIER: INCLUS (coût réel pour le budget municipal)
     #
     # cout_incitatif_par_menage est un COÛT TOTAL par ménage, réparti sur duree_incitatif_ans
-    # Exemple: rabais 30% sur facture 600$/an × 3 ans = 540$/ménage TOTAL (→ 180$/an × 3 ans)
+    # Exemple: forfait 540$/ménage TOTAL (→ 180$/an × 3 ans)
     cout_incitatif_par_menage: float = 0.0   # $ TOTAL par ménage adopté (réparti sur duree_incitatif_ans)
     duree_incitatif_ans: int = 1             # Nombre d'années sur lesquelles l'incitatif est étalé
     #
-    # Calibration recommandée:
+    # Calibration recommandée (forfaits indicatifs, à ajuster localement):
     #   - OBLIGATOIRE: 0$ (pas besoin d'incitatif)
-    #   - RAPIDE (30% × 3 ans): 540$/ménage
-    #   - PROGRESSIVE (10% × 3 ans): 180$/ménage
-    #   - LENTE (5% × 3 ans): 90$/ménage
+    #   - RAPIDE (forfait sur 3 ans): 540$/ménage
+    #   - PROGRESSIVE (forfait sur 3 ans): 180$/ménage
+    #   - LENTE (forfait sur 3 ans): 90$/ménage
+
+    # === TIMING D'INSTALLATION ===
+    # Fraction des effets annuels attribuée à l'année d'installation.
+    # 1.0 = effet complet, 0.5 = installation moyenne en milieu d'année.
+    fraction_premiere_annee: float = 1.0
 
     # === DÉLAI DE DÉMARRAGE ===
     annee_demarrage: int = 1            # Année de début du déploiement
@@ -1917,6 +2683,8 @@ class ParametresAdoption:
             raise ValueError("cout_incitatif_par_menage doit être >= 0")
         if self.duree_incitatif_ans < 1:
             raise ValueError("duree_incitatif_ans doit être >= 1")
+        if not 0.0 <= self.fraction_premiere_annee <= 1.0:
+            raise ValueError("fraction_premiere_annee doit être entre 0 et 1")
 
 
 def calculer_adoption(t: float, params: ParametresAdoption) -> float:
@@ -2007,10 +2775,28 @@ def calculer_delta_adoption(serie_adoption: np.ndarray) -> np.ndarray:
     return delta
 
 
+def calculer_adoption_effective(
+    serie_adoption: np.ndarray,
+    fraction_premiere_annee: float
+) -> np.ndarray:
+    """
+    Calculer l'adoption effective pour les flux annuels.
+
+    A_eff(t) = A(t-1) + f × (A(t) - A(t-1)), avec A(0)=0.
+    f=0.5 ≈ installation moyenne en milieu d'année.
+    """
+    if len(serie_adoption) == 0:
+        return np.array([])
+    f = max(0.0, min(1.0, fraction_premiere_annee))
+    delta = calculer_delta_adoption(serie_adoption)
+    return serie_adoption - (1.0 - f) * delta
+
+
 def convoluer_cohortes(
     delta_adoption: np.ndarray,
     serie_par_age: np.ndarray,
     nb_menages: int,
+    fraction_premiere_annee: float = 1.0,
 ) -> np.ndarray:
     """
     Somme des cohortes: convolution discrète des nouveaux adoptants avec une série d'âge.
@@ -2020,7 +2806,12 @@ def convoluer_cohortes(
     if len(delta_adoption) == 0:
         return np.array([])
 
-    convolution = np.convolve(delta_adoption, serie_par_age)[:len(delta_adoption)]
+    serie = np.array(serie_par_age, copy=True)
+    if len(serie) > 0:
+        f = max(0.0, min(1.0, fraction_premiere_annee))
+        serie[0] *= f
+
+    convolution = np.convolve(delta_adoption, serie)[:len(delta_adoption)]
     return convolution * nb_menages
 
 
@@ -2077,37 +2868,40 @@ def calculer_capex_etale(
 # Scénario OBLIGATOIRE: Déploiement immédiat par règlement
 ADOPTION_OBLIGATOIRE = ParametresAdoption(
     mode=ModeAdoption.OBLIGATOIRE,
+    adoption_max_pct=100.0,  # 100% obligatoire
     etaler_capex=False,
     nom="Obligatoire",
     description="Déploiement immédiat et universel par règlement municipal",
 )
 
 # Scénario RAPIDE: Volontaire avec fortes incitations (3 ans pour 80%)
-# Calibration incitatif: rabais 30% sur facture 600$/an × 3 ans = 540$/ménage
+# Calibration incitatif: forfait 540$/ménage sur 3 ans (crédit taxes / subvention)
 ADOPTION_RAPIDE = ParametresAdoption(
     mode=ModeAdoption.VOLONTAIRE_INCITATIF,
     k_vitesse=1.5,           # Adoption rapide
     t0_point_median=2.0,     # 50% atteint en 2 ans
     adoption_max_pct=95.0,   # Plafond à 95%
     etaler_capex=True,
-    cout_incitatif_par_menage=540.0,  # 30% × 600$/an × 3 ans (NOUVEAU v3.8)
-    duree_incitatif_ans=3,            # Rabais versé sur 3 ans
+    cout_incitatif_par_menage=540.0,  # Forfait 3 ans
+    duree_incitatif_ans=3,            # Crédit versé sur 3 ans
+    fraction_premiere_annee=0.5,      # Installation moyenne sur l'année
     nom="Volontaire rapide",
-    description="Incitations fortes: rabais taxe 30% × 3 ans, adoption rapide en 3-4 ans",
+    description="Incitations fortes: crédit taxes / subvention (forfait 540$ sur 3 ans)",
 )
 
 # Scénario PROGRESSIF: Volontaire avec incitations modérées (7 ans pour 80%)
-# Calibration incitatif: rabais 10% sur facture 600$/an × 3 ans = 180$/ménage
+# Calibration incitatif: forfait 180$/ménage sur 3 ans (crédit taxes / subvention)
 ADOPTION_PROGRESSIVE = ParametresAdoption(
     mode=ModeAdoption.VOLONTAIRE_INCITATIF,
     k_vitesse=0.6,           # Adoption modérée
     t0_point_median=5.0,     # 50% atteint en 5 ans
     adoption_max_pct=85.0,   # Plafond à 85%
     etaler_capex=True,
-    cout_incitatif_par_menage=180.0,  # 10% × 600$/an × 3 ans (NOUVEAU v3.8)
-    duree_incitatif_ans=3,            # Rabais versé sur 3 ans
+    cout_incitatif_par_menage=180.0,  # Forfait 3 ans
+    duree_incitatif_ans=3,            # Crédit versé sur 3 ans
+    fraction_premiere_annee=0.5,      # Installation moyenne sur l'année
     nom="Volontaire progressif",
-    description="Incitations modérées: rabais taxe 10% × 3 ans, adoption en 7-8 ans",
+    description="Incitations modérées: crédit taxes / subvention (forfait 180$ sur 3 ans)",
 )
 
 # Scénario NOUVEAUX SEULEMENT: Seulement nouvelles constructions
@@ -2116,6 +2910,7 @@ ADOPTION_NOUVEAUX = ParametresAdoption(
     taux_nouveaux_pct=3.0,   # 3% de nouvelles constructions/an
     adoption_max_pct=60.0,   # Plafond réaliste sur 20 ans
     etaler_capex=True,
+    fraction_premiere_annee=0.5,      # Installation moyenne sur l'année
     nom="Nouveaux branchements",
     description="Obligation seulement pour nouvelles constructions/rénovations majeures",
 )
@@ -2127,23 +2922,108 @@ ADOPTION_PAR_SECTEUR = ParametresAdoption(
     annees_par_secteur=2.0,  # 2 ans par secteur (10 ans total)
     adoption_max_pct=100.0,  # Couverture complète à terme
     etaler_capex=True,
+    fraction_premiere_annee=0.5,      # Installation moyenne sur l'année
     nom="Par secteur",
     description="Plan quinquennal: un arrondissement tous les 2 ans",
 )
 
 # Scénario LENT: Adoption très progressive (pour comparaison)
-# Calibration incitatif: rabais 5% sur facture 600$/an × 3 ans = 90$/ménage
+# Calibration incitatif: forfait 90$/ménage sur 3 ans (crédit taxes / subvention)
 ADOPTION_LENTE = ParametresAdoption(
     mode=ModeAdoption.VOLONTAIRE_INCITATIF,
     k_vitesse=0.3,           # Adoption lente
     t0_point_median=10.0,    # 50% atteint en 10 ans
     adoption_max_pct=70.0,   # Plafond bas
     etaler_capex=True,
-    cout_incitatif_par_menage=90.0,   # 5% × 600$/an × 3 ans (NOUVEAU v3.8)
-    duree_incitatif_ans=3,            # Rabais versé sur 3 ans
+    cout_incitatif_par_menage=90.0,   # Forfait 3 ans
+    duree_incitatif_ans=3,            # Crédit versé sur 3 ans
+    fraction_premiere_annee=0.5,      # Installation moyenne sur l'année
     nom="Volontaire lent",
-    description="Incitations minimales: rabais taxe 5% × 3 ans, adoption lente",
+    description="Incitations minimales: crédit taxes / subvention (forfait 90$ sur 3 ans)",
 )
+
+# =============================================================================
+# SCÉNARIO ICI SEULEMENT — INSTITUTIONNEL (placeholder à calibrer)
+# =============================================================================
+# Déploiement limité aux compteurs ICI (industriel/commercial/institutionnel).
+# Le modèle est résidentiel: il faut fournir un % de parc ICI pour l'adoption.
+def creer_adoption_ici_seulement(part_ici_pct: float = 10.0) -> ParametresAdoption:
+    """
+    Créer une stratégie d'adoption "ICI seulement".
+
+    Args:
+        part_ici_pct: % du parc total correspondant aux compteurs ICI.
+    """
+    return ParametresAdoption(
+        mode=ModeAdoption.OBLIGATOIRE,
+        adoption_max_pct=part_ici_pct,
+        etaler_capex=False,
+        nom="ICI seulement",
+        description="Déploiement ICI (part du parc à calibrer localement)",
+    )
+
+
+ADOPTION_ICI_SEULEMENT = creer_adoption_ici_seulement()
+
+# =============================================================================
+# SCÉNARIO ÉCHANTILLONNAGE 380 — SQEEP/RAUEP
+# =============================================================================
+# Le SQEEP (Stratégie québécoise d'économie d'eau potable) et le RAUEP
+# exigent un échantillon statistique de 380 compteurs résidentiels pour
+# caractériser la consommation. Ce n'est PAS un déploiement universel.
+#
+# CALCUL DU POURCENTAGE:
+#   adoption_max_pct = (380 / nb_menages) × 100
+#   Ex: Longueuil (116 258 ménages) → 380/116258 × 100 = 0.327%
+#
+# CARACTÉRISTIQUES:
+#   - Sélection aléatoire stratifiée (représentativité statistique)
+#   - Coût marginal très bas (380 compteurs, pas d'économie d'échelle)
+#   - Objectif: caractérisation, pas réduction de consommation
+#   - La VAN sera NÉGATIVE (coût sans bénéfice comportemental significatif)
+#
+# FONCTION HELPER: creer_adoption_echantillonnage_380(nb_menages)
+# =============================================================================
+
+# Preset pour Longueuil (valeur par défaut du modèle)
+# Pour d'autres municipalités, utiliser creer_adoption_echantillonnage_380()
+ADOPTION_ECHANTILLONNAGE_380 = ParametresAdoption(
+    mode=ModeAdoption.OBLIGATOIRE,  # Les 380 compteurs sont sélectionnés par la ville
+    adoption_max_pct=0.327,  # 380/116258 × 100 pour Longueuil
+    etaler_capex=False,      # Installation en une seule phase
+    nom="Échantillonnage SQEEP (380)",
+    description="Échantillon statistique de 380 compteurs pour caractérisation SQEEP/RAUEP",
+)
+
+
+def creer_adoption_echantillonnage_380(nb_menages: int = 116258) -> ParametresAdoption:
+    """
+    Créer une stratégie d'adoption pour l'échantillonnage SQEEP de 380 compteurs.
+
+    Le SQEEP exige un échantillon de n=380 compteurs résidentiels pour obtenir
+    un intervalle de confiance de 95% avec une marge d'erreur de ±5%.
+
+    Args:
+        nb_menages: Nombre total de ménages dans la municipalité
+
+    Returns:
+        ParametresAdoption configuré pour 380 compteurs
+
+    Example:
+        >>> adoption_380 = creer_adoption_echantillonnage_380(nb_menages=50000)
+        >>> print(f"Taux: {adoption_380.adoption_max_pct:.3f}%")  # 0.760%
+    """
+    TAILLE_ECHANTILLON = 380
+    pct = (TAILLE_ECHANTILLON / nb_menages) * 100
+
+    return ParametresAdoption(
+        mode=ModeAdoption.OBLIGATOIRE,
+        adoption_max_pct=pct,
+        etaler_capex=False,
+        nom="Échantillonnage SQEEP (380)",
+        description=f"Échantillon de {TAILLE_ECHANTILLON} compteurs sur {nb_menages:,} ménages ({pct:.3f}%)",
+    )
+
 
 # Dictionnaire des stratégies
 STRATEGIES_ADOPTION = {
@@ -2153,6 +3033,8 @@ STRATEGIES_ADOPTION = {
     "nouveaux": ADOPTION_NOUVEAUX,
     "secteur": ADOPTION_PAR_SECTEUR,
     "lent": ADOPTION_LENTE,
+    "ici_seulement": ADOPTION_ICI_SEULEMENT,
+    "echantillonnage_380": ADOPTION_ECHANTILLONNAGE_380,  # SQEEP
 }
 
 
@@ -2192,6 +3074,7 @@ def comparer_strategies_adoption(
     Comparer les résultats du modèle selon différentes stratégies d'adoption.
 
     Cette fonction répond à la question centrale: "Quelle stratégie maximise la VAN?"
+    Si config_echelle est None, compare deux scénarios: sans et avec économies d'échelle.
 
     Paramètres:
         params: Paramètres du modèle
@@ -2216,33 +3099,35 @@ def comparer_strategies_adoption(
 
     resultats = []
 
-    for nom, params_adoption in strategies.items():
-        res = executer_modele(
-            params, compteur, config_echelle, persistance, params_fuites,
-            params_fuites_reseau,
-            mode_compte=mode_compte, valeur_eau=valeur_eau,
-            params_adoption=params_adoption
-        )
+    for label_echelle, cfg_echelle in _configs_echelle_comparaison(config_echelle):
+        for nom, params_adoption in strategies.items():
+            res = executer_modele(
+                params, compteur, cfg_echelle, persistance, params_fuites,
+                params_fuites_reseau,
+                mode_compte=mode_compte, valeur_eau=valeur_eau,
+                params_adoption=params_adoption
+            )
 
-        # Générer série adoption pour métriques
-        serie = generer_serie_adoption(params_adoption, params.horizon_analyse)
-        a5 = serie[4] if len(serie) > 4 else serie[-1]
-        a10 = serie[9] if len(serie) > 9 else serie[-1]
-        a_final = serie[-1]
+            # Générer série adoption pour métriques
+            serie = generer_serie_adoption(params_adoption, params.horizon_analyse)
+            a5 = serie[4] if len(serie) > 4 else serie[-1]
+            a10 = serie[9] if len(serie) > 9 else serie[-1]
+            a_final = serie[-1]
 
-        resultats.append({
-            "Stratégie": params_adoption.nom,
-            "Mode": params_adoption.mode.value,
-            "A(5 ans)": f"{a5*100:.0f}%",
-            "A(10 ans)": f"{a10*100:.0f}%",
-            "A(final)": f"{a_final*100:.0f}%",
-            "CAPEX étalé": "Oui" if params_adoption.etaler_capex else "Non",
-            "VAN ($)": res.van,
-            "RBC": res.rbc,
-            "Récup. (ans)": res.periode_recuperation,
-            "VA Bénéfices ($)": res.va_benefices,
-            "VA Coûts ($)": res.va_couts_totaux,
-        })
+            resultats.append({
+                "Échelle": label_echelle,
+                "Stratégie": params_adoption.nom,
+                "Mode": params_adoption.mode.value,
+                "A(5 ans)": f"{a5*100:.0f}%",
+                "A(10 ans)": f"{a10*100:.0f}%",
+                "A(final)": f"{a_final*100:.0f}%",
+                "CAPEX étalé": "Oui" if params_adoption.etaler_capex else "Non",
+                "VAN ($)": res.van,
+                "RBC": res.rbc,
+                "Récup. (ans)": res.periode_recuperation,
+                "VA Bénéfices ($)": res.va_benefices,
+                "VA Coûts ($)": res.va_couts_totaux,
+            })
 
     return pd.DataFrame(resultats)
 
@@ -2258,29 +3143,41 @@ def afficher_comparaison_strategies(
         df: DataFrame retourné par comparer_strategies_adoption
         titre: Titre du tableau
     """
-    print("\n" + "=" * 100)
-    print(f"{titre:^100}")
-    print("=" * 100)
+    has_echelle = "Échelle" in df.columns
+    largeur = 112 if has_echelle else 100
+    print("\n" + "=" * largeur)
+    print(f"{titre:^{largeur}}")
+    print("=" * largeur)
 
     # En-tête
-    print(f"\n{'Stratégie':<22} │ {'A(5)':<6} │ {'A(fin)':<6} │ "
-          f"{'VAN':<14} │ {'RBC':<6} │ {'Récup.':<10}")
-    print("─" * 22 + "─┼─" + "─" * 6 + "─┼─" + "─" * 6 + "─┼─" +
-          "─" * 14 + "─┼─" + "─" * 6 + "─┼─" + "─" * 10)
+    if has_echelle:
+        print(f"\n{'Échelle':<14} │ {'Stratégie':<22} │ {'A(5)':<6} │ {'A(fin)':<6} │ "
+              f"{'VAN':<14} │ {'RBC':<6} │ {'Récup.':<10}")
+        print("─" * 14 + "─┼─" + "─" * 22 + "─┼─" + "─" * 6 + "─┼─" + "─" * 6 + "─┼─" +
+              "─" * 14 + "─┼─" + "─" * 6 + "─┼─" + "─" * 10)
+    else:
+        print(f"\n{'Stratégie':<22} │ {'A(5)':<6} │ {'A(fin)':<6} │ "
+              f"{'VAN':<14} │ {'RBC':<6} │ {'Récup.':<10}")
+        print("─" * 22 + "─┼─" + "─" * 6 + "─┼─" + "─" * 6 + "─┼─" +
+              "─" * 14 + "─┼─" + "─" * 6 + "─┼─" + "─" * 10)
 
     for _, row in df.iterrows():
         van_fmt = fmt_argent(row["VAN ($)"])
         recup_fmt = f"{row['Récup. (ans)']:.1f} ans" if row['Récup. (ans)'] < 999 else ">20 ans"
 
-        print(f"{row['Stratégie']:<22} │ {row['A(5 ans)']:<6} │ {row['A(final)']:<6} │ "
-              f"{van_fmt:<14} │ {row['RBC']:>5.2f} │ {recup_fmt:<10}")
+        if has_echelle:
+            print(f"{row['Échelle']:<14} │ {row['Stratégie']:<22} │ {row['A(5 ans)']:<6} │ {row['A(final)']:<6} │ "
+                  f"{van_fmt:<14} │ {row['RBC']:>5.2f} │ {recup_fmt:<10}")
+        else:
+            print(f"{row['Stratégie']:<22} │ {row['A(5 ans)']:<6} │ {row['A(final)']:<6} │ "
+                  f"{van_fmt:<14} │ {row['RBC']:>5.2f} │ {recup_fmt:<10}")
 
-    print("=" * 100)
+    print("=" * largeur)
 
     # Interprétation
-    print("\n" + "-" * 100)
+    print("\n" + "-" * largeur)
     print("INTERPRÉTATION:")
-    print("-" * 100)
+    print("-" * largeur)
 
     # Trouver la meilleure stratégie
     best_idx = df["VAN ($)"].idxmax()
@@ -2306,7 +3203,7 @@ def afficher_comparaison_strategies(
             print(f"\n  → La stratégie volontaire '{best['Stratégie']}' offre un bon compromis")
             print("    entre VAN et acceptabilité sociale")
 
-    print("=" * 100)
+    print("=" * largeur)
 
 
 def graphique_strategies_adoption(
@@ -2414,6 +3311,444 @@ def afficher_scenarios_fuites(nb_menages: int = 10_000, horizon: int = 20) -> No
     print("=" * 75)
 
 
+# =============================================================================
+# MODULE SEGMENTATION RÉSIDENTIELLE
+# =============================================================================
+#
+# Ce module permet de différencier l'analyse par type de logement résidentiel.
+# Les caractéristiques de consommation et les coûts varient significativement
+# selon la densité d'habitation.
+#
+# Sources:
+# - SQEEP 2023 (Stratégie québécoise d'économie d'eau potable)
+# - Statistique Canada (2021) - Ménages privés selon le type de logement
+# - MAMH - Registre des infrastructures municipales
+#
+# =============================================================================
+
+class TypeLogement(Enum):
+    """Type de logement résidentiel."""
+    UNIFAMILIAL = "unifamilial"      # Maison individuelle
+    MULTIPLEX = "multiplex"          # 2-4 logements (duplex, triplex, quadruplex)
+    MULTILOGEMENT = "multilogement"  # 5+ logements (immeubles d'appartements)
+
+
+@dataclass
+class ParametresSegment:
+    """
+    Paramètres spécifiques à un segment résidentiel.
+
+    Chaque segment a ses propres caractéristiques de consommation
+    et d'installation des compteurs.
+
+    Valeurs par défaut basées sur données Québec (SQEEP 2023, StatCan 2021):
+    - Unifamilial: 2.3 pers/ménage, 250 LPCD, jardin/piscine → haute conso
+    - Multiplex: 1.9 pers/ménage, 210 LPCD, moins d'extérieur
+    - Multilogement: 1.6 pers/ménage, 180 LPCD, peu d'usages extérieurs
+    """
+    type_logement: TypeLogement = TypeLogement.UNIFAMILIAL
+
+    # Nombre de ménages dans ce segment
+    nb_menages: int = 10_000
+    # Nombre de compteurs dans ce segment (compteur maître possible)
+    nb_compteurs: Optional[int] = None
+
+    # Caractéristiques démographiques
+    personnes_par_menage: float = 2.3
+
+    # Consommation
+    lpcd: float = 250.0  # Litres per capita per day
+
+    # Ajustement coût compteur (économies d'échelle, accès, etc.)
+    # < 1.0 = moins cher (multilogement: accès groupé, économies)
+    # > 1.0 = plus cher (unifamilial: déplacement, excavation)
+    cout_compteur_ajustement: float = 1.0
+
+    # Ajustement coût installation
+    cout_installation_ajustement: float = 1.0
+
+    # Prévalence des fuites (peut varier selon l'âge du parc)
+    prevalence_fuites_pct: float = 20.0
+
+    # Potentiel de réduction comportementale
+    # Unifamilial: plus de marge (arrosage, piscine)
+    # Multilogement: moins de marge (usages essentiels)
+    potentiel_reduction_pct: float = 8.0
+
+    # Métadonnées
+    nom: str = ""
+    description: str = ""
+
+    def __post_init__(self):
+        """Valider et générer nom par défaut."""
+        if self.nb_menages <= 0:
+            raise ValueError("nb_menages doit être > 0")
+        if self.nb_compteurs is None:
+            self.nb_compteurs = self.nb_menages
+        else:
+            self.nb_compteurs = int(round(self.nb_compteurs))
+        if self.nb_compteurs <= 0:
+            raise ValueError("nb_compteurs doit être > 0")
+        if self.personnes_par_menage <= 0:
+            raise ValueError("personnes_par_menage doit être > 0")
+        if self.lpcd <= 0:
+            raise ValueError("lpcd doit être > 0")
+
+        if not self.nom:
+            self.nom = self.type_logement.value.title()
+
+    @property
+    def usage_annuel_menage_m3(self) -> float:
+        """Consommation annuelle par ménage (m³)."""
+        return self.lpcd * self.personnes_par_menage * 365 / 1000
+
+
+# =============================================================================
+# PRÉRÉGLAGES SEGMENTATION QUÉBEC (SQEEP 2023 + StatCan 2021)
+# =============================================================================
+
+SEGMENT_UNIFAMILIAL = ParametresSegment(
+    type_logement=TypeLogement.UNIFAMILIAL,
+    nb_menages=70_000,           # ~60% du parc résidentiel
+    nb_compteurs=70_000,         # 1 compteur par ménage
+    personnes_par_menage=2.5,
+    lpcd=250.0,
+    cout_compteur_ajustement=1.0,
+    cout_installation_ajustement=1.0,
+    prevalence_fuites_pct=22.0,  # Légèrement plus élevé (plus de plomberie)
+    potentiel_reduction_pct=10.0,  # Plus de marge (extérieur)
+    nom="Unifamilial",
+    description="Maisons individuelles - haute consommation, fort potentiel",
+)
+
+SEGMENT_MULTIPLEX = ParametresSegment(
+    type_logement=TypeLogement.MULTIPLEX,
+    nb_menages=25_000,           # ~21% du parc
+    nb_compteurs=10_000,         # ~1 compteur par 2.5 logements (compteur maître)
+    personnes_par_menage=2.0,
+    lpcd=210.0,
+    cout_compteur_ajustement=0.95,
+    cout_installation_ajustement=0.90,  # Accès plus facile
+    prevalence_fuites_pct=20.0,
+    potentiel_reduction_pct=7.0,
+    nom="Multiplex",
+    description="Duplex/triplex/quadruplex - consommation moyenne",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MULTILOGEMENT — EXCLU DE L'ANALYSE PAR DÉFAUT
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# LIMITATION MÉTHODOLOGIQUE ASSUMÉE
+# =================================
+# Le segment multilogement (immeubles de 5+ logements, ~18% du parc résidentiel
+# québécois) est volontairement exclu de l'analyse principale. Cette exclusion
+# constitue une limite du modèle, justifiée par l'absence de données empiriques
+# permettant de calibrer les hypothèses clés.
+#
+# PROBLÈME FONDAMENTAL : BIFURCATION COÛT-EFFET
+# ---------------------------------------------
+# L'effet comportemental dépend du mode de comptage, créant deux configurations
+# aux profils coût-bénéfice opposés et incomparables :
+#
+#   Configuration A — Compteur bâtiment (maître)
+#   • Coût par logement : ~75$ (compteur partagé entre N logements)
+#   • Effet comportemental : α ≈ 0 (aucune rétroaction individuelle)
+#   • Détection fuites : au niveau bâtiment seulement
+#   • Bénéfice net : marginal voire nul
+#
+#   Configuration B — Sous-comptage individuel (submetering)
+#   • Coût par logement : 500-800$+ (compteur + plomberie + réseau par unité)
+#   • Effet comportemental : α potentiellement comparable à l'unifamilial
+#   • Détection fuites : par logement (mais responsabilité propriétaire/locataire floue)
+#   • Bénéfice net : possiblement positif, mais CAPEX très élevé
+#
+# ABSENCE DE DONNÉES QUÉBÉCOISES
+# ------------------------------
+# • Aucune étude empirique québécoise sur l'effet comportemental en multilogement
+# • Le submetering résidentiel est rare au Québec (contrairement à l'Ontario)
+# • La dynamique propriétaire-locataire pour les réparations n'est pas documentée
+# • Les coûts réels d'installation en contexte locatif québécois sont inconnus
+#
+# JUSTIFICATION DE L'EXCLUSION
+# ----------------------------
+# 1. Inclure ce segment avec des hypothèses arbitraires fragiliserait l'ensemble
+#    de l'analyse et exposerait le modèle à des critiques légitimes.
+#
+# 2. L'analyse reste pertinente : unifamilial + multiplex représentent ~82% du
+#    parc résidentiel québécois et la grande majorité de la consommation.
+#
+# 3. Cette limitation est documentée et constitue une avenue de recherche future.
+#
+# AVENUE DE RECHERCHE FUTURE
+# --------------------------
+# Pour inclure le multilogement, il faudrait :
+# • Données empiriques sur l'effet comportemental avec compteur maître vs submeter
+# • Enquête sur les pratiques de réparation de fuites en contexte locatif
+# • Analyse des coûts réels de submetering au Québec
+# • Création de deux sous-segments : MULTILOGEMENT_BATIMENT et MULTILOGEMENT_SUBMETER
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# Définition conservée pour référence et recherche future — NON UTILISÉ par défaut
+SEGMENT_MULTILOGEMENT = ParametresSegment(
+    type_logement=TypeLogement.MULTILOGEMENT,
+    nb_menages=21_000,           # ~18% du parc résidentiel québécois
+    nb_compteurs=4_200,          # Hypothèse compteur maître (1 pour ~5 logements)
+    personnes_par_menage=1.7,
+    lpcd=180.0,
+    # ATTENTION: Les ajustements ci-dessous supposent un compteur maître (config A).
+    # Pour du submetering (config B), ces valeurs seraient très différentes.
+    cout_compteur_ajustement=0.85,      # Coût/logement bas SI compteur maître
+    cout_installation_ajustement=0.75,  # Installation groupée SI compteur maître
+    prevalence_fuites_pct=18.0,
+    potentiel_reduction_pct=5.0,        # FRAGILE: α≈0 avec compteur maître
+    nom="Multilogement (non utilisé)",
+    description="EXCLU — Voir LIMITATION MÉTHODOLOGIQUE. Config compteur maître hypothétique.",
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SEGMENTS INCLUS DANS L'ANALYSE PAR DÉFAUT
+# ─────────────────────────────────────────────────────────────────────────────
+# Couverture : ~82% du parc résidentiel québécois
+# Exclusion  : Multilogement (~18%) — voir LIMITATION MÉTHODOLOGIQUE ci-dessus
+# ─────────────────────────────────────────────────────────────────────────────
+SEGMENTS_QUEBEC_DEFAUT = [
+    SEGMENT_UNIFAMILIAL,   # ~55% du parc — effet comportemental bien documenté
+    SEGMENT_MULTIPLEX,     # ~27% du parc — effet comportemental extrapolé
+    # MULTILOGEMENT EXCLU — bifurcation coût-effet non résoluble sans données empiriques
+]
+
+
+def creer_params_modele_depuis_segment(
+    segment: ParametresSegment,
+    params_base: Optional['ParametresModele'] = None,
+) -> 'ParametresModele':
+    """
+    Créer un ParametresModele à partir d'un segment.
+
+    Paramètres:
+        segment: Segment résidentiel
+        params_base: Paramètres de base à modifier (optionnel)
+
+    Retourne:
+        ParametresModele configuré pour ce segment
+    """
+    if params_base is None:
+        params = ParametresModele()
+    else:
+        # Cloner les paramètres de base
+        params = ParametresModele(**_cloner_params(params_base))
+
+    # Appliquer les caractéristiques du segment
+    params.nb_menages = segment.nb_menages
+    params.nb_compteurs = segment.nb_compteurs
+    params.taille_menage = segment.personnes_par_menage
+    params.lpcd = segment.lpcd
+    params.reduction_comportement_pct = segment.potentiel_reduction_pct
+    params.part_menages_fuite_pct = segment.prevalence_fuites_pct
+
+    return params
+
+
+def creer_compteur_depuis_segment(
+    segment: ParametresSegment,
+    compteur_base: Optional['ParametresCompteur'] = None,
+) -> 'ParametresCompteur':
+    """
+    Créer un ParametresCompteur ajusté pour un segment.
+
+    Paramètres:
+        segment: Segment résidentiel
+        compteur_base: Compteur de base à modifier (optionnel)
+
+    Retourne:
+        ParametresCompteur ajusté pour ce segment
+    """
+    if compteur_base is None:
+        compteur = ParametresCompteur()
+    else:
+        compteur = ParametresCompteur(**_cloner_compteur(compteur_base))
+
+    # Appliquer les ajustements du segment
+    compteur.cout_compteur *= segment.cout_compteur_ajustement
+    compteur.heures_installation *= segment.cout_installation_ajustement
+
+    return compteur
+
+
+def executer_modele_segmente(
+    segments: list[ParametresSegment],
+    compteur_base: Optional['ParametresCompteur'] = None,
+    params_base: Optional['ParametresModele'] = None,
+    config_echelle: Optional[ConfigEconomiesEchelle] = None,
+    **kwargs,
+) -> dict:
+    """
+    Exécuter le modèle sur plusieurs segments et agréger les résultats.
+
+    Paramètres:
+        segments: Liste des segments à analyser
+        compteur_base: Compteur de base (sera ajusté par segment)
+        params_base: Paramètres de base (seront ajustés par segment)
+        config_echelle: Configuration économies d'échelle
+        **kwargs: Arguments supplémentaires passés à executer_modele()
+
+    Retourne:
+        Dictionnaire avec:
+        - 'segments': résultats par segment
+        - 'agrege': métriques agrégées
+        - 'total_menages': nombre total de ménages
+        - 'van_totale': VAN totale ($)
+    """
+    resultats_segments = {}
+    van_totale = 0.0
+    va_benefices_total = 0.0
+    va_couts_total = 0.0
+    total_menages = 0
+    total_compteurs = 0
+    total_economies_m3 = 0.0
+
+    for segment in segments:
+        # Créer paramètres spécifiques au segment
+        params = creer_params_modele_depuis_segment(segment, params_base)
+        compteur = creer_compteur_depuis_segment(segment, compteur_base)
+
+        # Exécuter le modèle
+        res = executer_modele(
+            params=params,
+            compteur=compteur,
+            config_echelle=config_echelle,
+            **kwargs,
+        )
+
+        resultats_segments[segment.type_logement.value] = {
+            'segment': segment,
+            'params': params,
+            'compteur': compteur,
+            'resultats': res,
+        }
+
+        # Agréger
+        van_totale += res.van
+        va_benefices_total += res.va_benefices
+        va_couts_total += res.va_couts_totaux
+        total_menages += segment.nb_menages
+        total_compteurs += segment.nb_compteurs
+        # CORRECTION v3.9: Utiliser le total réel sur l'horizon (pas l'année 1 × T)
+        total_economies_m3 += res.economies_totales_horizon_m3
+
+    # Calculer métriques agrégées
+    rbc_agrege = va_benefices_total / va_couts_total if va_couts_total > 0 else 0.0
+
+    return {
+        'segments': resultats_segments,
+        'total_menages': total_menages,
+        'total_compteurs': total_compteurs,
+        'van_totale': van_totale,
+        'va_benefices_total': va_benefices_total,
+        'va_couts_total': va_couts_total,
+        'rbc_agrege': rbc_agrege,
+        'total_economies_m3': total_economies_m3,
+    }
+
+
+def afficher_resultats_segmentes(resultats: dict) -> None:
+    """
+    Afficher un tableau récapitulatif des résultats segmentés.
+
+    Paramètres:
+        resultats: Dictionnaire retourné par executer_modele_segmente()
+    """
+    print("\n" + "=" * 90)
+    print(" " * 25 + "RÉSULTATS PAR SEGMENT RÉSIDENTIEL")
+    print("=" * 90)
+
+    print(f"\n{'Segment':<15} │ {'Ménages':<10} │ {'Compteurs':<10} │ {'LPCD':<6} │ {'VAN':<15} │ "
+          f"{'RBC':<6} │ {'Éco. m³/mén/an':<14}")
+    print("─" * 15 + "─┼─" + "─" * 10 + "─┼─" + "─" * 10 + "─┼─" + "─" * 6 + "─┼─" +
+          "─" * 15 + "─┼─" + "─" * 6 + "─┼─" + "─" * 14)
+
+    for type_log, data in resultats['segments'].items():
+        segment = data['segment']
+        res = data['resultats']
+        print(f"{segment.nom:<15} │ {segment.nb_menages:>9,} │ {segment.nb_compteurs:>9,} │ "
+              f"{segment.lpcd:>5.0f} │ {fmt_argent(res.van):>14} │ {res.rbc:>5.2f} │ {res.economie_totale_menage:>12.1f}")
+
+    print("─" * 15 + "─┼─" + "─" * 10 + "─┼─" + "─" * 10 + "─┼─" + "─" * 6 + "─┼─" +
+          "─" * 15 + "─┼─" + "─" * 6 + "─┼─" + "─" * 14)
+    print(f"{'TOTAL':<15} │ {resultats['total_menages']:>9,} │ {resultats['total_compteurs']:>9,} │ {'---':>5} │ "
+          f"{fmt_argent(resultats['van_totale']):>14} │ {resultats['rbc_agrege']:>5.2f} │ {'---':>12}")
+
+    print("=" * 90)
+
+    # Décomposition en %
+    print("\n  Contribution à la VAN totale:")
+    for type_log, data in resultats['segments'].items():
+        segment = data['segment']
+        res = data['resultats']
+        pct = res.van / resultats['van_totale'] * 100 if resultats['van_totale'] != 0 else 0
+        barre = "█" * int(pct / 2)
+        print(f"    {segment.nom:<15}: {pct:>5.1f}% {barre}")
+
+    print()
+
+
+def graphique_segmentation(resultats: dict, dossier: str = None) -> plt.Figure:
+    """
+    Créer un graphique comparatif des segments.
+
+    Paramètres:
+        resultats: Dictionnaire retourné par executer_modele_segmente()
+        dossier: Dossier de sauvegarde (optionnel)
+
+    Retourne:
+        Figure matplotlib
+    """
+    segments_noms = []
+    vans = []
+    rbcs = []
+    economies = []
+
+    for type_log, data in resultats['segments'].items():
+        segment = data['segment']
+        res = data['resultats']
+        segments_noms.append(segment.nom)
+        vans.append(res.van / 1e6)  # En millions
+        rbcs.append(res.rbc)
+        economies.append(res.economie_totale_menage)
+
+    fig, axes = plt.subplots(1, 3, figsize=(14, 5))
+
+    # VAN par segment
+    couleurs = ['#2E86AB', '#A23B72', '#F18F01']
+    axes[0].bar(segments_noms, vans, color=couleurs)
+    axes[0].set_title("VAN par segment")
+    axes[0].set_ylabel("VAN (M$)")
+    axes[0].axhline(y=0, color='black', linestyle='-', linewidth=0.5)
+
+    # RBC par segment
+    axes[1].bar(segments_noms, rbcs, color=couleurs)
+    axes[1].set_title("Ratio Bénéfices-Coûts")
+    axes[1].set_ylabel("RBC")
+    axes[1].axhline(y=1, color='red', linestyle='--', linewidth=1, label='Seuil rentabilité')
+    axes[1].legend()
+
+    # Économies par ménage
+    axes[2].bar(segments_noms, economies, color=couleurs)
+    axes[2].set_title("Économies d'eau par ménage")
+    axes[2].set_ylabel("m³/ménage/an")
+
+    plt.tight_layout()
+
+    if dossier:
+        os.makedirs(dossier, exist_ok=True)
+        chemin = os.path.join(dossier, "segmentation_residentielle.png")
+        fig.savefig(chemin, dpi=150, bbox_inches='tight')
+        print(f"Figure sauvegardée: {chemin}")
+
+    return fig
+
+
 @dataclass
 class Trajectoires:
     """
@@ -2461,6 +3796,10 @@ class Trajectoires:
 
     # Coûts incitatifs - NOUVEAU v3.8
     couts_incitatifs: np.ndarray = field(default_factory=lambda: np.array([]))  # $/an
+
+    # Coûts ponctuels séparés (batterie compteur vs réseau) - NOUVEAU v3.10
+    couts_ponctuels_compteur: dict = field(default_factory=dict)
+    couts_ponctuels_reseau: dict = field(default_factory=dict)
 
     @property
     def benefices_totaux(self) -> np.ndarray:
@@ -2562,8 +3901,13 @@ def calculer_economies_eau(
         taux_correction = params.taux_correction_fuite_pct / 100.0
     else:
         part_fuite = params_fuites.part_menages_fuite_pct / 100.0
-        debit_fuite = params_fuites.debit_fuite_m3_an
-        taux_correction = params_fuites.taux_correction_effectif
+        # CORRECTION 4.5: Utiliser volume_fuite_moyen_pondere si mode deux-stocks
+        if params_fuites.utiliser_prevalence_differenciee:
+            debit_fuite = params_fuites.volume_fuite_moyen_pondere
+        else:
+            debit_fuite = params_fuites.debit_fuite_m3_an
+        # CORRECTION 4.4: Utiliser taux effectif avec persistance
+        taux_correction = params_fuites.taux_correction_effectif_avec_persistance
 
     # Volume moyen de fuites AVANT correction (m³/an/ménage)
     volume_fuite_pre = part_fuite * debit_fuite
@@ -2611,7 +3955,7 @@ def generer_trajectoires(
     - NOUVEAU: Adoption progressive A(t) avec CAPEX étalé
 
     L'adoption A(t) ∈ [0,1] représente la fraction du parc équipée.
-    - OPEX et revenus sont proportionnels à A(t)
+    - OPEX et bénéfices d'eau sont proportionnels à A(t)
     - CAPEX peut être étalé selon A(t) ou concentré en t=0
     - NOUVEAU: économies privées calculées par cohortes (âge du compteur)
 
@@ -2633,27 +3977,49 @@ def generer_trajectoires(
         facteur_echelle: Facteur appliqué aux coûts
         cout_ajuste: Coût par compteur après économies d'échelle
     """
-    H = params.nb_menages
+    H_menages = params.nb_menages
+    H_compteurs = params.nb_compteurs_effectif
     T = params.horizon_analyse
+
+    # === ADOPTION (NOUVEAU v3.5) ===
+    # DÉPLACÉ ICI pour correction 4.2: calculer économies d'échelle sur H_effectif
+    if params_adoption is None:
+        params_adoption = ADOPTION_OBLIGATOIRE  # Défaut: 100% immédiat
+
+    # CORRECTION 4.2: Calculer les économies d'échelle sur le nombre effectif de compteurs
+    # Si adoption max = 70%, on n'achète que 70% des compteurs → rabais volume sur 0.70*H_compteurs
+    A_max = params_adoption.adoption_max_pct / 100.0
+    H_effectif = int(H_compteurs * A_max)
 
     # === ÉCONOMIES D'ÉCHELLE ===
     if config_echelle is None:
         config_echelle = ConfigEconomiesEchelle(activer=False)
 
-    facteur_echelle = calculer_facteur_echelle(H, config_echelle)
+    facteur_echelle = calculer_facteur_echelle(H_effectif, config_echelle)
+    cout_compteur = compteur.cout_compteur
+    cout_installation = compteur.cout_installation
+    cout_reseau = compteur.cout_reseau_par_compteur if compteur.type_compteur == TypeCompteur.AMI else 0.0
+
+    facteur_echelle_compteur = appliquer_facteur_echelle(facteur_echelle, config_echelle.poids_compteur)
+    facteur_echelle_installation = appliquer_facteur_echelle(facteur_echelle, config_echelle.poids_installation)
+    facteur_echelle_reseau = appliquer_facteur_echelle(facteur_echelle, config_echelle.poids_reseau)
+
     cout_base = compteur.cout_initial_par_compteur
-    cout_ajuste = cout_base * facteur_echelle
+    cout_ajuste = (
+        cout_compteur * facteur_echelle_compteur +
+        cout_installation * facteur_echelle_installation +
+        cout_reseau * facteur_echelle_reseau
+    )
 
     # Investissement initial (pour adoption complète)
-    I0_total = cout_ajuste * H
-
-    # === ADOPTION (NOUVEAU v3.5) ===
-    if params_adoption is None:
-        params_adoption = ADOPTION_OBLIGATOIRE  # Défaut: 100% immédiat
+    I0_total = cout_ajuste * H_compteurs
 
     # Générer la série d'adoption A(t) pour t = 1..T
     serie_adoption = generer_serie_adoption(params_adoption, T)
     delta_adoption = calculer_delta_adoption(serie_adoption)
+    serie_adoption_effective = calculer_adoption_effective(
+        serie_adoption, params_adoption.fraction_premiere_annee
+    )
 
     # Calculer CAPEX étalé si nécessaire
     if params_adoption.etaler_capex:
@@ -2707,12 +4073,12 @@ def generer_trajectoires(
         res_reseau = calculer_dynamique_fuites_reseau(
             params_fuites_reseau,
             T,
-            serie_adoption=serie_adoption,
+            serie_adoption=serie_adoption_effective,
         )
         economies_reseau_m3 = res_reseau.economies_m3_par_an
         couts_reseau = res_reseau.couts_totaux_par_an
-        if H > 0:
-            economies_reseau_par_menage = economies_reseau_m3 / H
+        if H_menages > 0:
+            economies_reseau_par_menage = economies_reseau_m3 / H_menages
 
         # CAPEX ponctuel (DMA, capteurs, analytics)
         if params_fuites_reseau.cout_capex_initial > 0:
@@ -2726,8 +4092,14 @@ def generer_trajectoires(
     )  # m³/ménage/an
 
     # Économies privées par cohortes (comportement + fuites)
-    economies_comportement_m3 = convoluer_cohortes(delta_adoption, eco_comportement_serie, H)
-    economies_fuites_m3 = convoluer_cohortes(delta_adoption, eco_fuite_menage_serie, H)
+    economies_comportement_m3 = convoluer_cohortes(
+        delta_adoption, eco_comportement_serie, H_menages,
+        fraction_premiere_annee=params_adoption.fraction_premiere_annee
+    )
+    economies_fuites_m3 = convoluer_cohortes(
+        delta_adoption, eco_fuite_menage_serie, H_menages,
+        fraction_premiere_annee=params_adoption.fraction_premiere_annee
+    )
 
     # Économies totales (privé + réseau)
     economies_eau_m3 = (
@@ -2762,32 +4134,50 @@ def generer_trajectoires(
     # Report infrastructure
     # Le report d'infrastructure dépend des économies totales, donc aussi de A(t)
     benef_infra_annuel = params.benefice_report_infra_annuel
-    benefices_infra = np.full(T, benef_infra_annuel) * serie_adoption
+    benefices_infra = np.full(T, benef_infra_annuel) * serie_adoption_effective
+    if params.benefice_report_infra_par_m3 > 0:
+        benefices_infra = benefices_infra + (economies_eau_m3 * params.benefice_report_infra_par_m3)
 
     # === COÛTS D'EXPLOITATION ===
     # L'OPEX est proportionnel au nombre de compteurs installés
-    cout_exploit_annuel = compteur.cout_exploitation_annuel * H
-    couts_exploitation = np.full(T, cout_exploit_annuel) * serie_adoption
+    cout_exploit_annuel = compteur.cout_exploitation_annuel * H_compteurs
+    couts_exploitation = np.full(T, cout_exploit_annuel) * serie_adoption_effective
 
     # === COÛTS PONCTUELS ===
     couts_ponctuels = {}
+    couts_ponctuels_compteur = {}
+    couts_ponctuels_reseau = {}
 
     # CAPEX réseau ponctuel
     for annee, montant in capex_reseau.items():
         couts_ponctuels[annee] = couts_ponctuels.get(annee, 0.0) + montant
+        couts_ponctuels_reseau[annee] = couts_ponctuels_reseau.get(annee, 0.0) + montant
 
     # Remplacement batterie (AMI/AMR seulement)
     # Coût déclenché à l'âge batterie pour chaque cohorte installée
+    # CORRECTION v3.9: Boucle pour gérer plusieurs remplacements si horizon > durée_vie
+    # Ex: horizon 30 ans, batterie 10 ans → remplacements aux années 10, 20, 30
     if compteur.type_compteur in [TypeCompteur.AMI, TypeCompteur.AMR]:
-        if T > compteur.duree_vie_batterie and compteur.cout_remplacement_batterie > 0:
-            age_index = compteur.duree_vie_batterie - 1
-            if 0 <= age_index < T:
-                cout_batterie_par_age = np.zeros(T)
-                cout_batterie_par_age[age_index] = compteur.cout_remplacement_batterie
-                couts_batterie = convoluer_cohortes(delta_adoption, cout_batterie_par_age, H)
+        if compteur.cout_remplacement_batterie > 0 and compteur.duree_vie_batterie > 0:
+            cout_batterie_par_age = np.zeros(T)
+            # Ajouter un remplacement tous les duree_vie_batterie ans
+            annee_remplacement = compteur.duree_vie_batterie
+            while annee_remplacement <= T:
+                age_index = annee_remplacement - 1  # Conversion année → index (0-based)
+                if 0 <= age_index < T:
+                    cout_batterie_par_age[age_index] = compteur.cout_remplacement_batterie
+                annee_remplacement += compteur.duree_vie_batterie
+
+            # Convoluer avec les cohortes d'adoption
+            if np.any(cout_batterie_par_age > 0):
+                couts_batterie = convoluer_cohortes(
+                    delta_adoption, cout_batterie_par_age, H_compteurs,
+                    fraction_premiere_annee=params_adoption.fraction_premiere_annee
+                )
                 for annee, montant in enumerate(couts_batterie, start=1):
                     if montant > 0:
                         couts_ponctuels[annee] = couts_ponctuels.get(annee, 0.0) + montant
+                        couts_ponctuels_compteur[annee] = couts_ponctuels_compteur.get(annee, 0.0) + montant
 
     # === COÛTS DE RÉPARATION DES FUITES (NOUVEAU v3.3) ===
     # Les coûts suivent la même logique de cohortes que les économies privées
@@ -2795,13 +4185,16 @@ def generer_trajectoires(
         if res_fuites_cohorte is None:
             res_fuites_cohorte = calculer_dynamique_fuites(params_fuites, 1, T)
         couts_reparation_fuites = convoluer_cohortes(
-            delta_adoption, res_fuites_cohorte.cout_total_par_an, H
+            delta_adoption, res_fuites_cohorte.cout_total_par_an, H_menages,
+            fraction_premiere_annee=params_adoption.fraction_premiere_annee
         )
         couts_reparation_ville = convoluer_cohortes(
-            delta_adoption, res_fuites_cohorte.cout_ville_par_an, H
+            delta_adoption, res_fuites_cohorte.cout_ville_par_an, H_menages,
+            fraction_premiere_annee=params_adoption.fraction_premiere_annee
         )
         couts_reparation_menages = convoluer_cohortes(
-            delta_adoption, res_fuites_cohorte.cout_menages_par_an, H
+            delta_adoption, res_fuites_cohorte.cout_menages_par_an, H_menages,
+            fraction_premiere_annee=params_adoption.fraction_premiere_annee
         )
     else:
         # Pas de coûts de réparation
@@ -2818,8 +4211,8 @@ def generer_trajectoires(
         cout_annuel_par_menage = params_adoption.cout_incitatif_par_menage / params_adoption.duree_incitatif_ans
         duree = params_adoption.duree_incitatif_ans
 
-        # Nouveaux adoptants chaque année (delta_adoption * H)
-        nouveaux_adoptants = delta_adoption * H
+        # Nouveaux adoptants chaque année (delta_adoption * H_menages)
+        nouveaux_adoptants = delta_adoption * H_menages
 
         # Pour chaque année t, calculer le coût total des incitatifs
         # = somme des coûts pour toutes les cohortes qui reçoivent encore l'incitatif
@@ -2836,6 +4229,8 @@ def generer_trajectoires(
         benefices_infra=benefices_infra,
         couts_exploitation=couts_exploitation,
         couts_ponctuels=couts_ponctuels,
+        couts_ponctuels_compteur=couts_ponctuels_compteur,
+        couts_ponctuels_reseau=couts_ponctuels_reseau,
         couts_reparation_fuites=couts_reparation_fuites,
         couts_reparation_ville=couts_reparation_ville,
         couts_reparation_menages=couts_reparation_menages,
@@ -2862,10 +4257,14 @@ def actualiser_series(
     I0: float,
     inclure_reparations: bool = True,
     mode_compte: ModeCompte = ModeCompte.ECONOMIQUE,
+    part_ville_capex: float = 1.0,
+    part_ville_opex: float = 1.0,
+    valeur_eau: Optional[ParametresValeurEau] = None,
 ) -> tuple[float, float, float, float, float, float, float]:
     """
     Actualiser les séries temporelles et calculer les métriques financières.
 
+    Version 3.11.0: Support MCF (Coût Marginal des Fonds publics).
     Version 3.8.0: Support coûts incitatifs pour stratégies d'adoption.
 
     Formules:
@@ -2873,6 +4272,11 @@ def actualiser_series(
     - VA(C) = I0 + VA(CAPEX_etale) + Σ C_exploit[t] + Σ C_reseau[t] + Σ C_reparation[t] + Σ C_incitatifs[t] + ponctuels
     - VAN = VA(B) - VA(C)
     - RBC = VA(B) / VA(C)
+
+    MCF (Coût Marginal des Fonds publics):
+    - En mode ÉCONOMIQUE avec MCF activé, seule la part publique est majorée
+      du facteur (1 + mcf) pour refléter le coût social de la taxation
+    - Source: Treasury Board of Canada (2007): MCF = 0.20
 
     CAPEX étalé:
     - Si I0 > 0: investissement initial ponctuel (adoption obligatoire)
@@ -2888,6 +4292,9 @@ def actualiser_series(
         I0: Investissement initial ($) - 0 si CAPEX étalé
         inclure_reparations: Inclure les coûts de réparation dans VA(C)
         mode_compte: ECONOMIQUE ou FINANCIER (affecte les coûts de réparation)
+        part_ville_capex: Part du CAPEX payé par la ville (0-1)
+        part_ville_opex: Part de l'OPEX payé par la ville (0-1)
+        valeur_eau: Paramètres de valeur d'eau (pour MCF). Si None, MCF non appliqué.
 
     Retourne:
         va_benefices: Valeur actuelle des bénéfices
@@ -2904,32 +4311,65 @@ def actualiser_series(
     # Valeurs actuelles par composante
     va_benefices = float(np.sum(traj.benefices_totaux * facteurs_actu))
 
-    couts_exploit_total = traj.couts_exploitation
+    # Parts payées par la ville
+    capex_part = part_ville_capex
+    opex_part = part_ville_opex
+
+    # Facteur MCF (v3.11.0) - appliqué uniquement à la part publique en mode économique
+    # Le MCF reflète le coût social de lever des fonds publics par taxation
+    facteur_mcf = 1.0
+    if valeur_eau is not None:
+        facteur_mcf = valeur_eau.facteur_mcf(mode_compte)
+
+    if mode_compte == ModeCompte.ECONOMIQUE:
+        capex_mix = capex_part * facteur_mcf + (1.0 - capex_part)
+        opex_mix = opex_part * facteur_mcf + (1.0 - opex_part)
+        reseau_mix = facteur_mcf  # réseau = 100% public
+    else:
+        capex_mix = capex_part
+        opex_mix = opex_part
+        reseau_mix = 1.0
+
+    couts_exploit_total = traj.couts_exploitation * opex_mix
     if len(traj.couts_reseau) > 0:
-        couts_exploit_total = couts_exploit_total + traj.couts_reseau
+        # Les coûts réseau sont municipaux (non partagés)
+        couts_exploit_total = couts_exploit_total + traj.couts_reseau * reseau_mix
     va_couts_exploit = float(np.sum(couts_exploit_total * facteurs_actu))
 
     # CAPEX étalé (v3.5) - si adoption progressive avec étalement
     if traj.capex_etale_actif:
-        va_capex_etale = float(np.sum(traj.capex_etale * facteurs_actu))
+        va_capex_etale = float(np.sum(traj.capex_etale * facteurs_actu)) * capex_mix
     else:
         va_capex_etale = 0.0
 
     # Coûts ponctuels actualisés
-    va_couts_ponctuels = sum(
+    couts_ponctuels_compteur = getattr(traj, "couts_ponctuels_compteur", {})
+    couts_ponctuels_reseau = getattr(traj, "couts_ponctuels_reseau", {})
+    if len(couts_ponctuels_compteur) == 0 and len(couts_ponctuels_reseau) == 0:
+        couts_ponctuels_compteur = traj.couts_ponctuels
+
+    va_ponctuels_compteur = sum(
         montant / (1.0 + r) ** annee
-        for annee, montant in traj.couts_ponctuels.items()
+        for annee, montant in couts_ponctuels_compteur.items()
     )
+    va_ponctuels_reseau = sum(
+        montant / (1.0 + r) ** annee
+        for annee, montant in couts_ponctuels_reseau.items()
+    )
+    va_couts_ponctuels = (va_ponctuels_reseau * reseau_mix) + (va_ponctuels_compteur * capex_mix)
 
     # Coûts de réparation des fuites (v3.4: selon la perspective)
+    # CORRECTION MCF: en mode ÉCONOMIQUE, seule la part ville est majorée du MCF
     if inclure_reparations and traj.couts_reparation_actifs:
         if mode_compte == ModeCompte.ECONOMIQUE:
-            # Analyse économique: tous les coûts (qui paie n'importe pas)
-            couts_repar = traj.couts_reparation_fuites
+            # Analyse économique: coûts ville (avec MCF) + coûts ménages (sans MCF)
+            # Le MCF s'applique aux dépenses publiques seulement
+            va_repar_ville = float(np.sum(traj.couts_reparation_ville * facteurs_actu))
+            va_repar_menages = float(np.sum(traj.couts_reparation_menages * facteurs_actu))
+            va_couts_reparation = (va_repar_ville * facteur_mcf) + va_repar_menages
         else:
-            # Analyse financière: seulement les coûts de la ville
-            couts_repar = traj.couts_reparation_ville
-        va_couts_reparation = float(np.sum(couts_repar * facteurs_actu))
+            # Analyse financière: seulement les coûts de la ville (sans MCF)
+            va_couts_reparation = float(np.sum(traj.couts_reparation_ville * facteurs_actu))
     else:
         va_couts_reparation = 0.0
 
@@ -2943,7 +4383,9 @@ def actualiser_series(
         va_couts_incitatifs = 0.0
 
     # Totaux (I0 + CAPEX étalé + OPEX + ponctuels + réparations + incitatifs si FINANCIER)
-    va_couts_totaux = I0 + va_capex_etale + va_couts_exploit + va_couts_ponctuels + va_couts_reparation + va_couts_incitatifs
+    # I0 public est majoré du MCF en mode économique
+    I0_effectif = I0 * capex_mix
+    va_couts_totaux = I0_effectif + va_capex_etale + va_couts_exploit + va_couts_ponctuels + va_couts_reparation + va_couts_incitatifs
     van = va_benefices - va_couts_totaux
     rbc = division_securisee(va_benefices, va_couts_totaux)
 
@@ -2956,10 +4398,14 @@ def calculer_van_cumulative(
     I0: float,
     inclure_reparations: bool = True,
     mode_compte: ModeCompte = ModeCompte.ECONOMIQUE,
+    part_ville_capex: float = 1.0,
+    part_ville_opex: float = 1.0,
+    valeur_eau: Optional[ParametresValeurEau] = None,
 ) -> tuple[np.ndarray, float]:
     """
     Calculer la VAN cumulative année par année.
 
+    Version 3.12.0: Support MCF pour cohérence avec actualiser_series.
     Version 3.5.0: Support CAPEX étalé pour adoption progressive.
 
     Utilisé pour:
@@ -2972,6 +4418,9 @@ def calculer_van_cumulative(
         I0: Investissement initial ($) - 0 si CAPEX étalé
         inclure_reparations: Inclure les coûts de réparation des fuites
         mode_compte: ECONOMIQUE ou FINANCIER (affecte les coûts de réparation)
+        part_ville_capex: Part du CAPEX payé par la ville (0-1)
+        part_ville_opex: Part de l'OPEX payé par la ville (0-1)
+        valeur_eau: Paramètres valeur d'eau (pour MCF). Si None, MCF non appliqué.
 
     Retourne:
         van_cumulative: VAN cumulative pour chaque année [1..T]
@@ -2982,37 +4431,67 @@ def calculer_van_cumulative(
     # Facteurs d'actualisation
     facteurs_actu = np.array([1.0 / (1.0 + r) ** t for t in traj.annees])
 
+    # Facteur MCF (cohérent avec actualiser_series, appliqué à la part publique)
+    facteur_mcf = 1.0
+    if valeur_eau is not None:
+        facteur_mcf = valeur_eau.facteur_mcf(mode_compte)
+
     # Bénéfices actualisés cumulés
     benefices_actualises = traj.benefices_totaux * facteurs_actu
     va_benef_cum = np.cumsum(benefices_actualises)
 
     # Coûts actualisés cumulés (I0 + CAPEX étalé + OPEX cumulé)
-    couts_exploit_total = traj.couts_exploitation
-    if len(traj.couts_reseau) > 0:
-        couts_exploit_total = couts_exploit_total + traj.couts_reseau
-    couts_exploit_actualises = couts_exploit_total * facteurs_actu
-    va_cout_cum = I0 + np.cumsum(couts_exploit_actualises)
+    capex_part = part_ville_capex
+    opex_part = part_ville_opex
+    if mode_compte == ModeCompte.ECONOMIQUE:
+        capex_mix = capex_part * facteur_mcf + (1.0 - capex_part)
+        opex_mix = opex_part * facteur_mcf + (1.0 - opex_part)
+        reseau_mix = facteur_mcf
+    else:
+        capex_mix = capex_part
+        opex_mix = opex_part
+        reseau_mix = 1.0
 
-    # Ajouter CAPEX étalé si actif (v3.5)
+    # OPEX (MCF sur part publique seulement)
+    couts_exploit_total = traj.couts_exploitation * opex_mix
+    if len(traj.couts_reseau) > 0:
+        couts_exploit_total = couts_exploit_total + traj.couts_reseau * reseau_mix
+    couts_exploit_actualises = couts_exploit_total * facteurs_actu
+
+    # I0 avec MCF partiel
+    va_cout_cum = (I0 * capex_mix) + np.cumsum(couts_exploit_actualises)
+
+    # Ajouter CAPEX étalé si actif (v3.5) avec MCF partiel
     if traj.capex_etale_actif:
-        capex_actualise = traj.capex_etale * facteurs_actu
+        capex_actualise = traj.capex_etale * facteurs_actu * capex_mix
         va_cout_cum += np.cumsum(capex_actualise)
 
-    # Ajouter coûts ponctuels aux années appropriées
-    for annee, montant in traj.couts_ponctuels.items():
+    # Ajouter coûts ponctuels aux années appropriées (MCF partiel)
+    couts_ponctuels_compteur = getattr(traj, "couts_ponctuels_compteur", {})
+    couts_ponctuels_reseau = getattr(traj, "couts_ponctuels_reseau", {})
+    if len(couts_ponctuels_compteur) == 0 and len(couts_ponctuels_reseau) == 0:
+        couts_ponctuels_compteur = traj.couts_ponctuels
+
+    for annee, montant in couts_ponctuels_compteur.items():
         if 1 <= annee <= T:
-            va_ponctuel = montant / (1.0 + r) ** annee
-            # Affecter à partir de l'année du coût
+            va_ponctuel = (montant * capex_mix) / (1.0 + r) ** annee
+            va_cout_cum[annee - 1:] += va_ponctuel
+    for annee, montant in couts_ponctuels_reseau.items():
+        if 1 <= annee <= T:
+            va_ponctuel = (montant * reseau_mix) / (1.0 + r) ** annee
             va_cout_cum[annee - 1:] += va_ponctuel
 
-    # Ajouter coûts de réparation des fuites (v3.4: selon la perspective)
+    # Ajouter coûts de réparation des fuites (avec MCF cohérent)
     if inclure_reparations and traj.couts_reparation_actifs:
         if mode_compte == ModeCompte.ECONOMIQUE:
-            couts_repar = traj.couts_reparation_fuites
+            # Mode économique: part ville (avec MCF) + part ménages (sans MCF)
+            repar_ville_actu = traj.couts_reparation_ville * facteurs_actu * facteur_mcf
+            repar_menages_actu = traj.couts_reparation_menages * facteurs_actu
+            va_cout_cum += np.cumsum(repar_ville_actu) + np.cumsum(repar_menages_actu)
         else:
-            couts_repar = traj.couts_reparation_ville
-        couts_repar_actualises = couts_repar * facteurs_actu
-        va_cout_cum += np.cumsum(couts_repar_actualises)
+            # Mode financier: part ville seulement (sans MCF)
+            couts_repar_actualises = traj.couts_reparation_ville * facteurs_actu
+            va_cout_cum += np.cumsum(couts_repar_actualises)
 
     # Ajouter coûts incitatifs (NOUVEAU v3.8)
     # En mode ÉCONOMIQUE: EXCLUS (transferts neutres pour le bien-être social)
@@ -3136,8 +4615,8 @@ def executer_modele(
                       Utiliser FUITES_SANS_COUT/MENAGE_SEUL/SUBVENTION_50/VILLE_SEULE
         params_fuites_reseau: Configuration des pertes réseau (optionnel)
         mode_compte: ECONOMIQUE (bien-être social) ou FINANCIER (budget municipal)
-                    ECONOMIQUE: valeur sociale de l'eau, revenus exclus, tous les coûts
-                    FINANCIER: coût variable, revenus inclus, coûts ville seulement
+                    ECONOMIQUE: valeur sociale de l'eau, sans tarification, tous les coûts
+                    FINANCIER: coût variable évité, sans tarification, coûts ville seulement
         valeur_eau: Paramètres de valorisation (défaut: VALEUR_EAU_QUEBEC)
         params_adoption: Stratégie d'adoption (défaut: ADOPTION_OBLIGATOIRE)
                         Utiliser ADOPTION_OBLIGATOIRE/RAPIDE/PROGRESSIVE/NOUVEAUX/PAR_SECTEUR
@@ -3147,8 +4626,11 @@ def executer_modele(
     """
     # Extraction paramètres
     H = params.nb_menages
+    H_compteurs = params.nb_compteurs_effectif
     r = params.taux_actualisation_pct / 100.0
     T = params.horizon_analyse
+    part_ville_capex = params.part_ville_capex_pct / 100.0
+    part_ville_opex = params.part_ville_opex_pct / 100.0
 
     # Initialiser config économies d'échelle si non fournie
     if config_echelle is None:
@@ -3164,22 +4646,55 @@ def executer_modele(
         mode_compte=mode_compte, valeur_eau=valeur_eau,
         params_adoption=params_adoption
     )
+    facteur_echelle_compteur = appliquer_facteur_echelle(facteur_echelle, config_echelle.poids_compteur)
+    facteur_echelle_installation = appliquer_facteur_echelle(facteur_echelle, config_echelle.poids_installation)
+    facteur_echelle_reseau = appliquer_facteur_echelle(facteur_echelle, config_echelle.poids_reseau)
 
-    # === ÉTAPE 3: ACTUALISATION DES SÉRIES (v3.8: avec coûts incitatifs) ===
+    # === ÉTAPE 3: ACTUALISATION DES SÉRIES (v3.8: avec coûts incitatifs, v3.11: MCF) ===
     inclure_repar = params_fuites is not None and params_fuites.inclure_cout_reparation
     va_benef, va_exploit, va_batterie, va_reparation, va_incitatifs, van, rbc = actualiser_series(
-        traj, r, I0, inclure_reparations=inclure_repar, mode_compte=mode_compte
+        traj,
+        r,
+        I0,
+        inclure_reparations=inclure_repar,
+        mode_compte=mode_compte,
+        part_ville_capex=part_ville_capex,
+        part_ville_opex=part_ville_opex,
+        valeur_eau=valeur_eau,  # v3.11: pour application du MCF
     )
 
     # Coûts totaux actualisés (incluant CAPEX étalé et incitatifs si actifs)
     # Note : actualiser_series inclut déjà le CAPEX étalé et les incitatifs dans ses calculs
     facteurs_actu = np.array([1.0 / (1.0 + r) ** t for t in traj.annees])
-    va_capex_etale = float(np.sum(traj.capex_etale * facteurs_actu)) if traj.capex_etale_actif else 0.0
-    va_couts = I0 + va_capex_etale + va_exploit + va_batterie + va_reparation + va_incitatifs
+    va_couts = va_benef - van
+
+    # Valeur d'eau effective (cohérente avec generer_trajectoires)
+    if valeur_eau is None:
+        valeur_eau_eff = ParametresValeurEau(
+            valeur_sociale_m3=params.valeur_eau_m3,
+            cout_variable_m3=VALEUR_EAU_QUEBEC.cout_variable_m3,
+        )
+    else:
+        valeur_eau_eff = valeur_eau
+
+    # Décomposition des bénéfices d'eau (VA)
+    va_benefices_eau = float(np.sum(traj.benefices_eau * facteurs_actu))
+    va_benefices_report_infra = float(np.sum(traj.benefices_infra * facteurs_actu))
+    va_benefices_cout_variable = float(np.sum(traj.economies_eau_m3 * valeur_eau_eff.cout_variable_m3 * facteurs_actu))
+    va_benefices_infra_m3 = float(np.sum(traj.economies_eau_m3 * valeur_eau_eff.cout_infrastructure_m3 * facteurs_actu))
+    va_benefices_externalites = float(np.sum(traj.economies_eau_m3 * valeur_eau_eff.valeur_externalites_m3 * facteurs_actu))
 
     # === ÉTAPE 4: VAN CUMULATIVE ET PÉRIODE DE RÉCUPÉRATION ===
+    # CORRECTION v3.12: Passer valeur_eau pour cohérence MCF avec actualiser_series
     van_cum, periode_recup = calculer_van_cumulative(
-        traj, r, I0, inclure_reparations=inclure_repar, mode_compte=mode_compte
+        traj,
+        r,
+        I0,
+        inclure_reparations=inclure_repar,
+        mode_compte=mode_compte,
+        part_ville_capex=part_ville_capex,
+        part_ville_opex=part_ville_opex,
+        valeur_eau=valeur_eau,
     )
 
     # === MÉTRIQUES PAR MÉNAGE (PV-COHÉRENTES) ===
@@ -3194,27 +4709,24 @@ def executer_modele(
     lcsw = division_securisee(va_couts, pv_m3)
 
     # Seuil de rentabilité (m³/an) : cohérent avec le mode de valorisation
-    if valeur_eau is None:
-        # Aucun ratio implicite: coût variable explicite via le défaut Québec.
-        valeur_eau_eff = ParametresValeurEau(
-            valeur_sociale_m3=params.valeur_eau_m3,
-            cout_variable_m3=VALEUR_EAU_QUEBEC.cout_variable_m3,
-        )
-    else:
-        valeur_eau_eff = valeur_eau
     valeur_m3 = valeur_eau_eff.valeur_eau(mode_compte)
     q_star = division_securisee(eac, valeur_m3)
 
     # === CALCULS DÉRIVÉS POUR COMPATIBILITÉ ===
     cout_base = compteur.cout_initial_par_compteur
-    economies_echelle = (cout_base - cout_ajuste) * H
+    economies_echelle = (cout_base - cout_ajuste) * H_compteurs
 
     # Bénéfices annuels (année 1 pour affichage, mais varient avec persistance)
     benef_eau = float(traj.benefices_eau[0])
     benef_infra = float(traj.benefices_infra[0])
     benef_totaux = float(np.mean(traj.benefices_totaux))  # Moyenne pour persistance
     cout_reseau_an1 = float(traj.couts_reseau[0]) if len(traj.couts_reseau) > 0 else 0.0
-    cout_exploit = float(traj.couts_exploitation[0] + cout_reseau_an1)
+    if mode_compte == ModeCompte.FINANCIER:
+        cout_exploit = float(traj.couts_exploitation[0] * part_ville_opex + cout_reseau_an1)
+        investissement_initial = I0 * part_ville_capex
+    else:
+        cout_exploit = float(traj.couts_exploitation[0] + cout_reseau_an1)
+        investissement_initial = I0
 
     # Économies: année 1 (initial) pour compatibilité affichage
     # Note : avec persistance, economies_par_menage varie par année
@@ -3236,20 +4748,28 @@ def executer_modele(
     return ResultatsModele(
         params=params,
         compteur=compteur,
+        mode_compte=mode_compte,
         # Économies d'eau par ménage (valeurs initiales année 1)
         usage_base_menage=economies.usage_base,
         economie_fuite_menage=eco_fuite_initiale,
         economie_comportement_menage=eco_comportement_initiale,
         economie_reseau_menage=eco_reseau_initiale,
         economie_totale_menage=float(traj.economies_par_menage[0]),
+        # Économies totales sur l'horizon (m³, tous ménages, toutes années)
+        economies_totales_horizon_m3=float(np.sum(traj.economies_eau_m3)),
         # Flux annuels
-        investissement_initial=I0,
+        investissement_initial=investissement_initial,
         benefices_eau_annuels=benef_eau,
         benefice_infra_annuel=benef_infra,
         benefices_totaux_annuels=benef_totaux,
         couts_exploitation_annuels=cout_exploit,
         # Valeurs actualisées
         va_benefices=va_benef,
+        va_benefices_eau=va_benefices_eau,
+        va_benefices_report_infra=va_benefices_report_infra,
+        va_benefices_cout_variable=va_benefices_cout_variable,
+        va_benefices_infra_m3=va_benefices_infra_m3,
+        va_benefices_externalites=va_benefices_externalites,
         va_couts_exploitation=va_exploit,
         va_couts_totaux=va_couts,
         van=van,
@@ -3265,6 +4785,9 @@ def executer_modele(
         # Économies d'échelle
         economies_echelle_actives=config_echelle.activer,
         facteur_echelle=facteur_echelle,
+        facteur_echelle_compteur=facteur_echelle_compteur,
+        facteur_echelle_installation=facteur_echelle_installation,
+        facteur_echelle_reseau=facteur_echelle_reseau,
         cout_par_compteur_base=cout_base,
         cout_par_compteur_ajuste=cout_ajuste,
         economies_realisees=economies_echelle,
@@ -3280,37 +4803,44 @@ def comparer_types_compteurs(
     Comparer les 3 types de compteurs (AMI, AMR, Manuel).
 
     Utilise les mêmes paramètres de modèle mais ajuste les coûts
-    selon le type de compteur.
+    selon le type de compteur. Les coûts unitaires sont stylisés:
+    ils dépendent aussi de la plomberie, densité urbaine, réseau,
+    intégration SI et cybersécurité.
+    Si config_echelle est None, compare sans et avec économies d'échelle.
     """
     if compteur_base is None:
         compteur_base = ParametresCompteur()
 
     resultats = []
 
-    for type_c in TypeCompteur:
-        # Créer compteur avec le bon type
-        compteur = ParametresCompteur(
-            type_compteur=type_c,
-            cout_compteur=_cout_compteur_par_type(type_c),
-            heures_installation=compteur_base.heures_installation,
-            taux_horaire_installation=compteur_base.taux_horaire_installation,
-            cout_reseau_par_compteur=(50.0 if type_c == TypeCompteur.AMI else 0.0),
-            duree_vie_compteur=compteur_base.duree_vie_compteur,
-            duree_vie_batterie=compteur_base.duree_vie_batterie,
-        )
+    for label_echelle, cfg_echelle in _configs_echelle_comparaison(config_echelle):
+        for type_c in TypeCompteur:
+            # Créer compteur avec le bon type
+            compteur = ParametresCompteur(
+                type_compteur=type_c,
+                cout_compteur=_cout_compteur_par_type(type_c),
+                heures_installation=compteur_base.heures_installation,
+                taux_horaire_installation=compteur_base.taux_horaire_installation,
+                cout_reseau_par_compteur=(50.0 if type_c == TypeCompteur.AMI else 0.0),
+                duree_vie_compteur=compteur_base.duree_vie_compteur,
+                duree_vie_batterie=compteur_base.duree_vie_batterie,
+                cout_opex_non_tech_ami=compteur_base.cout_opex_non_tech_ami,
+                ventilation_opex_ami=compteur_base.ventilation_opex_ami,
+            )
 
-        res = executer_modele(params, compteur, config_echelle)
+            res = executer_modele(params, compteur, cfg_echelle)
 
-        resultats.append({
-            "Type": type_c.value.upper(),
-            "Coût initial/compteur": res.cout_par_compteur_ajuste if config_echelle and config_echelle.activer else compteur.cout_initial_par_compteur,
-            "Investissement total": res.investissement_initial,
-            "Coût exploit./an": res.couts_exploitation_annuels,
-            "VAN": res.van,
-            "RBC": res.rbc,
-            "Récupération (ans)": res.periode_recuperation,
-            "LCSW ($/m³)": res.lcsw,
-        })
+            resultats.append({
+                "Échelle": label_echelle,
+                "Type": type_c.value.upper(),
+                "Coût initial/compteur": res.cout_par_compteur_ajuste if cfg_echelle and cfg_echelle.activer else compteur.cout_initial_par_compteur,
+                "Investissement total": res.investissement_initial,
+                "Coût exploit./an": res.couts_exploitation_annuels,
+                "VAN": res.van,
+                "RBC": res.rbc,
+                "Récupération (ans)": res.periode_recuperation,
+                "LCSW ($/m³)": res.lcsw,
+            })
 
     return pd.DataFrame(resultats)
 
@@ -3340,6 +4870,7 @@ def comparer_scenarios_persistance(
 
     Cette fonction permet d'évaluer l'impact de la persistance des effets
     comportementaux sur la rentabilité du projet.
+    Si config_echelle est None, compare sans et avec économies d'échelle.
 
     Paramètres:
         params: Paramètres du modèle
@@ -3358,33 +4889,35 @@ def comparer_scenarios_persistance(
 
     resultats = []
 
-    for nom, persistance in scenarios.items():
-        res = executer_modele(params, compteur, config_echelle, persistance)
+    for label_echelle, cfg_echelle in _configs_echelle_comparaison(config_echelle):
+        for nom, persistance in scenarios.items():
+            res = executer_modele(params, compteur, cfg_echelle, persistance)
 
-        # Calculer économies moyennes sur l'horizon
-        # (déjà fait dans executer_modele mais on recalcule pour clarté)
-        economies = calculer_economies_eau(params, compteur=compteur)
-        traj, _, _, _ = generer_trajectoires(
-            params, compteur, economies, config_echelle, persistance
-        )
-        eco_moy = float(np.mean(traj.economies_par_menage))
-        eco_an1 = float(traj.economies_par_menage[0])
-        eco_an20 = float(traj.economies_par_menage[-1])
+            # Calculer économies moyennes sur l'horizon
+            # (déjà fait dans executer_modele mais on recalcule pour clarté)
+            economies = calculer_economies_eau(params, compteur=compteur)
+            traj, _, _, _ = generer_trajectoires(
+                params, compteur, economies, cfg_echelle, persistance
+            )
+            eco_moy = float(np.mean(traj.economies_par_menage))
+            eco_an1 = float(traj.economies_par_menage[0])
+            eco_an20 = float(traj.economies_par_menage[-1])
 
-        resultats.append({
-            "Scénario": persistance.nom,
-            "Mode": persistance.mode.value,
-            # Économies d'eau
-            "Éco. an 1 (m³/mén)": eco_an1,
-            "Éco. an 20 (m³/mén)": eco_an20,
-            "Éco. moyenne (m³/mén)": eco_moy,
-            "Rétention (%)": (eco_an20 / eco_an1 * 100) if eco_an1 > 0 else 0,
-            # Métriques financières
-            "VAN": res.van,
-            "RBC": res.rbc,
-            "Récup. (ans)": res.periode_recuperation,
-            "LCSW ($/m³)": res.lcsw,
-        })
+            resultats.append({
+                "Échelle": label_echelle,
+                "Scénario": persistance.nom,
+                "Mode": persistance.mode.value,
+                # Économies d'eau
+                "Éco. an 1 (m³/mén)": eco_an1,
+                "Éco. an 20 (m³/mén)": eco_an20,
+                "Éco. moyenne (m³/mén)": eco_moy,
+                "Rétention (%)": (eco_an20 / eco_an1 * 100) if eco_an1 > 0 else 0,
+                # Métriques financières
+                "VAN": res.van,
+                "RBC": res.rbc,
+                "Récup. (ans)": res.periode_recuperation,
+                "LCSW ($/m³)": res.lcsw,
+            })
 
     return pd.DataFrame(resultats)
 
@@ -3400,14 +4933,22 @@ def afficher_comparaison_persistance(
         df: DataFrame retourné par comparer_scenarios_persistance()
         titre: Titre du tableau
     """
-    print("\n" + "=" * 80)
-    print(f" {titre}".center(80))
-    print("=" * 80)
+    has_echelle = "Échelle" in df.columns
+    largeur = 92 if has_echelle else 80
+    print("\n" + "=" * largeur)
+    print(f" {titre}".center(largeur))
+    print("=" * largeur)
 
-    print(f"\n{'Scénario':<12} │ {'Éco moy':<10} │ {'Rétention':<10} │ "
-          f"{'VAN':<12} │ {'RBC':<6} │ {'Récup.':<8}")
-    print("─" * 12 + "─┼─" + "─" * 10 + "─┼─" + "─" * 10 + "─┼─" +
-          "─" * 12 + "─┼─" + "─" * 6 + "─┼─" + "─" * 8)
+    if has_echelle:
+        print(f"\n{'Échelle':<14} │ {'Scénario':<12} │ {'Éco moy':<10} │ {'Rétention':<10} │ "
+              f"{'VAN':<12} │ {'RBC':<6} │ {'Récup.':<8}")
+        print("─" * 14 + "─┼─" + "─" * 12 + "─┼─" + "─" * 10 + "─┼─" + "─" * 10 + "─┼─" +
+              "─" * 12 + "─┼─" + "─" * 6 + "─┼─" + "─" * 8)
+    else:
+        print(f"\n{'Scénario':<12} │ {'Éco moy':<10} │ {'Rétention':<10} │ "
+              f"{'VAN':<12} │ {'RBC':<6} │ {'Récup.':<8}")
+        print("─" * 12 + "─┼─" + "─" * 10 + "─┼─" + "─" * 10 + "─┼─" +
+              "─" * 12 + "─┼─" + "─" * 6 + "─┼─" + "─" * 8)
 
     for _, row in df.iterrows():
         scenario = row["Scénario"][:11]
@@ -3417,10 +4958,14 @@ def afficher_comparaison_persistance(
         rbc = f"{row['RBC']:.2f}"
         recup = f"{row['Récup. (ans)']:.1f} ans"
 
-        print(f"{scenario:<12} │ {eco_moy:<10} │ {retention:<10} │ "
-              f"{van:<12} │ {rbc:<6} │ {recup:<8}")
+        if has_echelle:
+            print(f"{row['Échelle']:<14} │ {scenario:<12} │ {eco_moy:<10} │ {retention:<10} │ "
+                  f"{van:<12} │ {rbc:<6} │ {recup:<8}")
+        else:
+            print(f"{scenario:<12} │ {eco_moy:<10} │ {retention:<10} │ "
+                  f"{van:<12} │ {rbc:<6} │ {recup:<8}")
 
-    print("=" * 80)
+    print("=" * largeur)
 
     # Calcul de l'écart optimiste-pessimiste
     if len(df) >= 2:
@@ -3528,7 +5073,9 @@ def graphique_van_scenarios_persistance(
     scenarios: Optional[dict] = None,
     sauvegarder: bool = True,
     afficher: bool = True,
-    dossier: str = "figures"
+    dossier: str = "figures",
+    mode_compte: ModeCompte = ModeCompte.ECONOMIQUE,
+    valeur_eau: Optional[ParametresValeurEau] = None,
 ) -> Optional[plt.Figure]:
     """
     Générer un graphique comparant la VAN cumulative selon les scénarios.
@@ -3541,6 +5088,8 @@ def graphique_van_scenarios_persistance(
         sauvegarder: Sauvegarder en PNG
         afficher: Afficher le graphique
         dossier: Dossier de sauvegarde
+        mode_compte: Perspective d'analyse (économique/financier)
+        valeur_eau: Paramètres de valorisation (MCF si applicable)
 
     Retourne:
         Figure matplotlib
@@ -3553,6 +5102,8 @@ def graphique_van_scenarios_persistance(
 
     T = params.horizon_analyse
     r = params.taux_actualisation_pct / 100.0
+    part_ville_capex = params.part_ville_capex_pct / 100.0
+    part_ville_opex = params.part_ville_opex_pct / 100.0
     annees = np.arange(1, T + 1)
 
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -3569,9 +5120,18 @@ def graphique_van_scenarios_persistance(
         # Exécuter le modèle (v3.8: avec facteurs efficacité compteur)
         economies = calculer_economies_eau(params, compteur=compteur)
         traj, I0, _, _ = generer_trajectoires(
-            params, compteur, economies, config_echelle, persistance
+            params, compteur, economies, config_echelle, persistance,
+            mode_compte=mode_compte, valeur_eau=valeur_eau
         )
-        van_cum, _ = calculer_van_cumulative(traj, r, I0)
+        van_cum, _ = calculer_van_cumulative(
+            traj,
+            r,
+            I0,
+            mode_compte=mode_compte,
+            part_ville_capex=part_ville_capex,
+            part_ville_opex=part_ville_opex,
+            valeur_eau=valeur_eau,
+        )
 
         couleur = couleurs.get(nom, "#95a5a6")
         ax.plot(annees, van_cum / 1e6, linewidth=2.5, label=persistance.nom,
@@ -3619,6 +5179,7 @@ def comparer_scenarios_fuites(
 
     Cette fonction permet d'évaluer l'impact des coûts de réparation et
     du partage des coûts ville/ménages sur la rentabilité du projet.
+    Si config_echelle est None, compare sans et avec économies d'échelle.
 
     Paramètres:
         params: Paramètres du modèle
@@ -3641,31 +5202,33 @@ def comparer_scenarios_fuites(
 
     resultats = []
 
-    for nom, params_fuites in scenarios_fuites.items():
-        # Exécuter le modèle avec ce scénario de fuites
-        res = executer_modele(params, compteur, config_echelle, persistance, params_fuites)
+    for label_echelle, cfg_echelle in _configs_echelle_comparaison(config_echelle):
+        for nom, params_fuites in scenarios_fuites.items():
+            # Exécuter le modèle avec ce scénario de fuites
+            res = executer_modele(params, compteur, cfg_echelle, persistance, params_fuites)
 
-        # Calculer les coûts de réparation pour ce scénario (v3.8: avec facteur efficacité)
-        res_fuites = calculer_dynamique_fuites(
-            params_fuites, params.nb_menages, params.horizon_analyse,
-            facteur_efficacite_detection=compteur.facteur_efficacite_fuites
-        )
+            # Calculer les coûts de réparation pour ce scénario (v3.8: avec facteur efficacité)
+            res_fuites = calculer_dynamique_fuites(
+                params_fuites, params.nb_menages, params.horizon_analyse,
+                facteur_efficacite_detection=compteur.facteur_efficacite_fuites
+            )
 
-        resultats.append({
-            "Scénario": params_fuites.nom,
-            "Mode": params_fuites.mode_repartition.value,
-            "Part ville (%)": params_fuites.part_ville_pct,
-            # Métriques réparations
-            "Réparations": res_fuites.total_reparations,
-            "Coût total ($)": res_fuites.cout_total,
-            "Coût ville ($)": res_fuites.cout_ville_total,
-            "Coût ménages ($)": res_fuites.cout_menages_total,
-            # Métriques financières
-            "VAN": res.van,
-            "RBC": res.rbc,
-            "Récup. (ans)": res.periode_recuperation,
-            "LCSW ($/m³)": res.lcsw,
-        })
+            resultats.append({
+                "Échelle": label_echelle,
+                "Scénario": params_fuites.nom,
+                "Mode": params_fuites.mode_repartition.value,
+                "Part ville (%)": params_fuites.part_ville_pct,
+                # Métriques réparations
+                "Réparations": res_fuites.total_reparations,
+                "Coût total ($)": res_fuites.cout_total,
+                "Coût ville ($)": res_fuites.cout_ville_total,
+                "Coût ménages ($)": res_fuites.cout_menages_total,
+                # Métriques financières
+                "VAN": res.van,
+                "RBC": res.rbc,
+                "Récup. (ans)": res.periode_recuperation,
+                "LCSW ($/m³)": res.lcsw,
+            })
 
     return pd.DataFrame(resultats)
 
@@ -3681,14 +5244,22 @@ def afficher_comparaison_fuites(
         df: DataFrame retourné par comparer_scenarios_fuites()
         titre: Titre du tableau
     """
-    print("\n" + "=" * 90)
-    print(f" {titre}".center(90))
-    print("=" * 90)
+    has_echelle = "Échelle" in df.columns
+    largeur = 104 if has_echelle else 90
+    print("\n" + "=" * largeur)
+    print(f" {titre}".center(largeur))
+    print("=" * largeur)
 
-    print(f"\n{'Scénario':<16} │ {'Part ville':<10} │ {'Coût total':<12} │ "
-          f"{'VAN':<14} │ {'RBC':<6} │ {'Récup.':<8}")
-    print("─" * 16 + "─┼─" + "─" * 10 + "─┼─" + "─" * 12 + "─┼─" +
-          "─" * 14 + "─┼─" + "─" * 6 + "─┼─" + "─" * 8)
+    if has_echelle:
+        print(f"\n{'Échelle':<14} │ {'Scénario':<16} │ {'Part ville':<10} │ {'Coût total':<12} │ "
+              f"{'VAN':<14} │ {'RBC':<6} │ {'Récup.':<8}")
+        print("─" * 14 + "─┼─" + "─" * 16 + "─┼─" + "─" * 10 + "─┼─" + "─" * 12 + "─┼─" +
+              "─" * 14 + "─┼─" + "─" * 6 + "─┼─" + "─" * 8)
+    else:
+        print(f"\n{'Scénario':<16} │ {'Part ville':<10} │ {'Coût total':<12} │ "
+              f"{'VAN':<14} │ {'RBC':<6} │ {'Récup.':<8}")
+        print("─" * 16 + "─┼─" + "─" * 10 + "─┼─" + "─" * 12 + "─┼─" +
+              "─" * 14 + "─┼─" + "─" * 6 + "─┼─" + "─" * 8)
 
     for _, row in df.iterrows():
         scenario = row["Scénario"][:15]
@@ -3698,15 +5269,24 @@ def afficher_comparaison_fuites(
         rbc = f"{row['RBC']:.2f}"
         recup = f"{row['Récup. (ans)']:.1f} ans" if np.isfinite(row['Récup. (ans)']) else "N/A"
 
-        print(f"{scenario:<16} │ {part_ville:<10} │ {cout_total:<12} │ "
-              f"{van:<14} │ {rbc:<6} │ {recup:<8}")
+        if has_echelle:
+            print(f"{row['Échelle']:<14} │ {scenario:<16} │ {part_ville:<10} │ {cout_total:<12} │ "
+                  f"{van:<14} │ {rbc:<6} │ {recup:<8}")
+        else:
+            print(f"{scenario:<16} │ {part_ville:<10} │ {cout_total:<12} │ "
+                  f"{van:<14} │ {rbc:<6} │ {recup:<8}")
 
-    print("=" * 90)
+    print("=" * largeur)
 
     # Analyse de l'impact des coûts de réparation
     if len(df) >= 2:
-        van_sans_cout = df[df["Mode"] == "gratuit"]["VAN"].values
-        van_menage = df[df["Mode"] == "menage"]["VAN"].values
+        df_interpret = df
+        if has_echelle:
+            df_base = df[df["Échelle"] == "Sans échelle"]
+            if not df_base.empty:
+                df_interpret = df_base
+        van_sans_cout = df_interpret[df_interpret["Mode"] == "gratuit"]["VAN"].values
+        van_menage = df_interpret[df_interpret["Mode"] == "menage"]["VAN"].values
         if len(van_sans_cout) > 0 and len(van_menage) > 0:
             impact = van_sans_cout[0] - van_menage[0]
             impact_pct = (impact / van_sans_cout[0] * 100) if van_sans_cout[0] > 0 else 0
@@ -3721,7 +5301,9 @@ def graphique_scenarios_fuites(
     scenarios_fuites: Optional[dict] = None,
     sauvegarder: bool = True,
     afficher: bool = True,
-    dossier: str = "figures"
+    dossier: str = "figures",
+    mode_compte: ModeCompte = ModeCompte.ECONOMIQUE,
+    valeur_eau: Optional[ParametresValeurEau] = None,
 ) -> Optional[plt.Figure]:
     """
     Générer un graphique comparant la VAN selon les scénarios de fuites.
@@ -3735,6 +5317,8 @@ def graphique_scenarios_fuites(
         sauvegarder: Sauvegarder en PNG
         afficher: Afficher le graphique
         dossier: Dossier de sauvegarde
+        mode_compte: Perspective d'analyse (économique/financier)
+        valeur_eau: Paramètres de valorisation (MCF si applicable)
 
     Retourne:
         Figure matplotlib
@@ -3750,6 +5334,8 @@ def graphique_scenarios_fuites(
 
     T = params.horizon_analyse
     r = params.taux_actualisation_pct / 100.0
+    part_ville_capex = params.part_ville_capex_pct / 100.0
+    part_ville_opex = params.part_ville_opex_pct / 100.0
     annees = np.arange(1, T + 1)
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
@@ -3766,10 +5352,20 @@ def graphique_scenarios_fuites(
     for nom, params_fuites in scenarios_fuites.items():
         economies = calculer_economies_eau(params, params_fuites, compteur)
         traj, I0, _, _ = generer_trajectoires(
-            params, compteur, economies, config_echelle, persistance, params_fuites
+            params, compteur, economies, config_echelle, persistance, params_fuites,
+            mode_compte=mode_compte, valeur_eau=valeur_eau
         )
         inclure_repar = params_fuites.inclure_cout_reparation
-        van_cum, _ = calculer_van_cumulative(traj, r, I0, inclure_reparations=inclure_repar)
+        van_cum, _ = calculer_van_cumulative(
+            traj,
+            r,
+            I0,
+            inclure_reparations=inclure_repar,
+            mode_compte=mode_compte,
+            part_ville_capex=part_ville_capex,
+            part_ville_opex=part_ville_opex,
+            valeur_eau=valeur_eau,
+        )
 
         couleur = couleurs.get(nom, "#95a5a6")
         ax1.plot(annees, van_cum / 1e6, linewidth=2.5, label=params_fuites.nom,
@@ -3848,8 +5444,9 @@ def comparer_perspectives(
 
     Différences clés:
     - Valeur de l'eau: sociale (4.69$) vs coût variable (0.50$)
-    - Revenus récupérés: exclus (transfert) vs inclus (recette)
     - Coûts réparation: total vs part ville
+    - MCF: applicable en économique (si activé) vs non applicable en financier
+    Si config_echelle est None, compare sans et avec économies d'échelle.
 
     Paramètres:
         params: Paramètres du modèle
@@ -3874,30 +5471,32 @@ def comparer_perspectives(
 
     resultats = []
 
-    for mode in [ModeCompte.ECONOMIQUE, ModeCompte.FINANCIER]:
-        res = executer_modele(
-            params, compteur, config_echelle, persistance, params_fuites,
-            params_fuites_reseau,
-            mode_compte=mode, valeur_eau=valeur_eau
-        )
+    for label_echelle, cfg_echelle in _configs_echelle_comparaison(config_echelle):
+        for mode in [ModeCompte.ECONOMIQUE, ModeCompte.FINANCIER]:
+            res = executer_modele(
+                params, compteur, cfg_echelle, persistance, params_fuites,
+                params_fuites_reseau,
+                mode_compte=mode, valeur_eau=valeur_eau
+            )
 
-        # Déterminer la valeur de l'eau utilisée
-        val_eau = valeur_eau.valeur_sociale_m3 if mode == ModeCompte.ECONOMIQUE else valeur_eau.cout_variable_m3
+            # Déterminer la valeur de l'eau utilisée
+            val_eau = valeur_eau.valeur_sociale_m3 if mode == ModeCompte.ECONOMIQUE else valeur_eau.cout_variable_m3
 
-        resultats.append({
-            "Perspective": "Économique" if mode == ModeCompte.ECONOMIQUE else "Financier",
-            "Mode": mode.value,
-            # Valorisation
-            "Valeur eau ($/m³)": val_eau,
-            "Revenus inclus": "Non" if mode == ModeCompte.ECONOMIQUE else "Oui",
-            # Métriques financières
-            "VA Bénéfices ($)": res.va_benefices,
-            "VA Coûts ($)": res.va_couts_totaux,
-            "VAN ($)": res.van,
-            "RBC": res.rbc,
-            "Récup. (ans)": res.periode_recuperation,
-            "LCSW ($/m³)": res.lcsw,
-        })
+            resultats.append({
+                "Échelle": label_echelle,
+                "Perspective": "Économique" if mode == ModeCompte.ECONOMIQUE else "Financier",
+                "Mode": mode.value,
+                # Valorisation
+                "Valeur eau ($/m³)": val_eau,
+                "Tarification volumétrique": "Non",
+                # Métriques financières
+                "VA Bénéfices ($)": res.va_benefices,
+                "VA Coûts ($)": res.va_couts_totaux,
+                "VAN ($)": res.van,
+                "RBC": res.rbc,
+                "Récup. (ans)": res.periode_recuperation,
+                "LCSW ($/m³)": res.lcsw,
+            })
 
     return pd.DataFrame(resultats)
 
@@ -3913,39 +5512,56 @@ def afficher_comparaison_perspectives(
         df: DataFrame retourné par comparer_perspectives()
         titre: Titre du tableau
     """
-    print("\n" + "=" * 95)
-    print(f" {titre}".center(95))
-    print("=" * 95)
+    has_echelle = "Échelle" in df.columns
+    largeur = 111 if has_echelle else 95
+    print("\n" + "=" * largeur)
+    print(f" {titre}".center(largeur))
+    print("=" * largeur)
 
-    print(f"\n{'Perspective':<12} │ {'Val. eau':<10} │ {'Revenus':<8} │ "
-          f"{'VAN':<14} │ {'RBC':<6} │ {'Récup.':<8} │ {'LCSW':<10}")
-    print("─" * 12 + "─┼─" + "─" * 10 + "─┼─" + "─" * 8 + "─┼─" +
-          "─" * 14 + "─┼─" + "─" * 6 + "─┼─" + "─" * 8 + "─┼─" + "─" * 10)
+    if has_echelle:
+        print(f"\n{'Échelle':<14} │ {'Perspective':<12} │ {'Val. eau':<10} │ {'Tarif.':<8} │ "
+              f"{'VAN':<14} │ {'RBC':<6} │ {'Récup.':<8} │ {'LCSW':<10}")
+        print("─" * 14 + "─┼─" + "─" * 12 + "─┼─" + "─" * 10 + "─┼─" + "─" * 8 + "─┼─" +
+              "─" * 14 + "─┼─" + "─" * 6 + "─┼─" + "─" * 8 + "─┼─" + "─" * 10)
+    else:
+        print(f"\n{'Perspective':<12} │ {'Val. eau':<10} │ {'Tarif.':<8} │ "
+              f"{'VAN':<14} │ {'RBC':<6} │ {'Récup.':<8} │ {'LCSW':<10}")
+        print("─" * 12 + "─┼─" + "─" * 10 + "─┼─" + "─" * 8 + "─┼─" +
+              "─" * 14 + "─┼─" + "─" * 6 + "─┼─" + "─" * 8 + "─┼─" + "─" * 10)
 
     for _, row in df.iterrows():
         perspective = row["Perspective"]
         val_eau = f"{row['Valeur eau ($/m³)']:.2f} $"
-        revenus = row["Revenus inclus"]
+        tarif = row["Tarification volumétrique"]
         van = fmt_argent(row["VAN ($)"])
         rbc = f"{row['RBC']:.2f}"
         recup = f"{row['Récup. (ans)']:.1f} ans" if np.isfinite(row['Récup. (ans)']) else "N/A"
         lcsw = f"{row['LCSW ($/m³)']:.2f} $"
 
-        print(f"{perspective:<12} │ {val_eau:<10} │ {revenus:<8} │ "
-              f"{van:<14} │ {rbc:<6} │ {recup:<8} │ {lcsw:<10}")
+        if has_echelle:
+            print(f"{row['Échelle']:<14} │ {perspective:<12} │ {val_eau:<10} │ {tarif:<8} │ "
+                  f"{van:<14} │ {rbc:<6} │ {recup:<8} │ {lcsw:<10}")
+        else:
+            print(f"{perspective:<12} │ {val_eau:<10} │ {tarif:<8} │ "
+                  f"{van:<14} │ {rbc:<6} │ {recup:<8} │ {lcsw:<10}")
 
-    print("=" * 95)
+    print("=" * largeur)
 
     # Interprétation
-    eco_row = df[df["Mode"] == "economique"].iloc[0]
-    fin_row = df[df["Mode"] == "financier"].iloc[0]
+    df_interpret = df
+    if has_echelle:
+        df_base = df[df["Échelle"] == "Sans échelle"]
+        if not df_base.empty:
+            df_interpret = df_base
+    eco_row = df_interpret[df_interpret["Mode"] == "economique"].iloc[0]
+    fin_row = df_interpret[df_interpret["Mode"] == "financier"].iloc[0]
 
     van_eco = eco_row["VAN ($)"]
     van_fin = fin_row["VAN ($)"]
 
-    print("\n" + "─" * 95)
+    print("\n" + "─" * largeur)
     print("INTERPRÉTATION:")
-    print("─" * 95)
+    print("─" * largeur)
 
     if van_eco > 0 and van_fin > 0:
         print("✓ Projet DOUBLEMENT VIABLE: rentable socialement ET financièrement")
@@ -3965,7 +5581,7 @@ def afficher_comparaison_perspectives(
     ecart = van_eco - van_fin
     print(f"\nÉcart VAN (économique - financier): {fmt_argent(ecart)}")
     print("Cet écart reflète: la valeur sociale non capturée par le marché")
-    print("=" * 95)
+    print("=" * largeur)
 
 
 def graphique_perspectives(
@@ -4011,6 +5627,10 @@ def graphique_perspectives(
     r = params.taux_actualisation_pct / 100.0
     annees = np.arange(1, T + 1)
 
+    # Parts ville (pour mode financier)
+    part_ville_capex = params.part_ville_capex_pct / 100.0
+    part_ville_opex = params.part_ville_opex_pct / 100.0
+
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
     # Couleurs
@@ -4029,7 +5649,16 @@ def graphique_perspectives(
             mode_compte=mode, valeur_eau=valeur_eau
         )
         inclure_repar = params_fuites is not None and params_fuites.inclure_cout_reparation
-        van_cum, _ = calculer_van_cumulative(traj, r, I0, inclure_reparations=inclure_repar, mode_compte=mode)
+        van_cum, _ = calculer_van_cumulative(
+            traj,
+            r,
+            I0,
+            inclure_reparations=inclure_repar,
+            mode_compte=mode,
+            part_ville_capex=part_ville_capex,
+            part_ville_opex=part_ville_opex,
+            valeur_eau=valeur_eau,
+        )
 
         ax1.plot(annees, van_cum / 1e6, linewidth=2.5, label=label, color=couleur)
 
@@ -4114,6 +5743,7 @@ SPECS_COMPTEUR = [
     {"cle": "heures_installation",     "label": "Heures installation",       "type": "float", "min": 0.0},
     {"cle": "taux_horaire_installation","label": "Taux horaire ($/h)",       "type": "float", "min": 0.0},
     {"cle": "cout_reseau_par_compteur","label": "Coût réseau/compteur ($)",  "type": "float", "min": 0.0},
+    {"cle": "cout_opex_non_tech_ami",  "label": "OPEX AMI non-tech ($/an)",   "type": "float", "min": 0.0},
 ]
 
 
@@ -4138,6 +5768,8 @@ def _cloner_compteur(c: ParametresCompteur) -> dict:
         'cout_maintenance_amr': c.cout_maintenance_amr,
         'cout_maintenance_manuel': c.cout_maintenance_manuel,
         'cout_lecture_amr': c.cout_lecture_amr,
+        'cout_opex_non_tech_ami': c.cout_opex_non_tech_ami,
+        'ventilation_opex_ami': c.ventilation_opex_ami,
     }
 
 
@@ -4285,51 +5917,145 @@ def table_elasticite(
 
 def analyse_scenarios(
     params: ParametresModele,
-    compteur: ParametresCompteur
+    compteur: ParametresCompteur,
+    config_echelle: Optional[ConfigEconomiesEchelle] = None,
+    params_fuites: Optional[ParametresFuites] = None,
+    persistance: Optional[ParametresPersistance] = None,
+    valeur_eau: Optional[ParametresValeurEau] = None,
 ) -> pd.DataFrame:
     """
     Comparer scénarios pessimiste, base et optimiste.
+
+    CORRECTION v3.9: Varie les vrais paramètres du modèle:
+    - Coûts compteur: cout_compteur, cout_installation (±20-30%)
+    - Comportement: alpha_0 (±40%)
+    - Fuites: part_menages_fuite_pct, taux_detection_pct, taux_reparation_pct
+    - Valeur eau: valeur_sociale_m3 (±25%)
+
+    Si config_echelle est None, compare sans et avec économies d'échelle.
+
+    Paramètres:
+        params: Paramètres du modèle de base
+        compteur: Paramètres du compteur de base
+        config_echelle: Configuration économies d'échelle (optionnel)
+        params_fuites: Paramètres fuites de base (défaut: FUITES_CONTEXTE_QUEBEC)
+        persistance: Paramètres persistance (défaut: PERSISTANCE_REALISTE)
+        valeur_eau: Paramètres valeur eau (défaut: VALEUR_EAU_QUEBEC)
+
+    Retourne:
+        DataFrame avec VAN, RBC, récupération, LCSW pour chaque scénario
     """
-    scenarios = {
+    # Valeurs par défaut
+    if params_fuites is None:
+        params_fuites = FUITES_CONTEXTE_QUEBEC
+    if persistance is None:
+        persistance = PERSISTANCE_REALISTE
+    if valeur_eau is None:
+        valeur_eau = VALEUR_EAU_QUEBEC
+
+    # Définition des scénarios avec multiplicateurs sur les vrais paramètres
+    # Format: {param: (valeur_pessimiste, valeur_base, valeur_optimiste)}
+    scenarios_def = {
         'Pessimiste': {
-            'cout_compteur': 1.30,
-            'taux_correction_fuite_pct': 0.65,
-            'reduction_comportement_pct': 0.60,
-            'valeur_eau_m3': 0.75,
+            # Coûts +30%
+            'mult_cout_compteur': 1.30,
+            'mult_cout_installation': 1.30,
+            # Comportement -40% (alpha_0 plus bas)
+            'mult_alpha_0': 0.60,
+            # Fuites: moins de fuites détectées/réparées
+            'mult_part_menages_fuite': 0.80,      # Moins de fuites à corriger
+            'mult_taux_detection': 0.85,          # Détection moins efficace
+            'mult_taux_reparation': 0.85,         # Réparation moins fréquente
+            # Valeur eau -25%
+            'mult_valeur_sociale': 0.75,
         },
-        'Base': {},
+        'Base': {
+            'mult_cout_compteur': 1.00,
+            'mult_cout_installation': 1.00,
+            'mult_alpha_0': 1.00,
+            'mult_part_menages_fuite': 1.00,
+            'mult_taux_detection': 1.00,
+            'mult_taux_reparation': 1.00,
+            'mult_valeur_sociale': 1.00,
+        },
         'Optimiste': {
-            'cout_compteur': 0.80,
-            'taux_correction_fuite_pct': 1.15,
-            'reduction_comportement_pct': 1.40,
-            'valeur_eau_m3': 1.25,
+            # Coûts -20%
+            'mult_cout_compteur': 0.80,
+            'mult_cout_installation': 0.80,
+            # Comportement +40% (alpha_0 plus élevé)
+            'mult_alpha_0': 1.40,
+            # Fuites: plus de fuites détectées/réparées
+            'mult_part_menages_fuite': 1.20,      # Plus de fuites à corriger
+            'mult_taux_detection': 1.10,          # Détection plus efficace (plafonné à 100%)
+            'mult_taux_reparation': 1.10,         # Réparation plus fréquente (plafonné à 100%)
+            # Valeur eau +25%
+            'mult_valeur_sociale': 1.25,
         }
     }
 
     resultats = []
 
-    for nom, multiplicateurs in scenarios.items():
-        p_scen = _cloner_params(params)
-        c_scen = _cloner_compteur(compteur)
+    for label_echelle, cfg_echelle in _configs_echelle_comparaison(config_echelle):
+        for nom_scenario, mults in scenarios_def.items():
+            # Cloner et modifier les paramètres du modèle
+            p_dict = _cloner_params(params)
+            p_dict['reduction_comportement_pct'] = params.reduction_comportement_pct * mults['mult_alpha_0']
+            params_scen = ParametresModele(**p_dict)
 
-        for cle, mult in multiplicateurs.items():
-            if cle in p_scen:
-                p_scen[cle] = float(p_scen[cle]) * mult
-            if cle in c_scen:
-                c_scen[cle] = float(c_scen[cle]) * mult
+            # Cloner et modifier les paramètres du compteur
+            c_dict = _cloner_compteur(compteur)
+            c_dict['cout_compteur'] = compteur.cout_compteur * mults['mult_cout_compteur']
+            c_dict['heures_installation'] = compteur.heures_installation * mults['mult_cout_installation']
+            compteur_scen = ParametresCompteur(**c_dict)
 
-        res = executer_modele(
-            ParametresModele(**p_scen),
-            ParametresCompteur(**c_scen)
-        )
+            # Créer les paramètres de fuites modifiés
+            fuites_scen = ParametresFuites(
+                part_menages_fuite_pct=min(100.0, params_fuites.part_menages_fuite_pct * mults['mult_part_menages_fuite']),
+                debit_fuite_m3_an=params_fuites.debit_fuite_m3_an,
+                taux_detection_pct=min(100.0, params_fuites.taux_detection_pct * mults['mult_taux_detection']),
+                taux_reparation_pct=min(100.0, params_fuites.taux_reparation_pct * mults['mult_taux_reparation']),
+                cout_reparation_moyen=params_fuites.cout_reparation_moyen,
+                mode_repartition=params_fuites.mode_repartition,
+                part_ville_pct=params_fuites.part_ville_pct,
+                taux_nouvelles_fuites_pct=params_fuites.taux_nouvelles_fuites_pct,
+                inclure_cout_reparation=params_fuites.inclure_cout_reparation,
+                nom=f"{params_fuites.nom} ({nom_scenario})",
+            )
 
-        resultats.append({
-            "Scénario": nom,
-            "VAN": res.van,
-            "RBC": res.rbc,
-            "Récupération (ans)": res.periode_recuperation,
-            "LCSW ($/m³)": res.lcsw,
-        })
+            # Créer les paramètres de valeur eau modifiés
+            valeur_scen = ParametresValeurEau(
+                cout_variable_m3=valeur_eau.cout_variable_m3 * mults['mult_valeur_sociale'],
+                cout_infrastructure_m3=valeur_eau.cout_infrastructure_m3 * mults['mult_valeur_sociale'],
+                valeur_externalites_m3=valeur_eau.valeur_externalites_m3 * mults['mult_valeur_sociale'],
+                valeur_sociale_m3=valeur_eau.valeur_sociale_m3 * mults['mult_valeur_sociale'],
+                prix_vente_m3=valeur_eau.prix_vente_m3,
+                mcf=valeur_eau.mcf,
+                appliquer_mcf=valeur_eau.appliquer_mcf,
+                nom=f"{valeur_eau.nom} ({nom_scenario})",
+            )
+
+            # Exécuter le modèle avec tous les paramètres
+            res = executer_modele(
+                params_scen,
+                compteur_scen,
+                cfg_echelle,
+                persistance=persistance,
+                params_fuites=fuites_scen,
+                valeur_eau=valeur_scen,
+            )
+
+            resultats.append({
+                "Échelle": label_echelle,
+                "Scénario": nom_scenario,
+                "VAN": res.van,
+                "RBC": res.rbc,
+                "Récupération (ans)": res.periode_recuperation,
+                "LCSW ($/m³)": res.lcsw,
+                # Détails pour transparence
+                "α₀ (%)": params_scen.reduction_comportement_pct,
+                "Coût/compteur ($)": compteur_scen.cout_compteur,
+                "Valeur eau ($/m³)": valeur_scen.valeur_sociale_m3,
+            })
 
     return pd.DataFrame(resultats)
 
@@ -4540,6 +6266,815 @@ def graphique_araignee(
     return fig
 
 
+# =============================================================================
+# MODULE MONTE CARLO — SIMULATION STOCHASTIQUE
+# =============================================================================
+#
+# Ce module implémente l'analyse Monte Carlo pour quantifier l'incertitude
+# sur la VAN et calculer la probabilité P(VAN > 0).
+#
+# Approche:
+# 1. Définir des distributions (triangulaires/normales) sur les paramètres clés
+# 2. Tirer N échantillons de chaque distribution
+# 3. Calculer la VAN pour chaque combinaison
+# 4. Analyser la distribution résultante et les drivers de sensibilité
+#
+# Références:
+# - Boardman et al. (2018) Cost-Benefit Analysis, Ch. 7 "Uncertainty"
+# - Morgan & Henrion (1990) Uncertainty: A Guide to Dealing with Uncertainty
+# - Treasury Board of Canada (2007) Risk-Based CBA Guidelines
+#
+# =============================================================================
+
+@dataclass
+class DistributionParametre:
+    """
+    Définition d'une distribution pour un paramètre.
+
+    Types supportés:
+    - 'triangular': distribution triangulaire (min, mode, max)
+    - 'normal': distribution normale (moyenne, écart-type)
+    - 'uniform': distribution uniforme (min, max)
+    - 'lognormal': distribution log-normale (mu, sigma du log)
+    """
+    nom: str                          # Nom du paramètre (ex: "alpha0")
+    type_distribution: str = "triangular"
+    min_val: Optional[float] = None   # Pour triangular/uniform
+    mode_val: Optional[float] = None  # Pour triangular (= valeur la plus probable)
+    max_val: Optional[float] = None   # Pour triangular/uniform
+    moyenne: Optional[float] = None   # Pour normal
+    ecart_type: Optional[float] = None  # Pour normal
+    description: str = ""
+
+    def __post_init__(self):
+        """Valider la configuration."""
+        if self.type_distribution == "triangular":
+            if None in (self.min_val, self.mode_val, self.max_val):
+                raise ValueError(f"{self.nom}: triangular requiert min_val, mode_val, max_val")
+            if not (self.min_val <= self.mode_val <= self.max_val):
+                raise ValueError(f"{self.nom}: doit avoir min <= mode <= max")
+        elif self.type_distribution == "normal":
+            if None in (self.moyenne, self.ecart_type):
+                raise ValueError(f"{self.nom}: normal requiert moyenne et ecart_type")
+            if self.ecart_type <= 0:
+                raise ValueError(f"{self.nom}: ecart_type doit être > 0")
+        elif self.type_distribution == "uniform":
+            if None in (self.min_val, self.max_val):
+                raise ValueError(f"{self.nom}: uniform requiert min_val et max_val")
+
+    def tirer(self, n: int, rng: np.random.Generator) -> np.ndarray:
+        """
+        Tirer n valeurs de la distribution.
+
+        Paramètres:
+            n: Nombre de tirages
+            rng: Générateur de nombres aléatoires numpy
+
+        Retourne:
+            Array de n valeurs
+        """
+        if self.type_distribution == "triangular":
+            return rng.triangular(self.min_val, self.mode_val, self.max_val, n)
+        elif self.type_distribution == "normal":
+            return rng.normal(self.moyenne, self.ecart_type, n)
+        elif self.type_distribution == "uniform":
+            return rng.uniform(self.min_val, self.max_val, n)
+        elif self.type_distribution == "lognormal":
+            return rng.lognormal(self.moyenne, self.ecart_type, n)
+        else:
+            raise ValueError(f"Type de distribution inconnu: {self.type_distribution}")
+
+
+@dataclass
+class ParametresMonteCarlo:
+    """
+    Configuration de la simulation Monte Carlo.
+
+    Définit le nombre de simulations et les distributions à utiliser
+    pour chaque paramètre incertain.
+    """
+    n_simulations: int = 10_000
+    seed: Optional[int] = None  # Pour reproductibilité
+
+    # Distributions des paramètres clés
+    # Si None, le paramètre est fixé à sa valeur par défaut
+    distributions: dict = field(default_factory=dict)
+
+    # Paramètres à inclure dans l'analyse tornado (v3.9: étendu)
+    parametres_tornado: list = field(default_factory=lambda: [
+        "alpha0", "lpcd", "valeur_eau", "cout_compteur",
+        "heures_installation", "taux_horaire_installation", "cout_installation",
+        "opex_annuel", "prevalence_fuites", "debit_fuite_m3_an",
+        "taux_detection", "taux_reparation",
+        "adoption_max", "adoption_k", "adoption_t0",
+        "taux_actualisation"
+    ])
+
+    def __post_init__(self):
+        """Valider la configuration."""
+        if self.n_simulations < 100:
+            raise ValueError("n_simulations doit être >= 100 pour des résultats fiables")
+
+
+@dataclass
+class ResultatsMonteCarlo:
+    """
+    Résultats d'une simulation Monte Carlo.
+
+    Contient la distribution des VAN et les statistiques associées.
+    """
+    van_simulations: np.ndarray       # VAN pour chaque simulation
+    n_simulations: int
+    seed: Optional[int]
+
+    # Statistiques
+    van_moyenne: float = 0.0
+    van_mediane: float = 0.0
+    van_ecart_type: float = 0.0
+    prob_van_positive: float = 0.0
+
+    # Percentiles
+    percentile_5: float = 0.0
+    percentile_25: float = 0.0
+    percentile_75: float = 0.0
+    percentile_95: float = 0.0
+
+    # Analyse de sensibilité (corrélation paramètres/VAN)
+    correlations: dict = field(default_factory=dict)
+
+    # Valeurs tirées pour chaque paramètre (pour analyse)
+    tirages: dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        """Calculer les statistiques."""
+        if len(self.van_simulations) > 0:
+            self.van_moyenne = float(np.mean(self.van_simulations))
+            self.van_mediane = float(np.median(self.van_simulations))
+            self.van_ecart_type = float(np.std(self.van_simulations))
+            self.prob_van_positive = float(np.mean(self.van_simulations > 0))
+
+            self.percentile_5 = float(np.percentile(self.van_simulations, 5))
+            self.percentile_25 = float(np.percentile(self.van_simulations, 25))
+            self.percentile_75 = float(np.percentile(self.van_simulations, 75))
+            self.percentile_95 = float(np.percentile(self.van_simulations, 95))
+
+    @property
+    def intervalle_confiance_90(self) -> tuple[float, float]:
+        """Intervalle de confiance 90% (P5-P95)."""
+        return (self.percentile_5, self.percentile_95)
+
+    @property
+    def intervalle_interquartile(self) -> tuple[float, float]:
+        """Intervalle interquartile (P25-P75)."""
+        return (self.percentile_25, self.percentile_75)
+
+
+# =============================================================================
+# DISTRIBUTIONS MONTE CARLO PAR DÉFAUT (v3.9: étendu)
+# =============================================================================
+#
+# Paramètres incertains organisés par catégorie:
+#   1. COMPORTEMENT: alpha0 (réduction), lpcd (consommation)
+#   2. COÛTS: cout_compteur, heures_installation, taux_horaire_installation, opex_annuel
+#   3. VALORISATION: valeur_eau
+#   4. FUITES: prevalence_fuites, debit_fuite_m3_an, taux_detection, taux_reparation
+#   5. ADOPTION: adoption_max_pct, adoption_k, adoption_t0
+#   6. FINANCIER: taux_actualisation
+#
+# Sources des intervalles:
+#   - Littérature académique sur compteurs intelligents
+#   - Études de cas municipales (Longueuil, Winnipeg, Calgary)
+#   - Méta-analyses (AWWA, IWA) sur les effets comportementaux
+# =============================================================================
+
+DISTRIBUTIONS_DEFAUT = {
+    # === COMPORTEMENT ===
+    "alpha0": DistributionParametre(
+        nom="alpha0",
+        type_distribution="triangular",
+        min_val=0.04, mode_val=0.08, max_val=0.15,
+        description="Réduction comportementale initiale (4-15%)",
+    ),
+    "lpcd": DistributionParametre(
+        nom="lpcd",
+        type_distribution="triangular",
+        min_val=180.0, mode_val=250.0, max_val=350.0,
+        description="Consommation (LPCD): 180-350 L/p/j",
+    ),
+
+    # === COÛTS ===
+    "cout_compteur": DistributionParametre(
+        nom="cout_compteur",
+        type_distribution="triangular",
+        min_val=150.0, mode_val=250.0, max_val=400.0,
+        description="Coût du compteur AMI: 150-400 $",
+    ),
+    "cout_installation": DistributionParametre(
+        nom="cout_installation",
+        type_distribution="triangular",
+        min_val=80.0, mode_val=120.0, max_val=200.0,
+        description="Coût d'installation (alias): 80-200 $/compteur",
+    ),
+    "heures_installation": DistributionParametre(
+        nom="heures_installation",
+        type_distribution="triangular",
+        min_val=1.0, mode_val=1.5, max_val=3.0,
+        description="Heures installation: 1-3 h/compteur",
+    ),
+    "taux_horaire_installation": DistributionParametre(
+        nom="taux_horaire_installation",
+        type_distribution="triangular",
+        min_val=100.0, mode_val=125.0, max_val=150.0,
+        description="Taux horaire installation: 100-150 $/h",
+    ),
+    "opex_annuel": DistributionParametre(
+        nom="opex_annuel",
+        type_distribution="triangular",
+        min_val=15.0, mode_val=20.0, max_val=40.0,
+        description="OPEX total AMI (maintenance + non-tech): 15-40 $/compteur/an",
+    ),
+
+    # === VALORISATION ===
+    "valeur_eau": DistributionParametre(
+        nom="valeur_eau",
+        type_distribution="triangular",
+        min_val=2.50, mode_val=4.69, max_val=8.00,
+        description="Valeur sociale de l'eau: 2.50-8.00 $/m³",
+    ),
+
+    # === FUITES ===
+    "prevalence_fuites": DistributionParametre(
+        nom="prevalence_fuites",
+        type_distribution="triangular",
+        min_val=0.10, mode_val=0.20, max_val=0.35,
+        description="Prévalence des fuites: 10-35%",
+    ),
+    "debit_fuite_m3_an": DistributionParametre(
+        nom="debit_fuite_m3_an",
+        type_distribution="triangular",
+        min_val=20.0, mode_val=35.0, max_val=60.0,
+        description="Débit moyen par fuite: 20-60 m³/an",
+    ),
+    "taux_detection": DistributionParametre(
+        nom="taux_detection",
+        type_distribution="triangular",
+        min_val=0.70, mode_val=0.90, max_val=0.98,
+        description="Taux détection fuites AMI: 70-98%",
+    ),
+    "taux_reparation": DistributionParametre(
+        nom="taux_reparation",
+        type_distribution="triangular",
+        min_val=0.60, mode_val=0.85, max_val=0.95,
+        description="Taux réparation après détection: 60-95%",
+    ),
+
+    # === ADOPTION ===
+    "adoption_max": DistributionParametre(
+        nom="adoption_max",
+        type_distribution="triangular",
+        min_val=0.70, mode_val=0.85, max_val=1.00,
+        description="Taux d'adoption maximal: 70-100%",
+    ),
+    "adoption_k": DistributionParametre(
+        nom="adoption_k",
+        type_distribution="triangular",
+        min_val=0.3, mode_val=0.6, max_val=1.5,
+        description="Vitesse d'adoption (k): 0.3-1.5",
+    ),
+    "adoption_t0": DistributionParametre(
+        nom="adoption_t0",
+        type_distribution="triangular",
+        min_val=2.0, mode_val=5.0, max_val=10.0,
+        description="Point médian adoption (t0): 2-10 ans",
+    ),
+
+    # === FINANCIER ===
+    "taux_actualisation": DistributionParametre(
+        nom="taux_actualisation",
+        type_distribution="triangular",
+        min_val=0.02, mode_val=0.03, max_val=0.05,
+        description="Taux d'actualisation: 2-5% (mode 3%, Québec infrastructure)",
+    ),
+}
+
+# Sous-ensemble minimal (5 paramètres les plus influents) pour simulations rapides
+DISTRIBUTIONS_MINIMALES = {
+    "alpha0": DISTRIBUTIONS_DEFAUT["alpha0"],
+    "cout_compteur": DISTRIBUTIONS_DEFAUT["cout_compteur"],
+    "valeur_eau": DISTRIBUTIONS_DEFAUT["valeur_eau"],
+    "prevalence_fuites": DISTRIBUTIONS_DEFAUT["prevalence_fuites"],
+    "adoption_max": DISTRIBUTIONS_DEFAUT["adoption_max"],
+}
+
+# Sous-ensemble étendu (tous les paramètres) pour analyse complète
+DISTRIBUTIONS_ETENDUES = DISTRIBUTIONS_DEFAUT.copy()
+
+
+# =============================================================================
+# INVENTAIRE DES PRÉRÉGLAGES (sans tarification)
+# =============================================================================
+
+def afficher_inventaire_presets() -> None:
+    """Afficher l'inventaire des préréglages et l'espace combinatoire."""
+    print("\n" + "=" * 90)
+    print(" " * 18 + "INVENTAIRE DES PRÉRÉGLAGES (SANS TARIFICATION)")
+    print("=" * 90)
+
+    # A) Contexte de base
+    p_def = ParametresModele()
+    dl = DEFAUTS_LONGUEUIL
+    print("\nA) Contexte de base")
+    print(f"  DEFAUTS_LONGUEUIL: {dl.nb_menages} ménages, {dl.taille_menage:.2f} pers/ménage, {dl.lpcd:.0f} LPCD")
+    print("    Note: Longueuil ~236 L/p/j résidentiel; ~567 L/p/j tous usages (sources internes 2024)")
+    print(f"  ParametresModele() défauts: horizon={p_def.horizon_analyse} ans, "
+          f"taux actualisation={p_def.taux_actualisation_pct:.1f}%, "
+          f"LPCD={p_def.lpcd:.0f}, réduction comportementale={p_def.reduction_comportement_pct:.0f}%")
+
+    # B) Types de compteurs
+    print("\nB) Types de compteurs (coûts stylisés)")
+    couts_types = {t.name: _cout_compteur_par_type(t) for t in TypeCompteur}
+    print(f"  TypeCompteur: {', '.join(t.name for t in TypeCompteur)}")
+    print(f"  Comparaison (compteur nu): {couts_types}")
+    c_long = COMPTEUR_LONGUEUIL_AMI
+    cout_install = c_long.cout_installation
+    cout_total = c_long.cout_initial_par_compteur
+    print(f"  COMPTEUR_LONGUEUIL_AMI: compteur={c_long.cout_compteur:.0f}$, "
+          f"installation={c_long.heures_installation:.1f}h×{c_long.taux_horaire_installation:.0f}$/h "
+          f"({cout_install:.0f}$), réseau={c_long.cout_reseau_par_compteur:.0f}$ → total~{cout_total:.0f}$")
+    print("    Note: 250$ = compteur nu; ~675$ = compteur + MO + réseau (avant autres coûts)")
+
+    # C) Persistance comportementale
+    print("\nC) Persistance comportementale (SCENARIOS_PERSISTANCE)")
+    for key, s in SCENARIOS_PERSISTANCE.items():
+        print(f"  {key}: mode={s.mode.value}, α0={s.alpha_initial*100:.1f}%, "
+              f"plateau={s.alpha_plateau*100:.1f}%, lambda={s.lambda_decay:.2f}, "
+              f"fadeout={s.annees_fadeout} ans")
+
+    # D) Fuites privées (SCENARIOS_FUITES)
+    print("\nD) Fuites privées (SCENARIOS_FUITES)")
+    for key, f in SCENARIOS_FUITES.items():
+        print(f"  {key}: prévalence={f.part_menages_fuite_pct:.1f}%, "
+              f"durée sans compteur={f.duree_moyenne_fuite_sans_compteur} ans, "
+              f"détection={f.taux_detection_pct:.0f}%, réparation={f.taux_reparation_pct:.0f}%, "
+              f"coût moyen={f.cout_reparation_moyen:.0f}$, partage ville={f.part_ville_pct:.0f}%")
+
+    # E) Adoption / déploiement
+    print("\nE) Adoption / déploiement (STRATEGIES_ADOPTION)")
+    for key, a in STRATEGIES_ADOPTION.items():
+        print(f"  {key}: mode={a.mode.value}, Amax={a.adoption_max_pct:.3f}%, "
+              f"k={a.k_vitesse:.2f}, t0={a.t0_point_median:.1f}, incitatif={a.cout_incitatif_par_menage:.0f}$")
+    print("  Note Québec: échantillonnage SQEEP ~380 compteurs (preset dédié)")
+
+    # F) Valeur de l'eau + MCF
+    print("\nF) Valeur de l'eau (PREREGLAGES_VALEUR_EAU)")
+    for key, v in PREREGLAGES_VALEUR_EAU.items():
+        print(f"  {key}: sociale={v.valeur_sociale_m3:.2f}, variable={v.cout_variable_m3:.2f}, "
+              f"infra={v.cout_infrastructure_m3:.2f}, externalités={v.valeur_externalites_m3:.2f}, "
+              f"MCF={'ON' if v.appliquer_mcf else 'OFF'} ({v.mcf:.2f})")
+
+    # G) Ventilation OPEX AMI
+    print("\nG) Ventilation OPEX AMI (PREREGLAGES_VENTILATION_OPEX)")
+    for key, v in PREREGLAGES_VENTILATION_OPEX.items():
+        print(f"  {key}: cyber={v.cybersecurite_pct:.0%}, licences={v.licences_logiciels_pct:.0%}, "
+              f"stockage={v.stockage_donnees_pct:.0%}, service={v.service_client_pct:.0%}, "
+              f"integration={v.integration_si_pct:.0%}")
+
+    # H) Segmentation résidentielle
+    print("\nH) Segmentation résidentielle (SEGMENTS_QUEBEC_DEFAUT)")
+    for s in SEGMENTS_QUEBEC_DEFAUT:
+        print(f"  {s.nom}: LPCD={s.lpcd:.0f}, pers/ménage={s.personnes_par_menage:.2f}, "
+              f"prévalence fuites={s.prevalence_fuites_pct:.0f}%, potentiel={s.potentiel_reduction_pct:.0f}%")
+    print("  Note: Multilogement exclu par défaut (voir justification dans le code)")
+
+    # I) Monte Carlo
+    print("\nI) Monte Carlo (DISTRIBUTIONS_DEFAUT)")
+    for key, d in DISTRIBUTIONS_DEFAUT.items():
+        print(f"  {key}: {d.type_distribution} [{d.min_val}, {d.mode_val}, {d.max_val}]")
+    print("  Manques notables possibles: SI/télécom détaillé, dynamique d'adoption avancée")
+
+    # Espace combinatoire
+    print("\nEspace combinatoire:")
+    print("  adoption × persistance × fuites × valeur_eau × type_compteur × segmentation × Monte Carlo")
+    print("=" * 90)
+
+def simuler_monte_carlo(
+    params_base: ParametresModele,
+    compteur_base: ParametresCompteur,
+    config_mc: ParametresMonteCarlo = None,
+    config_echelle: ConfigEconomiesEchelle = None,
+    valeur_eau: ParametresValeurEau = None,
+    mode_compte: ModeCompte = ModeCompte.ECONOMIQUE,
+    afficher_progression: bool = True,
+    **kwargs,
+) -> ResultatsMonteCarlo:
+    """
+    Exécuter une simulation Monte Carlo.
+
+    Paramètres:
+        params_base: Paramètres du modèle (valeurs centrales)
+        compteur_base: Paramètres du compteur (valeurs centrales)
+        config_mc: Configuration Monte Carlo (distributions, n_simulations)
+        config_echelle: Configuration économies d'échelle
+        valeur_eau: Paramètres valeur d'eau
+        mode_compte: Mode de comptabilité
+        afficher_progression: Afficher une barre de progression
+        **kwargs: Arguments supplémentaires pour executer_modele()
+
+    Retourne:
+        ResultatsMonteCarlo avec distribution VAN et statistiques
+    """
+    if config_mc is None:
+        config_mc = ParametresMonteCarlo(distributions=DISTRIBUTIONS_DEFAUT)
+
+    if valeur_eau is None:
+        valeur_eau = VALEUR_EAU_QUEBEC
+
+    # Initialiser le générateur de nombres aléatoires
+    rng = np.random.default_rng(config_mc.seed)
+
+    n = config_mc.n_simulations
+    van_simulations = np.zeros(n)
+    tirages = {nom: np.zeros(n) for nom in config_mc.distributions}
+
+    # Tirer toutes les valeurs à l'avance
+    for nom, distrib in config_mc.distributions.items():
+        tirages[nom] = distrib.tirer(n, rng)
+
+    # Exécuter les simulations
+    for i in range(n):
+        if afficher_progression and i % 1000 == 0:
+            print(f"\r  Simulation {i+1}/{n}...", end="", flush=True)
+
+        # Cloner les paramètres
+        params_dict = _cloner_params(params_base)
+        compteur_dict = _cloner_compteur(compteur_base)
+        valeur_eau_dict = {
+            'valeur_sociale_m3': valeur_eau.valeur_sociale_m3,
+            'cout_variable_m3': valeur_eau.cout_variable_m3,
+            'cout_infrastructure_m3': valeur_eau.cout_infrastructure_m3,
+            'valeur_externalites_m3': valeur_eau.valeur_externalites_m3,
+            'prix_vente_m3': valeur_eau.prix_vente_m3,
+            'mcf': valeur_eau.mcf,
+            'appliquer_mcf': valeur_eau.appliquer_mcf,
+        }
+
+        # Appliquer les valeurs tirées
+        # v3.9: Support étendu pour installation, OPEX, adoption, fuites
+        params_fuites_dict = None  # Initialisé si nécessaire
+
+        has_heures = "heures_installation" in tirages
+        has_taux_horaire = "taux_horaire_installation" in tirages
+
+        for nom, valeur in tirages.items():
+            # === COMPORTEMENT ===
+            if nom == "alpha0":
+                # alpha0 = réduction comportementale (ex: 0.08 = 8%)
+                params_dict["reduction_comportement_pct"] = valeur[i] * 100
+            elif nom == "lpcd":
+                params_dict["lpcd"] = valeur[i]
+
+            # === COÛTS ===
+            elif nom == "cout_compteur":
+                compteur_dict["cout_compteur"] = valeur[i]
+            elif nom == "cout_installation":
+                # Alias: convertir un coût total en heures si heures/taux non tirés
+                if not has_heures and not has_taux_horaire:
+                    taux = max(compteur_dict.get("taux_horaire_installation", 0.0), 1e-6)
+                    compteur_dict["heures_installation"] = valeur[i] / taux
+            elif nom == "heures_installation":
+                compteur_dict["heures_installation"] = valeur[i]
+            elif nom == "taux_horaire_installation":
+                compteur_dict["taux_horaire_installation"] = valeur[i]
+            elif nom == "opex_annuel":
+                # OPEX total AMI = maintenance + non-tech → on ajuste la composante non-tech
+                base = max(compteur_dict.get("cout_maintenance_ami", 0.0), 0.0)
+                compteur_dict["cout_opex_non_tech_ami"] = max(0.0, valeur[i] - base)
+
+            # === VALORISATION ===
+            elif nom == "valeur_eau":
+                # Ajuster toutes les composantes de la valeur sociale
+                base = max(valeur_eau_dict["valeur_sociale_m3"], 1e-6)
+                ratio = valeur[i] / base
+                valeur_eau_dict["valeur_sociale_m3"] = valeur[i]
+                valeur_eau_dict["cout_infrastructure_m3"] = valeur_eau_dict["cout_infrastructure_m3"] * ratio
+                valeur_eau_dict["valeur_externalites_m3"] = valeur_eau_dict["valeur_externalites_m3"] * ratio
+
+            # === FUITES ===
+            elif nom == "prevalence_fuites":
+                params_dict["part_menages_fuite_pct"] = valeur[i] * 100
+            elif nom == "debit_fuite_m3_an":
+                params_dict["debit_fuite_m3_an"] = valeur[i]
+                if params_fuites_dict is None:
+                    params_fuites_dict = {"debit_fuite_m3_an": valeur[i]}
+                else:
+                    params_fuites_dict["debit_fuite_m3_an"] = valeur[i]
+            elif nom == "taux_detection":
+                if params_fuites_dict is None:
+                    params_fuites_dict = {"taux_detection_pct": valeur[i] * 100}
+                else:
+                    params_fuites_dict["taux_detection_pct"] = valeur[i] * 100
+            elif nom == "taux_reparation":
+                if params_fuites_dict is None:
+                    params_fuites_dict = {"taux_reparation_pct": valeur[i] * 100}
+                else:
+                    params_fuites_dict["taux_reparation_pct"] = valeur[i] * 100
+
+            # === ADOPTION ===
+            elif nom == "adoption_max":
+                # Stocké pour créer ParametresAdoption après
+                pass  # Traité séparément ci-dessous
+            elif nom == "adoption_k":
+                pass
+            elif nom == "adoption_t0":
+                pass
+
+            # === FINANCIER ===
+            elif nom == "taux_actualisation":
+                params_dict["taux_actualisation_pct"] = valeur[i] * 100
+
+        # Créer les objets
+        params = ParametresModele(**params_dict)
+        compteur = ParametresCompteur(**compteur_dict)
+        ve = ParametresValeurEau(**valeur_eau_dict)
+
+        # Créer params_fuites si des paramètres de fuites ont été variés
+        params_fuites_sim = kwargs.get('params_fuites', FUITES_CONTEXTE_QUEBEC)
+        if params_fuites_dict:
+            f_dict = params_fuites_sim.__dict__.copy()
+            debit_ref = f_dict.get("debit_fuite_m3_an", params_fuites_sim.debit_fuite_m3_an)
+            f_dict.update({
+                "part_menages_fuite_pct": params.part_menages_fuite_pct,
+                "debit_fuite_m3_an": params_fuites_dict.get("debit_fuite_m3_an", params_fuites_sim.debit_fuite_m3_an),
+                "taux_detection_pct": params_fuites_dict.get("taux_detection_pct", params_fuites_sim.taux_detection_pct),
+                "taux_reparation_pct": params_fuites_dict.get("taux_reparation_pct", params_fuites_sim.taux_reparation_pct),
+            })
+            params_fuites_sim = ParametresFuites(**f_dict)
+            if params_fuites_sim.utiliser_prevalence_differenciee and "debit_fuite_m3_an" in params_fuites_dict:
+                ratio = params_fuites_dict["debit_fuite_m3_an"] / max(debit_ref, 1e-6)
+                params_fuites_sim.debit_fuite_any_m3_an *= ratio
+                params_fuites_sim.debit_fuite_significative_m3_an *= ratio
+
+        # Créer params_adoption si adoption_max/k/t0 sont variés
+        base_adoption = kwargs.get('params_adoption', ADOPTION_OBLIGATOIRE)
+        params_adoption_sim = base_adoption
+        if ("adoption_max" in tirages) or ("adoption_k" in tirages) or ("adoption_t0" in tirages):
+            adoption_pct = tirages["adoption_max"][i] * 100 if "adoption_max" in tirages else base_adoption.adoption_max_pct
+            k_vitesse = tirages["adoption_k"][i] if "adoption_k" in tirages else base_adoption.k_vitesse
+            t0_median = tirages["adoption_t0"][i] if "adoption_t0" in tirages else base_adoption.t0_point_median
+            params_adoption_sim = ParametresAdoption(
+                mode=base_adoption.mode,
+                adoption_max_pct=adoption_pct,
+                etaler_capex=base_adoption.etaler_capex,
+                k_vitesse=k_vitesse,
+                t0_point_median=t0_median,
+                taux_nouveaux_pct=base_adoption.taux_nouveaux_pct,
+                nb_secteurs=base_adoption.nb_secteurs,
+                annees_par_secteur=base_adoption.annees_par_secteur,
+                cout_incitatif_par_menage=base_adoption.cout_incitatif_par_menage,
+                duree_incitatif_ans=base_adoption.duree_incitatif_ans,
+                fraction_premiere_annee=base_adoption.fraction_premiere_annee,
+                annee_demarrage=base_adoption.annee_demarrage,
+                nom=base_adoption.nom,
+                description=base_adoption.description,
+            )
+
+        # Exécuter le modèle avec les paramètres variés
+        try:
+            # Filtrer kwargs pour éviter les doublons
+            kwargs_filtered = {k: v for k, v in kwargs.items()
+                               if k not in ('params_fuites', 'params_adoption')}
+            res = executer_modele(
+                params=params,
+                compteur=compteur,
+                config_echelle=config_echelle,
+                mode_compte=mode_compte,
+                valeur_eau=ve,
+                params_fuites=params_fuites_sim,
+                params_adoption=params_adoption_sim,
+                **kwargs_filtered,
+            )
+            van_simulations[i] = res.van
+        except Exception:
+            van_simulations[i] = np.nan
+
+    if afficher_progression:
+        print(f"\r  Simulation {n}/{n}... Terminé!")
+
+    # Supprimer les NaN
+    van_valides = van_simulations[~np.isnan(van_simulations)]
+
+    # Calculer les corrélations (analyse de sensibilité)
+    correlations = {}
+    for nom, valeurs in tirages.items():
+        valeurs_valides = valeurs[~np.isnan(van_simulations)]
+        if len(valeurs_valides) > 0:
+            corr = np.corrcoef(valeurs_valides, van_valides)[0, 1]
+            correlations[nom] = float(corr) if np.isfinite(corr) else 0.0
+
+    return ResultatsMonteCarlo(
+        van_simulations=van_valides,
+        n_simulations=len(van_valides),
+        seed=config_mc.seed,
+        correlations=correlations,
+        tirages=tirages,
+    )
+
+
+def afficher_resultats_monte_carlo(resultats: ResultatsMonteCarlo) -> None:
+    """
+    Afficher un résumé des résultats Monte Carlo.
+
+    Paramètres:
+        resultats: Résultats de la simulation
+    """
+    print("\n" + "=" * 70)
+    print(" " * 18 + "RÉSULTATS SIMULATION MONTE CARLO")
+    print("=" * 70)
+
+    print(f"\n  Nombre de simulations: {resultats.n_simulations:,}")
+    if resultats.seed is not None:
+        print(f"  Seed (reproductibilité): {resultats.seed}")
+
+    print("\n  ─── STATISTIQUES VAN ───")
+    print(f"    Moyenne:      {fmt_argent(resultats.van_moyenne)}")
+    print(f"    Médiane:      {fmt_argent(resultats.van_mediane)}")
+    print(f"    Écart-type:   {fmt_argent(resultats.van_ecart_type)}")
+
+    print("\n  ─── PERCENTILES ───")
+    print(f"    P5  (pessimiste):  {fmt_argent(resultats.percentile_5)}")
+    print(f"    P25 (quartile 1):  {fmt_argent(resultats.percentile_25)}")
+    print(f"    P50 (médiane):     {fmt_argent(resultats.van_mediane)}")
+    print(f"    P75 (quartile 3):  {fmt_argent(resultats.percentile_75)}")
+    print(f"    P95 (optimiste):   {fmt_argent(resultats.percentile_95)}")
+
+    print("\n  ─── PROBABILITÉ ───")
+    pct = resultats.prob_van_positive * 100
+    barre = "█" * int(pct / 2) + "░" * (50 - int(pct / 2))
+    print(f"    P(VAN > 0) = {pct:.1f}%")
+    print(f"    [{barre}]")
+
+    if resultats.correlations:
+        print("\n  ─── DRIVERS DE SENSIBILITÉ (corrélations) ───")
+        correlations_triees = sorted(
+            resultats.correlations.items(),
+            key=lambda x: abs(x[1]),
+            reverse=True
+        )
+        for nom, corr in correlations_triees:
+            signe = "+" if corr > 0 else ""
+            impact = "█" * int(abs(corr) * 20)
+            print(f"    {nom:<20}: {signe}{corr:.3f} {impact}")
+
+    print("=" * 70 + "\n")
+
+
+def graphique_distribution_van(
+    resultats: ResultatsMonteCarlo,
+    titre: str = "Distribution Monte Carlo de la VAN",
+    dossier: str = None,
+) -> plt.Figure:
+    """
+    Créer un histogramme de la distribution VAN.
+
+    Paramètres:
+        resultats: Résultats Monte Carlo
+        titre: Titre du graphique
+        dossier: Dossier de sauvegarde (optionnel)
+
+    Retourne:
+        Figure matplotlib
+    """
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    # Histogramme
+    n_bins = min(100, resultats.n_simulations // 50)
+    n, bins, patches = ax.hist(
+        resultats.van_simulations / 1e6,  # En millions
+        bins=n_bins,
+        density=True,
+        alpha=0.7,
+        color='steelblue',
+        edgecolor='white',
+        linewidth=0.5,
+    )
+
+    # Colorier les valeurs négatives en rouge
+    for patch, left_edge in zip(patches, bins[:-1]):
+        if left_edge < 0:
+            patch.set_facecolor('#d62728')
+
+    # Lignes verticales pour les percentiles
+    ax.axvline(resultats.van_mediane / 1e6, color='orange', linewidth=2,
+               linestyle='--', label=f'Médiane: {fmt_argent(resultats.van_mediane)}')
+    ax.axvline(0, color='black', linewidth=2, linestyle='-', label='VAN = 0')
+    ax.axvline(resultats.percentile_5 / 1e6, color='red', linewidth=1.5,
+               linestyle=':', label=f'P5: {fmt_argent(resultats.percentile_5)}')
+    ax.axvline(resultats.percentile_95 / 1e6, color='green', linewidth=1.5,
+               linestyle=':', label=f'P95: {fmt_argent(resultats.percentile_95)}')
+
+    # Zone P(VAN > 0) — shading de 0 à la limite droite du graphique
+    # Note: bins est déjà en M$ (van_simulations / 1e6), pas besoin de rediviser
+    xlim_max = max(bins.max(), resultats.percentile_95 / 1e6 * 1.1)
+    ax.fill_betweenx([0, n.max() * 1.05], 0, xlim_max,
+                     alpha=0.1, color='green', label='_nolegend_')
+
+    # Annotation P(VAN > 0)
+    ax.annotate(
+        f'P(VAN > 0) = {resultats.prob_van_positive*100:.1f}%',
+        xy=(resultats.van_mediane / 1e6, n.max() * 0.8),
+        fontsize=14,
+        fontweight='bold',
+        bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.8),
+    )
+
+    ax.set_xlabel("VAN (M$)", fontsize=12, fontweight='bold')
+    ax.set_ylabel("Densité", fontsize=12, fontweight='bold')
+    ax.set_title(titre, fontsize=14, fontweight='bold', pad=15)
+    ax.legend(loc='upper right', fontsize=10)
+    ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+
+    if dossier:
+        os.makedirs(dossier, exist_ok=True)
+        chemin = os.path.join(dossier, "monte_carlo_distribution.png")
+        fig.savefig(chemin, dpi=150, bbox_inches='tight')
+        print(f"Figure sauvegardée: {chemin}")
+
+    return fig
+
+
+def graphique_tornado_mc(
+    resultats: ResultatsMonteCarlo,
+    titre: str = "Analyse Tornado — Drivers de la VAN",
+    dossier: str = None,
+) -> plt.Figure:
+    """
+    Créer un graphique tornado basé sur les corrélations Monte Carlo.
+
+    Paramètres:
+        resultats: Résultats Monte Carlo avec corrélations
+        titre: Titre du graphique
+        dossier: Dossier de sauvegarde (optionnel)
+
+    Retourne:
+        Figure matplotlib
+    """
+    if not resultats.correlations:
+        raise ValueError("Pas de données de corrélation disponibles")
+
+    # Trier par impact absolu
+    correlations_triees = sorted(
+        resultats.correlations.items(),
+        key=lambda x: abs(x[1]),
+        reverse=True
+    )
+
+    noms = [x[0] for x in correlations_triees]
+    valeurs = [x[1] for x in correlations_triees]
+
+    fig, ax = plt.subplots(figsize=(10, max(4, len(noms) * 0.6)))
+
+    # Barres horizontales
+    couleurs = ['#2ca02c' if v > 0 else '#d62728' for v in valeurs]
+    y_pos = np.arange(len(noms))
+
+    ax.barh(y_pos, valeurs, color=couleurs, alpha=0.8, edgecolor='black', linewidth=1)
+
+    # Ligne verticale à 0
+    ax.axvline(0, color='black', linewidth=1.5)
+
+    # Labels
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(noms, fontsize=11)
+    ax.set_xlabel("Corrélation avec la VAN", fontsize=12, fontweight='bold')
+    ax.set_title(titre, fontsize=14, fontweight='bold', pad=15)
+
+    # Annotations
+    for i, (nom, val) in enumerate(zip(noms, valeurs)):
+        signe = "+" if val > 0 else ""
+        ax.text(val + 0.02 * np.sign(val), i, f'{signe}{val:.2f}',
+                va='center', fontsize=10, fontweight='bold')
+
+    # Légende explicative
+    ax.text(0.02, 0.98, "Vert = augmente la VAN\nRouge = diminue la VAN",
+            transform=ax.transAxes, fontsize=9, verticalalignment='top',
+            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+    ax.set_xlim(-1.1, 1.1)
+    ax.grid(True, alpha=0.3, axis='x')
+
+    plt.tight_layout()
+
+    if dossier:
+        os.makedirs(dossier, exist_ok=True)
+        chemin = os.path.join(dossier, "monte_carlo_tornado.png")
+        fig.savefig(chemin, dpi=150, bbox_inches='tight')
+        print(f"Figure sauvegardée: {chemin}")
+
+    return fig
+
+
 def graphique_van_cumulative(res: ResultatsModele, ax: Optional[plt.Axes] = None) -> plt.Figure:
     """VAN cumulative avec période de récupération."""
     if ax is None:
@@ -4704,6 +7239,7 @@ def afficher_resume(res: ResultatsModele) -> None:
     print(f"\n{'PARAMÈTRES DU PROJET':^80}")
     print("-" * 80)
     print(f"  Ménages:                  {p.nb_menages:>15,}")
+    print(f"  Compteurs:                {p.nb_compteurs_effectif:>15,}")
     print(f"  Population:               {p.nb_personnes:>15,}")
     print(f"  Horizon d'analyse:        {p.horizon_analyse:>15} ans")
     print(f"  Taux d'actualisation:     {p.taux_actualisation_pct:>14.1f} %")
@@ -4716,6 +7252,8 @@ def afficher_resume(res: ResultatsModele) -> None:
         print(f"  Infrastructure réseau:    {c.cout_reseau_par_compteur:>15.0f} $")
     print(f"  TOTAL par compteur:       {c.cout_initial_par_compteur:>15.0f} $")
     print(f"  Exploitation annuelle:    {c.cout_exploitation_annuel:>15.0f} $/compteur")
+    if c.type_compteur == TypeCompteur.AMI and c.cout_opex_non_tech_ami > 0:
+        print(f"  OPEX non-tech AMI:         {c.cout_opex_non_tech_ami:>15.0f} $/compteur/an")
 
     # Afficher économies d'échelle si actives
     if res.economies_echelle_actives:
@@ -4723,6 +7261,7 @@ def afficher_resume(res: ResultatsModele) -> None:
         print("-" * 80)
         reduction_pct = (1.0 - res.facteur_echelle) * 100
         print(f"  Facteur d'échelle:        {res.facteur_echelle:>14.2f} ({reduction_pct:.1f}% réduction)")
+        print(f"  Facteurs (comp/inst/réseau): {res.facteur_echelle_compteur:.2f} / {res.facteur_echelle_installation:.2f} / {res.facteur_echelle_reseau:.2f}")
         print(f"  Coût/compteur (base):     {res.cout_par_compteur_base:>15.0f} $")
         print(f"  Coût/compteur (ajusté):   {res.cout_par_compteur_ajuste:>15.0f} $")
         print(f"  ÉCONOMIES TOTALES:        {fmt_argent(res.economies_realisees):>15}")
@@ -4749,6 +7288,15 @@ def afficher_resume(res: ResultatsModele) -> None:
     print(f"  VA(Bénéfices):            {fmt_argent(res.va_benefices):>15}")
     print(f"  VA(Coûts exploitation):   {fmt_argent(res.va_couts_exploitation):>15}")
     print(f"  VA(Coûts totaux):         {fmt_argent(res.va_couts_totaux):>15}")
+
+    print(f"\n{'DÉCOMPOSITION VALEUR DE L EAU (VA)':^80}")
+    print("-" * 80)
+    print(f"  Coût variable évité:      {fmt_argent(res.va_benefices_cout_variable):>15}")
+    print(f"  Report infra (valeur m³): {fmt_argent(res.va_benefices_infra_m3):>15}")
+    print(f"  Externalités:             {fmt_argent(res.va_benefices_externalites):>15}")
+    print(f"  Report infra (paramètres): {fmt_argent(res.va_benefices_report_infra):>15}")
+    if res.mode_compte == ModeCompte.FINANCIER:
+        print("  (Info) Composantes sociales non comptées en mode financier")
 
     print(f"\n{'RÉSULTATS PRINCIPAUX':^80}")
     print("=" * 80)
@@ -5031,7 +7579,7 @@ SOURCE_KENNEY_COLORADO = SourceCalibration(
     valeur_observee=0.065,
     intervalle_confiance=(0.04, 0.09),
     taille_echantillon=8000,
-    contexte="Programme combiné compteurs + tarification progressive",
+    contexte="Programme combiné compteurs + signal-prix (contexte externe, hors périmètre QC)",
     methodologie="Analyse économétrique panel 10 ans",
     page_ou_section="Table 2, Section 4",
     type_source="article",
@@ -5121,7 +7669,7 @@ SOURCE_WINNIPEG_METERS = SourceCalibration(
     page_ou_section="Section 4.2 Financial Analysis",
     type_source="rapport",
     url="https://winnipeg.ca/waterandwaste/water/meters/",
-    notes="~$16M/an de revenus récupérés estimés grâce à la précision"
+    notes="Sous-enregistrement estimé (~5%); contexte de remplacement, hors tarification résidentielle QC"
 )
 
 SOURCE_ARREGUI_ACCURACY = SourceCalibration(
@@ -5247,7 +7795,7 @@ CALIBRATION = {
             notes_methodologiques=(
                 "Valeur centrale basée sur Davies (Australie) et Carrillo (Équateur). "
                 "Beal (Australie) montre des effets plus élevés avec feedback détaillé. "
-                "Kenney (Colorado) suggère renforcement par tarification."
+                "Kenney (Colorado) suggère renforcement par engagement; non utilisé ici."
             ),
             incertitude="moyenne",
         ),
@@ -5856,17 +8404,17 @@ def executer_tests_validation() -> bool:
         print(f"  ERREUR: {e}")
 
     # Test 4: Comparaison types
-    print("\nTest 4: Comparaison 3 types de compteurs")
+    print("\nTest 4: Comparaison types de compteurs")
     tests_total += 1
     try:
         params = ParametresModele()
         df = comparer_types_compteurs(params)
 
-        if len(df) == 3:
-            print(f"  OK - 3 types comparés")
+        if len(df) == 6:
+            print(f"  OK - 6 lignes (2 échelles × 3 types)")
             tests_reussis += 1
         else:
-            print(f"  ÉCHEC - {len(df)} types au lieu de 3")
+            print(f"  ÉCHEC - {len(df)} lignes au lieu de 6")
     except Exception as e:
         print(f"  ERREUR: {e}")
 
@@ -5877,8 +8425,13 @@ def executer_tests_validation() -> bool:
         params = ParametresModele()
         df = comparer_types_compteurs(params)
 
-        inv_ami = df[df["Type"] == "AMI"]["Investissement total"].values[0]
-        inv_manuel = df[df["Type"] == "MANUEL"]["Investissement total"].values[0]
+        df_base = df
+        if "Échelle" in df.columns:
+            df_base = df[df["Échelle"] == "Sans échelle"]
+            if df_base.empty:
+                df_base = df
+        inv_ami = df_base[df_base["Type"] == "AMI"]["Investissement total"].values[0]
+        inv_manuel = df_base[df_base["Type"] == "MANUEL"]["Investissement total"].values[0]
 
         if inv_ami > inv_manuel:
             print(f"  OK - AMI ({fmt_argent(inv_ami)}) > Manuel ({fmt_argent(inv_manuel)})")
@@ -5888,7 +8441,7 @@ def executer_tests_validation() -> bool:
     except Exception as e:
         print(f"  ERREUR: {e}")
 
-    # Test 6: (Supprimé - revenus récupérés non applicable au Québec)
+# Test 6: (Supprimé - sous-enregistrement non applicable au Québec)
 
     # Test 7: Économies d'échelle désactivées par défaut
     print("\nTest 7: Économies d'échelle OFF par défaut")
@@ -6332,13 +8885,13 @@ def executer_tests_validation() -> bool:
         params = ParametresModele()
         df = comparer_scenarios_fuites(params)
 
-        if len(df) == 5:  # 5 scénarios prédéfinis (incluant quebec)
-            print(f"  OK - 5 scénarios comparés")
+        if len(df) == 12:  # 6 scénarios × 2 échelles
+            print(f"  OK - 12 lignes (2 échelles × 6 scénarios)")
             vans = df["VAN"].values
             print(f"       VAN min: {fmt_argent(min(vans))}, max: {fmt_argent(max(vans))}")
             tests_reussis += 1
         else:
-            print(f"  ÉCHEC - {len(df)} scénarios au lieu de 5")
+            print(f"  ÉCHEC - {len(df)} lignes au lieu de 12")
     except Exception as e:
         print(f"  ERREUR: {e}")
 
@@ -6421,7 +8974,7 @@ def executer_tests_validation() -> bool:
 
         # La VAN économique devrait être plus élevée car:
         # - valeur sociale (4.69$) > coût variable (0.50$)
-        # - mais le mode financier inclut les revenus récupérés
+        # - le mode financier utilise le coût variable évité (sans tarification)
         # Donc on vérifie juste que les deux sont calculées
         print(f"  OK - Comparaison calculée")
         print(f"       VAN économique: {fmt_argent(van_eco)}")
@@ -6431,28 +8984,29 @@ def executer_tests_validation() -> bool:
     except Exception as e:
         print(f"  ERREUR: {e}")
 
-    # Test 26: (Supprimé - revenus récupérés non applicable au Québec)
+    # Test 26: (Supprimé - sous-enregistrement non applicable au Québec)
 
-    # Test 27: comparer_perspectives() retourne 2 lignes
-    print("\nTest 27: comparer_perspectives() retourne 2 lignes")
+    # Test 27: comparer_perspectives() retourne 4 lignes
+    print("\nTest 27: comparer_perspectives() retourne 4 lignes")
     tests_total += 1
     try:
         params = ParametresModele(nb_menages=1000)
         df = comparer_perspectives(params)
 
-        if len(df) == 2:
+        if len(df) == 4:
             perspectives = df["Perspective"].tolist()
             if "Économique" in perspectives and "Financier" in perspectives:
-                print(f"  OK - 2 perspectives comparées")
-                van_eco = df[df['Perspective']=='Économique']['VAN ($)'].values[0]
-                van_fin = df[df['Perspective']=='Financier']['VAN ($)'].values[0]
+                print(f"  OK - 4 lignes (2 échelles × 2 perspectives)")
+                df_base = df[df["Échelle"] == "Sans échelle"] if "Échelle" in df.columns else df
+                van_eco = df_base[df_base['Perspective']=='Économique']['VAN ($)'].values[0]
+                van_fin = df_base[df_base['Perspective']=='Financier']['VAN ($)'].values[0]
                 print(f"       Économique: VAN = {fmt_argent(van_eco)}")
                 print(f"       Financier:  VAN = {fmt_argent(van_fin)}")
                 tests_reussis += 1
             else:
                 print(f"  ÉCHEC - Perspectives incorrectes: {perspectives}")
         else:
-            print(f"  ÉCHEC - {len(df)} lignes au lieu de 2")
+            print(f"  ÉCHEC - {len(df)} lignes au lieu de 4")
     except Exception as e:
         print(f"  ERREUR: {e}")
 
@@ -6575,20 +9129,21 @@ def executer_tests_validation() -> bool:
     except Exception as e:
         print(f"  ERREUR: {e}")
 
-    # Test 33: comparer_strategies_adoption() retourne 6 lignes
-    print("\nTest 33: comparer_strategies_adoption() retourne 6 lignes")
+    # Test 33: comparer_strategies_adoption() retourne 2 × nb stratégies
+    print("\nTest 33: comparer_strategies_adoption() retourne 2 × nb stratégies")
     tests_total += 1
     try:
         params = ParametresModele(nb_menages=10000)
         df = comparer_strategies_adoption(params)
 
-        if len(df) == 6:
+        attendu = len(STRATEGIES_ADOPTION) * 2  # 2 échelles par défaut
+        if len(df) == attendu:
             vans = df["VAN ($)"].values
-            print(f"  OK - 6 stratégies comparées")
+            print(f"  OK - {attendu} lignes (2 échelles × {len(STRATEGIES_ADOPTION)} stratégies)")
             print(f"       VAN min: {fmt_argent(min(vans))}, max: {fmt_argent(max(vans))}")
             tests_reussis += 1
         else:
-            print(f"  ÉCHEC - {len(df)} stratégies au lieu de 6")
+            print(f"  ÉCHEC - {len(df)} lignes au lieu de {attendu}")
     except Exception as e:
         print(f"  ERREUR: {e}")
 
@@ -6874,6 +9429,302 @@ def executer_tests_validation() -> bool:
     except Exception as e:
         print(f"  ERREUR: {e}")
 
+    # =========================================================================
+    # TESTS CORRECTIONS REVUE (v3.10.1)
+    # =========================================================================
+    print("\n" + "-" * 60)
+    print("TESTS CORRECTIONS REVUE (v3.10.1)")
+    print("-" * 60)
+
+    # Test 42: Correction 4.5 - volume_fuite_moyen_pondere en mode deux-stocks
+    print("\nTest 42: volume_fuite_moyen_pondere en mode deux-stocks")
+    tests_total += 1
+    try:
+        params_fuites_2s = FUITES_QUEBEC_DEUX_STOCKS
+        # Volume pondéré doit être différent du débit agrégé
+        vol_pondere = params_fuites_2s.volume_fuite_moyen_pondere
+        vol_agrege = params_fuites_2s.debit_fuite_m3_an
+
+        # Calculer les économies avec les deux modes
+        params = ParametresModele(nb_menages=1000)
+        eco_2s = calculer_economies_eau(params, params_fuites_2s)
+
+        # Le volume pondéré tient compte que sig ⊂ any (sous-ensemble)
+        # Formule: (vol_any × p_any_excl + vol_sig × p_sig) / p_any
+        # où p_any_excl = p_any - p_sig (petites fuites uniquement)
+        p_any = params_fuites_2s.part_menages_fuite_any_pct
+        p_sig = params_fuites_2s.part_menages_fuite_significative_pct
+        p_any_excl = p_any - p_sig  # Petites fuites (exclusif)
+        attendu = (
+            params_fuites_2s.debit_fuite_any_m3_an * p_any_excl +
+            params_fuites_2s.debit_fuite_significative_m3_an * p_sig
+        ) / p_any
+
+        if abs(vol_pondere - attendu) < 0.1:
+            print(f"  OK - volume_fuite_moyen_pondere = {vol_pondere:.1f} m³/an (vs agrégé {vol_agrege:.1f})")
+            tests_reussis += 1
+        else:
+            print(f"  ÉCHEC - volume_fuite_moyen_pondere = {vol_pondere:.1f}, attendu {attendu:.1f}")
+    except Exception as e:
+        print(f"  ERREUR: {e}")
+
+    # Test 43: Correction 4.2 - économies d'échelle avec adoption partielle
+    print("\nTest 43: Économies d'échelle calculées sur H × A_max")
+    tests_total += 1
+    try:
+        params = ParametresModele(nb_menages=200_000)
+        compteur = ParametresCompteur()
+        config_echelle = ConfigEconomiesEchelle(activer=True)
+
+        # Adoption partielle (70%)
+        adoption_70 = ParametresAdoption(
+            mode=ModeAdoption.VOLONTAIRE_INCITATIF,
+            adoption_max_pct=70.0,
+        )
+        # Adoption complète (100%)
+        adoption_100 = ADOPTION_OBLIGATOIRE
+
+        economies = calculer_economies_eau(params)
+
+        # Avec adoption 70%, H_effectif = 140k → facteur d'échelle différent de 200k
+        _, I0_70, facteur_70, _ = generer_trajectoires(
+            params, compteur, economies, config_echelle,
+            params_adoption=adoption_70
+        )
+        _, I0_100, facteur_100, _ = generer_trajectoires(
+            params, compteur, economies, config_echelle,
+            params_adoption=adoption_100
+        )
+
+        # Facteur 70% devrait être plus élevé (moins de rabais) que facteur 100%
+        # Car on achète moins de compteurs
+        if facteur_70 >= facteur_100:
+            print(f"  OK - Facteur échelle 70%: {facteur_70:.3f} >= 100%: {facteur_100:.3f}")
+            print(f"       (Moins de compteurs = moins de rabais volume)")
+            tests_reussis += 1
+        else:
+            print(f"  ÉCHEC - Facteur 70% ({facteur_70:.3f}) < 100% ({facteur_100:.3f})")
+    except Exception as e:
+        print(f"  ERREUR: {e}")
+
+    # Test 44: Correction 4.4 - taux_correction_effectif_avec_persistance utilisé
+    print("\nTest 44: taux_correction_effectif_avec_persistance")
+    tests_total += 1
+    try:
+        params_fuites = ParametresFuites(
+            part_menages_fuite_pct=20.0,
+            debit_fuite_m3_an=35.0,
+            taux_detection_pct=90.0,
+            taux_reparation_pct=85.0,
+            part_fuites_persistantes_pct=10.0,  # 10% jamais réparées
+        )
+
+        taux_base = params_fuites.taux_correction_effectif
+        taux_avec_persist = params_fuites.taux_correction_effectif_avec_persistance
+
+        # Taux avec persistance doit être inférieur
+        if taux_avec_persist < taux_base:
+            reduction_pct = (1 - taux_avec_persist / taux_base) * 100
+            print(f"  OK - Taux base: {taux_base:.3f}, avec persistance: {taux_avec_persist:.3f}")
+            print(f"       Réduction: {reduction_pct:.1f}% (attendu ~10%)")
+            tests_reussis += 1
+        else:
+            print(f"  ÉCHEC - Taux avec persistance devrait être < taux base")
+    except Exception as e:
+        print(f"  ERREUR: {e}")
+
+    # ==========================================================================
+    # TESTS v3.11.0 — Nouveaux modules
+    # ==========================================================================
+
+    # Test 45: VentilationOPEX - somme des pourcentages = 100%
+    print("\nTest 45: VentilationOPEX — somme des pourcentages = 100%")
+    tests_total += 1
+    try:
+        ventilation = VentilationOPEX()
+        total = (
+            ventilation.cybersecurite_pct
+            + ventilation.licences_logiciels_pct
+            + ventilation.stockage_donnees_pct
+            + ventilation.service_client_pct
+            + ventilation.integration_si_pct
+        )
+        if abs(total - 1.0) < 0.001:
+            print(f"  OK - Somme des pourcentages: {total*100:.1f}%")
+            tests_reussis += 1
+        else:
+            print(f"  ÉCHEC - Somme: {total*100:.1f}% (attendu 100%)")
+    except Exception as e:
+        print(f"  ERREUR: {e}")
+
+    # Test 46: VentilationOPEX - ventilation correcte
+    print("\nTest 46: VentilationOPEX — ventilation correcte")
+    tests_total += 1
+    try:
+        ventilation = VENTILATION_OPEX_STANDARD
+        cout_total = 100.0  # 100$ pour simplifier
+        details = ventilation.ventiler(cout_total)
+
+        if abs(details['total'] - cout_total) < 0.01:
+            print(f"  OK - Ventilation cohérente: {details}")
+            tests_reussis += 1
+        else:
+            print(f"  ÉCHEC - Total ventilé != coût total")
+    except Exception as e:
+        print(f"  ERREUR: {e}")
+
+    # Test 47: MCF - VAN avec MCF < VAN sans MCF en mode économique
+    print("\nTest 47: MCF — VAN avec MCF < VAN sans MCF")
+    tests_total += 1
+    try:
+        params = ParametresModele()
+        compteur = ParametresCompteur()
+
+        # Sans MCF (scénario Québec standard)
+        ve_sans = VALEUR_EAU_QUEBEC
+        res_sans = executer_modele(params, compteur, mode_compte=ModeCompte.ECONOMIQUE, valeur_eau=ve_sans)
+
+        # Avec MCF (20%)
+        ve_avec = VALEUR_EAU_QUEBEC_AVEC_MCF
+        res_avec = executer_modele(params, compteur, mode_compte=ModeCompte.ECONOMIQUE, valeur_eau=ve_avec)
+
+        # VAN avec MCF devrait être plus basse (coûts majorés)
+        if res_avec.van < res_sans.van:
+            diff = res_sans.van - res_avec.van
+            print(f"  OK - VAN sans MCF: {fmt_argent(res_sans.van)}")
+            print(f"       VAN avec MCF: {fmt_argent(res_avec.van)}")
+            print(f"       Différence (impact MCF): {fmt_argent(diff)}")
+            tests_reussis += 1
+        else:
+            print(f"  ÉCHEC - VAN avec MCF devrait être < VAN sans MCF")
+    except Exception as e:
+        print(f"  ERREUR: {e}")
+
+    # Test 48: Segmentation - création de segments valides
+    print("\nTest 48: Segmentation — création de segments valides")
+    tests_total += 1
+    try:
+        segments = SEGMENTS_QUEBEC_DEFAUT
+        total_menages = sum(s.nb_menages for s in segments)
+
+        # Note: Multilogement exclu par défaut (voir SEGMENTS_QUEBEC_DEFAUT)
+        if len(segments) == 2 and total_menages > 0:
+            print(f"  OK - {len(segments)} segments (multilogement exclu), {total_menages:,} ménages total")
+            for s in segments:
+                print(f"       {s.nom}: {s.nb_menages:,} mén., {s.lpcd:.0f} LPCD")
+            tests_reussis += 1
+        else:
+            print(f"  ÉCHEC - Segments invalides")
+    except Exception as e:
+        print(f"  ERREUR: {e}")
+
+    # Test 49: Segmentation - VAN agrégée cohérente
+    print("\nTest 49: Segmentation — VAN agrégée = Σ VAN segments")
+    tests_total += 1
+    try:
+        # Utiliser des segments simplifiés pour le test
+        segments_test = [
+            ParametresSegment(type_logement=TypeLogement.UNIFAMILIAL, nb_menages=5000, lpcd=250),
+            ParametresSegment(type_logement=TypeLogement.MULTIPLEX, nb_menages=3000, lpcd=210),
+        ]
+        resultats = executer_modele_segmente(segments_test)
+
+        # Vérifier que la VAN totale = somme des VAN
+        van_somme = sum(data['resultats'].van for data in resultats['segments'].values())
+        diff = abs(resultats['van_totale'] - van_somme)
+
+        if diff < 1.0:  # Tolérance 1$
+            print(f"  OK - VAN agrégée: {fmt_argent(resultats['van_totale'])}")
+            print(f"       Σ VAN segments: {fmt_argent(van_somme)}")
+            tests_reussis += 1
+        else:
+            print(f"  ÉCHEC - VAN agrégée != Σ VAN segments (diff: {diff:.2f})")
+    except Exception as e:
+        print(f"  ERREUR: {e}")
+
+    # Test 50: Monte Carlo - P(VAN>0) dans [0,1]
+    print("\nTest 50: Monte Carlo — P(VAN>0) ∈ [0,1]")
+    tests_total += 1
+    try:
+        params = ParametresModele(nb_menages=1000)  # Petit pour rapidité
+        compteur = ParametresCompteur()
+        config_mc = ParametresMonteCarlo(
+            n_simulations=100,  # Minimal pour test
+            seed=42,
+            distributions=DISTRIBUTIONS_DEFAUT,
+        )
+
+        resultats_mc = simuler_monte_carlo(
+            params, compteur, config_mc,
+            afficher_progression=False,
+        )
+
+        if 0.0 <= resultats_mc.prob_van_positive <= 1.0:
+            print(f"  OK - P(VAN>0) = {resultats_mc.prob_van_positive*100:.1f}%")
+            print(f"       VAN moyenne: {fmt_argent(resultats_mc.van_moyenne)}")
+            tests_reussis += 1
+        else:
+            print(f"  ÉCHEC - P(VAN>0) hors bornes: {resultats_mc.prob_van_positive}")
+    except Exception as e:
+        print(f"  ERREUR: {e}")
+
+    # Test 51: Monte Carlo - reproductibilité avec seed
+    print("\nTest 51: Monte Carlo — reproductibilité avec seed")
+    tests_total += 1
+    try:
+        params = ParametresModele(nb_menages=1000)
+        compteur = ParametresCompteur()
+        config_mc = ParametresMonteCarlo(
+            n_simulations=100,  # Minimum requis
+            seed=12345,
+            distributions=DISTRIBUTIONS_DEFAUT,
+        )
+
+        res1 = simuler_monte_carlo(params, compteur, config_mc, afficher_progression=False)
+        res2 = simuler_monte_carlo(params, compteur, config_mc, afficher_progression=False)
+
+        if abs(res1.van_moyenne - res2.van_moyenne) < 1.0:
+            print(f"  OK - Résultats reproductibles avec seed=12345")
+            print(f"       Run 1: {fmt_argent(res1.van_moyenne)}")
+            print(f"       Run 2: {fmt_argent(res2.van_moyenne)}")
+            tests_reussis += 1
+        else:
+            print(f"  ÉCHEC - Résultats non reproductibles")
+    except Exception as e:
+        print(f"  ERREUR: {e}")
+
+    # Test 52: DistributionParametre - validation triangulaire
+    print("\nTest 52: DistributionParametre — validation triangulaire")
+    tests_total += 1
+    try:
+        # Distribution valide
+        dist_ok = DistributionParametre(
+            nom="test",
+            type_distribution="triangular",
+            min_val=0.0, mode_val=0.5, max_val=1.0,
+        )
+
+        # Distribution invalide (mode hors bornes)
+        erreur_attendue = False
+        try:
+            dist_bad = DistributionParametre(
+                nom="test_bad",
+                type_distribution="triangular",
+                min_val=0.0, mode_val=1.5, max_val=1.0,  # mode > max
+            )
+        except ValueError:
+            erreur_attendue = True
+
+        if erreur_attendue:
+            print(f"  OK - Validation triangulaire fonctionne")
+            print(f"       Distribution valide acceptée")
+            print(f"       Distribution invalide rejetée")
+            tests_reussis += 1
+        else:
+            print(f"  ÉCHEC - Distribution invalide aurait dû lever ValueError")
+    except Exception as e:
+        print(f"  ERREUR: {e}")
+
     # Résumé
     print("\n" + "=" * 80)
     print(f"RÉSULTATS: {tests_reussis}/{tests_total} tests réussis")
@@ -7041,6 +9892,9 @@ def executer_analyse_complete(
         persistance = PERSISTANCE_REALISTE
     if params_fuites is None:
         params_fuites = FUITES_SANS_COUT
+
+    if config.afficher_cadre_quebec:
+        afficher_ordres_grandeur_quebec()
 
     # Exécuter modèle
     print("\n" + "=" * 80)
