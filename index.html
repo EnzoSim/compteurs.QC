@@ -1071,16 +1071,9 @@
                 <div class="input-group">
                     <label>Scénario de fuites</label>
                     <select id="scenario-fuites" onchange="onScenarioFuitesChange()">
-                        <optgroup label="Avec tarification volumétrique">
-                            <option value="standard">Standard sans coûts (20%, 35 m³/an)</option>
-                            <option value="quebec">Contexte Québec (35%, 35 m³/an)</option>
-                            <option value="deux_stocks">Différencié (petites + significatives)</option>
-                        </optgroup>
-                        <optgroup label="Sans tarification (QC typique)">
-                            <option value="deux_stocks_sans_tarif" selected>Différencié (réparation 55%/77%)</option>
-                            <option value="quebec_sans_tarif">Québec simple (réparation 55%)</option>
-                            <option value="menage_sans_tarif">Standard (réparation 55%)</option>
-                        </optgroup>
+                        <option value="deux_stocks_sans_tarif" selected>Différencié — petites (24%) + significatives (6%)</option>
+                        <option value="quebec_sans_tarif">Stock unique — prévalence 35%</option>
+                        <option value="standard">Borne basse — sans coûts réparation</option>
                         <option value="custom">Personnalisé...</option>
                     </select>
                 </div>
@@ -2240,12 +2233,9 @@
             };
 
             const fuitesNoms = {
-                'standard': 'Standard (sans coûts)',
-                'quebec': 'Québec',
-                'deux_stocks': 'Différencié',
-                'deux_stocks_sans_tarif': 'Différencié (sans tarif)',
-                'quebec_sans_tarif': 'Québec (sans tarif)',
-                'menage_sans_tarif': 'Standard (sans tarif)',
+                'standard': 'Borne basse',
+                'deux_stocks_sans_tarif': 'Différencié',
+                'quebec_sans_tarif': 'Stock unique',
                 'custom': 'Personnalisé'
             };
 
