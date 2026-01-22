@@ -51,6 +51,7 @@ from analyse_compteurs_eau import (
     PERSISTANCE_REALISTE,
     PERSISTANCE_PESSIMISTE,
     FUITES_SANS_COUT,
+    FUITES_CONTEXTE_QUEBEC,
     FUITES_QUEBEC_DEUX_STOCKS,
     VALEUR_EAU_QUEBEC,
 )
@@ -145,31 +146,20 @@ SCENARIOS_PERSISTANCE = {
     },
 }
 
-# Scénarios de fuites
+# Scénarios de fuites — utilise les préréglages de analyse_compteurs_eau.py
+# pour garantir la cohérence entre le JSON et les calculs directs
 SCENARIOS_FUITES = {
     "standard": {
-        "params": ParametresFuites(
-            part_menages_fuite_pct=20.0,
-            debit_fuite_m3_an=35.0,
-            taux_reparation_pct=85.0,
-            mode_repartition=ModeRepartitionCouts.SANS_COUT,
-            utiliser_prevalence_differenciee=False,
-        ),
-        "nom": "Standard (20%, 35 m³/an)",
+        "params": FUITES_SANS_COUT,
+        "nom": "Standard sans coût (20%, 4 ans)",
     },
     "quebec": {
-        "params": ParametresFuites(
-            part_menages_fuite_pct=35.0,
-            debit_fuite_m3_an=35.0,
-            taux_reparation_pct=85.0,
-            mode_repartition=ModeRepartitionCouts.SANS_COUT,
-            utiliser_prevalence_differenciee=False,
-        ),
-        "nom": "Contexte Québec (35%, 35 m³/an)",
+        "params": FUITES_CONTEXTE_QUEBEC,
+        "nom": "Contexte Québec (35%, 7 ans, coûts inclus)",
     },
     "deux_stocks": {
         "params": FUITES_QUEBEC_DEUX_STOCKS,
-        "nom": "Deux-stocks Québec",
+        "nom": "Différencié QC",
     },
 }
 

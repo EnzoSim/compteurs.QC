@@ -33,6 +33,7 @@ from analyse_compteurs_eau import (
     ModePersistance,
     ParametresFuites,
     ModeRepartitionCouts,
+    ConfigEconomiesEchelle,
     executer_modele,
     calculer_alpha_comportement,
     calculer_dynamique_fuites,
@@ -43,6 +44,9 @@ from analyse_compteurs_eau import (
     FUITES_SANS_COUT,
     FUITES_QUEBEC_DEUX_STOCKS,
     FUITES_CONTEXTE_QUEBEC,
+    FUITES_MENAGE_SANS_TARIF,
+    FUITES_QUEBEC_SANS_TARIF,
+    FUITES_QUEBEC_DEUX_STOCKS_SANS_TARIF,
     VALEUR_EAU_QUEBEC,
     # Monte Carlo
     ParametresMonteCarlo,
@@ -58,7 +62,7 @@ from analyse_compteurs_eau import (
 app = FastAPI(
     title="API Compteurs d'Eau Québec",
     description="Analyse coûts-bénéfices des compteurs d'eau intelligents",
-    version="3.10.0",
+    version="3.11.0",
 )
 
 # CORS pour permettre les appels depuis le frontend
@@ -93,25 +97,34 @@ class CalculRequest(BaseModel):
     heures_installation: float = Field(3.0, ge=0.5, le=8.0, description="Heures d'installation")
     taux_horaire: float = Field(125.0, ge=50, le=250, description="Taux horaire installation ($/h)")
     cout_reseau: float = Field(50.0, ge=0, le=300, description="Coût réseau par compteur ($)")
+    cout_infra_fixe: float = Field(0.0, ge=0, le=5_000_000, description="Coût infrastructure fixe ($)")
 
     # Paramètres comportementaux
     reduction_comportement: float = Field(8.0, ge=0, le=20, description="Réduction comportementale (%)")
     persistance: str = Field("realiste", description="Scénario: optimiste, realiste, pessimiste, ultra")
 
     # Paramètres fuites - scénario prédéfini
-    scenario_fuites: str = Field("deux_stocks", description="Scénario: standard, quebec, deux_stocks, custom")
+    scenario_fuites: str = Field(
+        "deux_stocks",
+        description="Scénario fuites: deux_stocks, quebec, standard (avec tarif) | "
+                    "deux_stocks_sans_tarif, quebec_sans_tarif, menage_sans_tarif (sans tarif) | custom"
+    )
 
     # === PARAMÈTRES AVANCÉS FUITES (utilisés si scenario_fuites = "custom") ===
-    # Prévalence petites fuites (toilettes, gouttes)
-    prevalence_petites_pct: float = Field(30.0, ge=0, le=50, description="% ménages avec petite fuite")
+    # Prévalence totale (incluant les fuites significatives)
+    prevalence_petites_pct: float = Field(
+        30.0,
+        ge=0,
+        le=50,
+        description="% ménages avec une fuite (total, inclut les grosses)",
+    )
     debit_petites_m3: float = Field(10.0, ge=1, le=30, description="Débit petites fuites (m³/an)")
-    # Prévalence grosses fuites (conduites)
-    prevalence_grosses_pct: float = Field(6.0, ge=0, le=20, description="% ménages avec grosse fuite")
+    # Prévalence grosses fuites (sous-ensemble de la prévalence totale)
+    prevalence_grosses_pct: float = Field(6.0, ge=0, le=20, description="% ménages avec grosse fuite (sous-ensemble)")
     debit_grosses_m3: float = Field(50.0, ge=20, le=150, description="Débit grosses fuites (m³/an)")
     # Taux de réparation et détection
     taux_reparation_pct: float = Field(85.0, ge=50, le=100, description="% fuites réparées après détection")
     taux_detection_pct: float = Field(90.0, ge=50, le=100, description="% fuites détectées par AMI")
-    delai_detection_mois: float = Field(1.0, ge=0.5, le=6, description="Délai détection (mois)")
     # Nouvelles fuites annuelles
     taux_nouvelles_fuites_pct: float = Field(5.0, ge=0, le=15, description="% ménages avec nouvelle fuite/an")
     # Fuites persistantes (jamais réparées)
@@ -121,6 +134,9 @@ class CalculRequest(BaseModel):
     mode_economique: bool = Field(True, description="True=économique, False=financier")
     valeur_sociale: float = Field(4.69, ge=0.5, le=15.0, description="Valeur sociale eau ($/m³)")
     cout_variable: float = Field(0.50, ge=0.1, le=3.0, description="Coût variable eau ($/m³)")
+
+    # Économies d'échelle (grands déploiements >10k compteurs)
+    activer_economies_echelle: bool = Field(False, description="Activer économies d'échelle")
 
 
 class CalculResponse(BaseModel):
@@ -203,34 +219,44 @@ def get_persistance(nom: str, alpha_initial: float) -> ParametresPersistance:
             annees_fadeout=10,
             nom="Pessimiste",
         )
-    else:  # ultra
+    elif nom in ("ultra", "ultra_pessimiste"):
+        # Accepte les deux noms pour compatibilité UI/Core
         return ParametresPersistance(
             mode=ModePersistance.CONSTANT,
             alpha_initial=0.0,
             alpha_plateau=0.0,
             nom="Ultra-pessimiste",
         )
+    else:
+        raise ValueError(f"Scénario de persistance inconnu: {nom}")
 
 
 def get_fuites(nom: str, req: CalculRequest = None) -> ParametresFuites:
-    """Récupérer les paramètres de fuites selon le scénario."""
+    """Récupérer les paramètres de fuites selon le scénario.
 
-    if nom == "standard":
-        return ParametresFuites(
-            part_menages_fuite_pct=20.0,
-            debit_fuite_m3_an=35.0,
-            taux_reparation_pct=85.0,
-            mode_repartition=ModeRepartitionCouts.SANS_COUT,
-            utiliser_prevalence_differenciee=False,
-        )
-    elif nom == "quebec":
-        return ParametresFuites(
-            part_menages_fuite_pct=35.0,
-            debit_fuite_m3_an=35.0,
-            taux_reparation_pct=85.0,
-            mode_repartition=ModeRepartitionCouts.SANS_COUT,
-            utiliser_prevalence_differenciee=False,
-        )
+    Utilise les presets du cœur pour garantir la cohérence.
+
+    Scénarios disponibles:
+    - Avec tarification (ou hypothèse incitatif fort):
+        standard, quebec, deux_stocks
+    - Sans tarification (contexte québécois typique):
+        menage_sans_tarif, quebec_sans_tarif, deux_stocks_sans_tarif
+    - Personnalisé: custom (utilise les paramètres avancés)
+    """
+    # Mapping des scénarios vers les presets
+    scenarios_map = {
+        # Avec tarification
+        "standard": FUITES_SANS_COUT,
+        "quebec": FUITES_CONTEXTE_QUEBEC,
+        "deux_stocks": FUITES_QUEBEC_DEUX_STOCKS,
+        # Sans tarification (taux réparation réduit, persistance augmentée)
+        "menage_sans_tarif": FUITES_MENAGE_SANS_TARIF,
+        "quebec_sans_tarif": FUITES_QUEBEC_SANS_TARIF,
+        "deux_stocks_sans_tarif": FUITES_QUEBEC_DEUX_STOCKS_SANS_TARIF,
+    }
+
+    if nom in scenarios_map:
+        return scenarios_map[nom]
     elif nom == "custom" and req is not None:
         # Utiliser les paramètres avancés personnalisés
         return ParametresFuites(
@@ -241,13 +267,13 @@ def get_fuites(nom: str, req: CalculRequest = None) -> ParametresFuites:
             debit_fuite_significative_m3_an=req.debit_grosses_m3,
             taux_reparation_pct=req.taux_reparation_pct,
             taux_detection_pct=req.taux_detection_pct,
-            delai_detection_mois=req.delai_detection_mois,
             taux_nouvelles_fuites_pct=req.taux_nouvelles_fuites_pct,
             part_fuites_persistantes_pct=req.part_persistantes_pct,
             mode_repartition=ModeRepartitionCouts.SANS_COUT,
             nom="Personnalisé",
         )
-    else:  # deux_stocks
+    else:
+        # Défaut: deux_stocks (avec tarification)
         return FUITES_QUEBEC_DEUX_STOCKS
 
 
@@ -266,6 +292,7 @@ def get_compteur(req: CalculRequest) -> ParametresCompteur:
         heures_installation=req.heures_installation,
         taux_horaire_installation=req.taux_horaire,
         cout_reseau_par_compteur=req.cout_reseau if req.type_compteur == "ami" else 0,
+        cout_infra_fixe=req.cout_infra_fixe if req.type_compteur == "ami" else 0,
     )
 
 
@@ -332,10 +359,14 @@ async def calculate(req: CalculRequest):
             cout_variable_m3=req.cout_variable,
         )
 
+        # Économies d'échelle
+        config_echelle = ConfigEconomiesEchelle(activer=req.activer_economies_echelle)
+
         # Exécuter le modèle
         result = executer_modele(
             params=params,
             compteur=compteur,
+            config_echelle=config_echelle,
             persistance=persistance,
             params_fuites=fuites,
             mode_compte=mode,
@@ -647,7 +678,7 @@ async def compare_fuites(req: CalculRequest):
     scenarios = [
         ("standard", "Standard (20%, 35 m³/an)"),
         ("quebec", "Québec (35%, 35 m³/an)"),
-        ("deux_stocks", "Deux stocks QC"),
+        ("deux_stocks", "Différencié QC"),
     ]
 
     for scenario_key, scenario_nom in scenarios:
@@ -764,7 +795,10 @@ async def get_scenario_name(persistance: str = "realiste", fuites: str = "deux_s
     fuites_noms = {
         "standard": "Standard",
         "quebec": "Québec",
-        "deux_stocks": "Deux-stocks QC",
+        "deux_stocks": "Différencié",
+        "deux_stocks_sans_tarif": "Différencié (sans tarif)",
+        "quebec_sans_tarif": "Québec (sans tarif)",
+        "menage_sans_tarif": "Standard (sans tarif)",
         "custom": "Personnalisé",
     }
 

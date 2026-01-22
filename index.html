@@ -975,6 +975,11 @@
                     <label>Infrastructure réseau <span class="value" id="val-cout-reseau">50 $/u</span></label>
                     <input type="range" id="cout-reseau" min="0" max="200" step="10" value="50" oninput="onParamChange()">
                 </div>
+
+                <div class="input-group" id="cout-infra-fixe-group">
+                    <label>Coût infra fixe (IT, intégration) <span class="value" id="val-cout-infra-fixe">0 $</span></label>
+                    <input type="range" id="cout-infra-fixe" min="0" max="2000000" step="50000" value="0" oninput="onParamChange()">
+                </div>
             </div>
 
             <!-- Behavior & Leaks -->
@@ -1005,9 +1010,16 @@
                 <div class="input-group">
                     <label>Scénario de fuites</label>
                     <select id="scenario-fuites" onchange="onScenarioFuitesChange()">
-                        <option value="standard">Standard (20% prévalence, 35 m³/an)</option>
-                        <option value="quebec">Contexte Québec (35%, 35 m³/an)</option>
-                        <option value="deux_stocks" selected>Deux stocks différenciés (QC)</option>
+                        <optgroup label="Avec tarification volumétrique">
+                            <option value="standard">Standard (20%, 35 m³/an)</option>
+                            <option value="quebec">Contexte Québec (35%, 35 m³/an)</option>
+                            <option value="deux_stocks">Différencié (petites + significatives)</option>
+                        </optgroup>
+                        <optgroup label="Sans tarification (QC typique)">
+                            <option value="deux_stocks_sans_tarif" selected>Différencié (réparation 55%/77%)</option>
+                            <option value="quebec_sans_tarif">Québec simple (réparation 55%)</option>
+                            <option value="menage_sans_tarif">Standard (réparation 55%)</option>
+                        </optgroup>
                         <option value="custom">Personnalisé...</option>
                     </select>
                 </div>
@@ -1020,21 +1032,23 @@
                     </div>
                     <div class="advanced-content" id="content-fuites">
                         <div class="param-section">
-                            <div class="section-title">Petites fuites (toilettes, gouttes)</div>
+                            <div class="section-title">Toutes fuites (prévalence totale)</div>
                             <div class="input-group">
-                                <label>Prévalence <span class="value" id="val-prevalence-petites">30 %</span></label>
+                                <label>Prévalence totale <span class="value" id="val-prevalence-petites">30 %</span></label>
                                 <input type="range" id="prevalence-petites" min="5" max="50" step="1" value="30" oninput="onParamChange()">
+                                <small style="color: #666; font-size: 10px;">Inclut petites + grosses fuites</small>
                             </div>
                             <div class="input-group">
-                                <label>Débit moyen <span class="value" id="val-debit-petites">10 m³/an</span></label>
+                                <label>Débit petites fuites <span class="value" id="val-debit-petites">10 m³/an</span></label>
                                 <input type="range" id="debit-petites" min="1" max="30" step="1" value="10" oninput="onParamChange()">
                             </div>
                         </div>
                         <div class="param-section">
-                            <div class="section-title">Grosses fuites (conduites)</div>
+                            <div class="section-title">Dont grosses fuites (sous-ensemble)</div>
                             <div class="input-group">
-                                <label>Prévalence <span class="value" id="val-prevalence-grosses">6 %</span></label>
+                                <label>Prévalence grosses <span class="value" id="val-prevalence-grosses">6 %</span></label>
                                 <input type="range" id="prevalence-grosses" min="0" max="20" step="0.5" value="6" oninput="onParamChange()">
+                                <small style="color: #666; font-size: 10px;">Sous-ensemble de la prévalence totale</small>
                             </div>
                             <div class="input-group">
                                 <label>Débit moyen <span class="value" id="val-debit-grosses">50 m³/an</span></label>
@@ -1050,10 +1064,6 @@
                             <div class="input-group">
                                 <label>Taux de réparation <span class="value" id="val-taux-reparation">85 %</span></label>
                                 <input type="range" id="taux-reparation" min="50" max="100" step="1" value="85" oninput="onParamChange()">
-                            </div>
-                            <div class="input-group">
-                                <label>Délai détection <span class="value" id="val-delai-detection">1.0 mois</span></label>
-                                <input type="range" id="delai-detection" min="0.5" max="6" step="0.5" value="1" oninput="onParamChange()">
                             </div>
                         </div>
                         <div class="param-section">
@@ -1094,6 +1104,16 @@
                 <div class="input-group">
                     <label>Coût variable de production <span class="value" id="val-cout-variable">0.50 $/m³</span></label>
                     <input type="range" id="cout-variable" min="0.1" max="2" step="0.05" value="0.5" oninput="onParamChange()">
+                </div>
+
+                <div class="input-group" style="margin-top: 15px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="economies-echelle" onchange="onParamChange()" style="width: 18px; height: 18px;">
+                        Économies d'échelle (>10k compteurs)
+                    </label>
+                    <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">
+                        Réduction 5-20% sur coûts matériel selon volume
+                    </small>
                 </div>
             </div>
         </div>
@@ -1138,11 +1158,11 @@
                 <div class="scenario-icon">📊</div>
                 <div class="scenario-info">
                     <div class="scenario-label">Scénario actuel</div>
-                    <div class="scenario-name" id="scenario-name">Réaliste + Deux-stocks QC</div>
+                    <div class="scenario-name" id="scenario-name">Réaliste + Différencié QC</div>
                 </div>
                 <div class="scenario-details" id="scenario-details">
                     <span class="tag tag-persistance">Réaliste</span>
-                    <span class="tag tag-fuites">Deux-stocks</span>
+                    <span class="tag tag-fuites">Différencié</span>
                     <span class="tag tag-mode">Économique</span>
                 </div>
             </div>
@@ -1452,12 +1472,14 @@
                 heures_installation: parseFloat(document.getElementById('heures-install').value),
                 taux_horaire: parseFloat(document.getElementById('taux-horaire').value),
                 cout_reseau: parseFloat(document.getElementById('cout-reseau').value),
+                cout_infra_fixe: parseFloat(document.getElementById('cout-infra-fixe').value),
                 reduction_comportement: parseFloat(document.getElementById('reduction-comportement').value),
                 persistance: document.getElementById('persistance').value,
                 scenario_fuites: document.getElementById('scenario-fuites').value,
                 mode_economique: modeEconomique,
                 valeur_sociale: parseFloat(document.getElementById('valeur-sociale').value),
                 cout_variable: parseFloat(document.getElementById('cout-variable').value),
+                activer_economies_echelle: document.getElementById('economies-echelle').checked,
             };
 
             // Ajouter les paramètres avancés si mode custom
@@ -1468,7 +1490,6 @@
                 params.debit_grosses_m3 = parseFloat(document.getElementById('debit-grosses').value);
                 params.taux_detection_pct = parseFloat(document.getElementById('taux-detection').value);
                 params.taux_reparation_pct = parseFloat(document.getElementById('taux-reparation').value);
-                params.delai_detection_mois = parseFloat(document.getElementById('delai-detection').value);
                 params.taux_nouvelles_fuites_pct = parseFloat(document.getElementById('nouvelles-fuites').value);
                 params.part_persistantes_pct = parseFloat(document.getElementById('persistantes').value);
             }
@@ -1536,6 +1557,10 @@
             document.getElementById('val-heures').textContent = parseFloat(document.getElementById('heures-install').value).toFixed(1) + ' h';
             document.getElementById('val-taux-horaire').textContent = document.getElementById('taux-horaire').value + ' $/h';
             document.getElementById('val-cout-reseau').textContent = document.getElementById('cout-reseau').value + ' $/u';
+            const coutInfraFixe = parseFloat(document.getElementById('cout-infra-fixe').value);
+            document.getElementById('val-cout-infra-fixe').textContent = coutInfraFixe >= 1000000
+                ? (coutInfraFixe / 1000000).toFixed(1) + ' M$'
+                : (coutInfraFixe / 1000).toFixed(0) + ' k$';
             document.getElementById('val-reduction').textContent = parseFloat(document.getElementById('reduction-comportement').value).toFixed(1) + ' %';
             document.getElementById('val-valeur-sociale').textContent = parseFloat(document.getElementById('valeur-sociale').value).toFixed(2) + ' $/m³';
             document.getElementById('val-cout-variable').textContent = parseFloat(document.getElementById('cout-variable').value).toFixed(2) + ' $/m³';
@@ -1547,12 +1572,12 @@
             document.getElementById('val-debit-grosses').textContent = document.getElementById('debit-grosses').value + ' m³/an';
             document.getElementById('val-taux-detection').textContent = document.getElementById('taux-detection').value + ' %';
             document.getElementById('val-taux-reparation').textContent = document.getElementById('taux-reparation').value + ' %';
-            document.getElementById('val-delai-detection').textContent = parseFloat(document.getElementById('delai-detection').value).toFixed(1) + ' mois';
             document.getElementById('val-nouvelles-fuites').textContent = document.getElementById('nouvelles-fuites').value + ' %';
             document.getElementById('val-persistantes').textContent = document.getElementById('persistantes').value + ' %';
 
-            document.getElementById('cout-reseau-group').style.display =
-                document.getElementById('type-compteur').value === 'ami' ? 'block' : 'none';
+            const isAMI = document.getElementById('type-compteur').value === 'ami';
+            document.getElementById('cout-reseau-group').style.display = isAMI ? 'block' : 'none';
+            document.getElementById('cout-infra-fixe-group').style.display = isAMI ? 'block' : 'none';
         }
 
         async function updateModel() {
@@ -1711,12 +1736,11 @@
 
             // Table paramètres fuites
             const fuitesHtml = pf.mode_deux_stocks ? `
-                <tr><td>Mode</td><td>Deux stocks (petites + grosses)</td></tr>
+                <tr><td>Mode</td><td>Différencié (petites + significatives)</td></tr>
                 <tr><td>Petites fuites</td><td>${pf.prevalence_petites_pct.toFixed(0)}% à ${pf.debit_petites_m3.toFixed(0)} m³/an</td></tr>
-                <tr><td>Grosses fuites</td><td>${pf.prevalence_grosses_pct.toFixed(1)}% à ${pf.debit_grosses_m3.toFixed(0)} m³/an</td></tr>
+                <tr><td>Fuites significatives</td><td>${pf.prevalence_grosses_pct.toFixed(1)}% à ${pf.debit_grosses_m3.toFixed(0)} m³/an</td></tr>
                 <tr><td>Taux détection AMI</td><td>${pf.taux_detection_pct.toFixed(0)}%</td></tr>
                 <tr><td>Taux réparation</td><td>${pf.taux_reparation_pct.toFixed(0)}%</td></tr>
-                <tr><td>Délai détection</td><td>${pf.delai_detection_mois.toFixed(1)} mois</td></tr>
                 <tr><td>Nouvelles fuites/an</td><td>${pf.taux_nouvelles_fuites_pct.toFixed(1)}%</td></tr>
                 <tr><td>Fuites persistantes</td><td>${pf.part_persistantes_pct.toFixed(0)}%</td></tr>
                 <tr><td><strong>Total réparations</strong></td><td><strong>${data.total_reparations.toLocaleString('fr-CA')}</strong></td></tr>
@@ -2032,7 +2056,7 @@
                     datasets: [
                         { label: 'Standard (20%)', data: [], borderColor: '#3b82f6', tension: 0.4, pointRadius: 0, borderWidth: 2.5 },
                         { label: 'Québec (35%)', data: [], borderColor: '#f59e0b', tension: 0.4, pointRadius: 0, borderWidth: 2.5 },
-                        { label: 'Deux-stocks QC', data: [], borderColor: '#10b981', tension: 0.4, pointRadius: 0, borderWidth: 2.5 }
+                        { label: 'Différencié QC', data: [], borderColor: '#10b981', tension: 0.4, pointRadius: 0, borderWidth: 2.5 }
                     ]
                 },
                 options: {
@@ -2117,7 +2141,10 @@
             const fuitesNoms = {
                 'standard': 'Standard',
                 'quebec': 'Québec',
-                'deux_stocks': 'Deux-stocks',
+                'deux_stocks': 'Différencié',
+                'deux_stocks_sans_tarif': 'Différencié (sans tarif)',
+                'quebec_sans_tarif': 'Québec (sans tarif)',
+                'menage_sans_tarif': 'Standard (sans tarif)',
                 'custom': 'Personnalisé'
             };
 

@@ -890,7 +890,9 @@ class ParametresCompteur:
     taux_horaire_installation: float = 125.0  # $/h (plombier)
 
     # Infrastructure réseau (AMI seulement)
-    cout_reseau_par_compteur: float = 50.0  # passerelles, serveurs, etc.
+    # Modèle: CAPEX_reseau = cout_infra_fixe + cout_reseau_par_compteur × nb_compteurs
+    cout_infra_fixe: float = 0.0           # Coût fixe (backbone IT, intégration) - défaut 0 pour rétrocompat
+    cout_reseau_par_compteur: float = 50.0  # Coût variable (passerelles, antennes, etc.)
 
     # Durée de vie
     duree_vie_compteur: int = 20          # années
@@ -1787,9 +1789,12 @@ class ParametresFuites:
 
     # === PERSISTANCE / LONGUE TRAÎNE (NOUVEAU v3.9) ===
     # Source: AWE (2023) documente des fuites exceptionnellement longues
-    # malgré programmes de détection et alertes
-    part_fuites_persistantes_pct: float = 5.0          # % fuites jamais réparées
-    facteur_duree_longue_traine: float = 5.0           # Multiplicateur durée
+    # malgré programmes de détection et alertes.
+    # Deux effets distincts:
+    # 1. Persistantes: fraction de fuites JAMAIS réparées (réduction taux correction)
+    # 2. Longue traîne: les autres fuites prennent PLUS LONGTEMPS à réparer
+    part_fuites_persistantes_pct: float = 5.0          # % fuites jamais réparées (réduit k_eff)
+    facteur_duree_longue_traine: float = 5.0           # Multiplicateur durée réparation (ralentit k)
 
     # === DIFFÉRENCIATION PAR TYPE DE FUITE (NOUVEAU v3.10) ===
     # Multiplicateurs pour fuites significatives vs petites fuites
@@ -1868,10 +1873,12 @@ class ParametresFuites:
     @property
     def taux_correction_effectif_avec_persistance(self) -> float:
         """
-        Taux de correction effectif ajusté pour la longue traîne.
+        Taux de correction effectif ajusté pour les fuites persistantes.
 
         Une fraction des fuites (part_fuites_persistantes_pct) ne sera jamais réparée,
         ce qui réduit le taux de correction effectif global.
+
+        Note: distinct de facteur_duree_longue_traine qui ralentit les réparations.
         """
         taux_base = self.taux_correction_effectif
         fraction_reparable = 1.0 - (self.part_fuites_persistantes_pct / 100.0)
@@ -2574,8 +2581,8 @@ FUITES_QUEBEC_DEUX_STOCKS = ParametresFuites(
     inclure_cout_reparation=True,
     mode_repartition=ModeRepartitionCouts.MENAGE_SEUL,
     part_ville_pct=0.0,
-    nom="Québec deux-stocks",
-    description="Deux stocks: 30% petites + 6% significatives, coûts 150$/600$, durée 6 ans",
+    nom="QC différencié",
+    description="Fuites différenciées: petites (24%) + significatives (6%), coûts 150$/600$",
 )
 
 # Dictionnaire des scénarios
@@ -2588,9 +2595,101 @@ SCENARIOS_FUITES = {
     "quebec_deux_stocks": FUITES_QUEBEC_DEUX_STOCKS,
 }
 
-# Note Québec: les taux 90% détection / 85% réparation supposent un minimum
-# d'accompagnement; sans tarification, les frictions (plombier, nuisance)
-# peuvent réduire ces taux (à tester en sensibilité).
+# =============================================================================
+# SCÉNARIOS SANS TARIFICATION VOLUMÉTRIQUE
+# =============================================================================
+#
+# Au Québec, l'eau est généralement incluse dans les taxes foncières (forfait).
+# Sans signal-prix, l'incitatif à réparer une fuite est réduit.
+#
+# HYPOTHÈSES COMPORTEMENTALES (défendables en soutenance):
+# - Taux réparation BASE: 55% (vs 85% avec tarification)
+#   → Reflète les incitatifs non-prix: conscience environnementale (~30%),
+#     nuisance sonore, risque de dommages, conformité assurance (~25% supp.)
+# - Grosses fuites: facteur 1.4 → taux effectif ~77%
+#   → Plus visibles (moisissures, dégâts), pression sociale/assurancielle
+# - Persistance: 10% (vs 5%) → plus de fuites jamais réparées
+#   → Absence d'urgence économique = procrastination durable
+#
+# SOURCES:
+# - Littérature "nudge" et économie comportementale (Thaler & Sunstein)
+# - Études sur la réponse aux alertes sans conséquence financière
+# =============================================================================
+
+# Scénario MENAGE_SEUL sans tarification volumétrique
+# Taux de réparation réduit car aucun incitatif financier direct
+FUITES_MENAGE_SANS_TARIF = ParametresFuites(
+    part_menages_fuite_pct=20.0,
+    debit_fuite_m3_an=35.0,
+    taux_detection_pct=90.0,
+    taux_reparation_pct=55.0,         # Réduit: incitatifs non-prix seulement
+    part_fuites_persistantes_pct=10.0, # Augmenté: procrastination durable
+    mode_repartition=ModeRepartitionCouts.MENAGE_SEUL,
+    part_ville_pct=0.0,
+    cout_reparation_moyen=200.0,
+    inclure_cout_reparation=True,
+    duree_moyenne_fuite_sans_compteur=4.0,
+    nom="Ménage seul (sans tarif)",
+    description="Sans tarification: taux réparation 55% (incitatifs non-prix), persistance 10%",
+)
+
+# Scénario CONTEXTE_QUEBEC sans tarification volumétrique
+FUITES_QUEBEC_SANS_TARIF = ParametresFuites(
+    part_menages_fuite_pct=35.0,       # Stock accumulé (pas de détection historique)
+    debit_fuite_m3_an=35.0,
+    taux_detection_pct=90.0,
+    taux_reparation_pct=55.0,          # Réduit: sans tarification
+    part_fuites_persistantes_pct=10.0, # Augmenté
+    duree_moyenne_fuite_sans_compteur=7.0,
+    cout_reparation_moyen=200.0,
+    inclure_cout_reparation=True,
+    mode_repartition=ModeRepartitionCouts.MENAGE_SEUL,
+    part_ville_pct=0.0,
+    nom="Québec (sans tarif)",
+    description="Contexte QC sans tarification: prévalence 35%, réparation 55%, persistance 10%",
+)
+
+# Scénario QUEBEC_DEUX_STOCKS sans tarification volumétrique
+# Différencie petites vs grosses fuites avec facteur_reparation_sig
+FUITES_QUEBEC_DEUX_STOCKS_SANS_TARIF = ParametresFuites(
+    utiliser_prevalence_differenciee=True,
+    part_menages_fuite_pct=30.0,
+    debit_fuite_m3_an=18.0,
+    part_menages_fuite_any_pct=30.0,
+    part_menages_fuite_significative_pct=6.0,
+    debit_fuite_any_m3_an=10.0,
+    debit_fuite_significative_m3_an=50.0,
+    cout_reparation_any=150.0,
+    cout_reparation_sig=600.0,
+    # Sans tarification: taux de base réduit mais grosses fuites mieux réparées
+    taux_detection_pct=90.0,
+    taux_reparation_pct=55.0,          # Base pour petites fuites
+    facteur_reparation_sig=1.4,        # Grosses fuites: 55% × 1.4 = 77% (dommages visibles)
+    part_fuites_persistantes_pct=10.0, # Augmenté
+    facteur_duree_longue_traine=5.0,
+    duree_moyenne_fuite_sans_compteur=6.0,
+    cout_reparation_moyen=160.0,
+    inclure_cout_reparation=True,
+    mode_repartition=ModeRepartitionCouts.MENAGE_SEUL,
+    part_ville_pct=0.0,
+    nom="QC différencié (sans tarif)",
+    description="Fuites différenciées sans tarif: petites 55%, significatives 77% (×1.4), persist. 10%",
+)
+
+# Dictionnaire étendu des scénarios
+SCENARIOS_FUITES = {
+    # Avec tarification (ou hypothèse incitatif fort)
+    "sans_cout": FUITES_SANS_COUT,
+    "menage": FUITES_MENAGE_SEUL,
+    "subvention_50": FUITES_SUBVENTION_50,
+    "ville": FUITES_VILLE_SEULE,
+    "quebec": FUITES_CONTEXTE_QUEBEC,
+    "quebec_deux_stocks": FUITES_QUEBEC_DEUX_STOCKS,
+    # Sans tarification (contexte québécois typique)
+    "menage_sans_tarif": FUITES_MENAGE_SANS_TARIF,
+    "quebec_sans_tarif": FUITES_QUEBEC_SANS_TARIF,
+    "quebec_deux_stocks_sans_tarif": FUITES_QUEBEC_DEUX_STOCKS_SANS_TARIF,
+}
 
 
 # =============================================================================
@@ -2775,8 +2874,13 @@ def calculer_adoption(t: float, params: ParametresAdoption) -> float:
     t_eff = t - params.annee_demarrage + 1
 
     if params.mode == ModeAdoption.OBLIGATOIRE:
-        # Adoption immédiate et complète
-        return 1.0
+        # Adoption immédiate jusqu'au plafond
+        # Note: adoption_max_pct peut être <100% pour modéliser un déploiement
+        # obligatoire partiel (ex: certaines zones seulement)
+        # Défaut: 100% si adoption_max_pct est à sa valeur par défaut (90%)
+        if params.adoption_max_pct >= 100.0 or params.adoption_max_pct == 90.0:
+            return 1.0  # 100% par défaut pour OBLIGATOIRE
+        return params.adoption_max_pct / 100.0
 
     elif params.mode == ModeAdoption.VOLONTAIRE_INCITATIF:
         # Courbe logistique (S-curve)
@@ -4081,7 +4185,9 @@ def generer_trajectoires(
     )
 
     # Investissement initial (pour adoption complète)
-    I0_total = cout_ajuste * H_compteurs
+    # = coût variable × nb_compteurs + coût fixe infrastructure (AMI seulement)
+    cout_infra_fixe = compteur.cout_infra_fixe if compteur.type_compteur == TypeCompteur.AMI else 0.0
+    I0_total = cout_ajuste * H_compteurs + cout_infra_fixe
 
     # Générer la série d'adoption A(t) pour t = 1..T
     serie_adoption = generer_serie_adoption(params_adoption, T)
@@ -6092,10 +6198,12 @@ def analyse_scenarios(
             )
 
             # Créer les paramètres de valeur eau modifiés
+            # Note: cout_capex_m3 et cout_opex_fixe_m3 sont les vrais champs
+            # (cout_infrastructure_m3 et valeur_externalites_m3 sont des alias en lecture seule)
             valeur_scen = ParametresValeurEau(
                 cout_variable_m3=valeur_eau.cout_variable_m3 * mults['mult_valeur_sociale'],
-                cout_infrastructure_m3=valeur_eau.cout_infrastructure_m3 * mults['mult_valeur_sociale'],
-                valeur_externalites_m3=valeur_eau.valeur_externalites_m3 * mults['mult_valeur_sociale'],
+                cout_capex_m3=valeur_eau.cout_capex_m3 * mults['mult_valeur_sociale'],
+                cout_opex_fixe_m3=valeur_eau.cout_opex_fixe_m3 * mults['mult_valeur_sociale'],
                 valeur_sociale_m3=valeur_eau.valeur_sociale_m3 * mults['mult_valeur_sociale'],
                 prix_vente_m3=valeur_eau.prix_vente_m3,
                 mcf=valeur_eau.mcf,
@@ -6780,8 +6888,8 @@ def simuler_monte_carlo(
         valeur_eau_dict = {
             'valeur_sociale_m3': valeur_eau.valeur_sociale_m3,
             'cout_variable_m3': valeur_eau.cout_variable_m3,
-            'cout_infrastructure_m3': valeur_eau.cout_infrastructure_m3,
-            'valeur_externalites_m3': valeur_eau.valeur_externalites_m3,
+            'cout_capex_m3': valeur_eau.cout_capex_m3,           # CAPEX (était cout_infrastructure_m3)
+            'cout_opex_fixe_m3': valeur_eau.cout_opex_fixe_m3,   # OPEX fixe (était valeur_externalites_m3)
             'prix_vente_m3': valeur_eau.prix_vente_m3,
             'mcf': valeur_eau.mcf,
             'appliquer_mcf': valeur_eau.appliquer_mcf,
@@ -6825,8 +6933,8 @@ def simuler_monte_carlo(
                 base = max(valeur_eau_dict["valeur_sociale_m3"], 1e-6)
                 ratio = valeur[i] / base
                 valeur_eau_dict["valeur_sociale_m3"] = valeur[i]
-                valeur_eau_dict["cout_infrastructure_m3"] = valeur_eau_dict["cout_infrastructure_m3"] * ratio
-                valeur_eau_dict["valeur_externalites_m3"] = valeur_eau_dict["valeur_externalites_m3"] * ratio
+                valeur_eau_dict["cout_capex_m3"] = valeur_eau_dict["cout_capex_m3"] * ratio
+                valeur_eau_dict["cout_opex_fixe_m3"] = valeur_eau_dict["cout_opex_fixe_m3"] * ratio
 
             # === FUITES ===
             elif nom == "prevalence_fuites":
