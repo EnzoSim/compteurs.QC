@@ -1011,7 +1011,7 @@
                     <label>Scénario de fuites</label>
                     <select id="scenario-fuites" onchange="onScenarioFuitesChange()">
                         <optgroup label="Avec tarification volumétrique">
-                            <option value="standard">Standard (20%, 35 m³/an)</option>
+                            <option value="standard">Standard sans coûts (20%, 35 m³/an)</option>
                             <option value="quebec">Contexte Québec (35%, 35 m³/an)</option>
                             <option value="deux_stocks">Différencié (petites + significatives)</option>
                         </optgroup>
@@ -2054,7 +2054,7 @@
                 data: {
                     labels: [],
                     datasets: [
-                        { label: 'Standard (20%)', data: [], borderColor: '#3b82f6', tension: 0.4, pointRadius: 0, borderWidth: 2.5 },
+                        { label: 'Sans coûts (20%)', data: [], borderColor: '#3b82f6', tension: 0.4, pointRadius: 0, borderWidth: 2.5 },
                         { label: 'Québec (35%)', data: [], borderColor: '#f59e0b', tension: 0.4, pointRadius: 0, borderWidth: 2.5 },
                         { label: 'Différencié QC', data: [], borderColor: '#10b981', tension: 0.4, pointRadius: 0, borderWidth: 2.5 }
                     ]
@@ -2139,7 +2139,7 @@
             };
 
             const fuitesNoms = {
-                'standard': 'Standard',
+                'standard': 'Standard (sans coûts)',
                 'quebec': 'Québec',
                 'deux_stocks': 'Différencié',
                 'deux_stocks_sans_tarif': 'Différencié (sans tarif)',

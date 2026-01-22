@@ -258,6 +258,14 @@ def get_fuites(nom: str, req: CalculRequest = None) -> ParametresFuites:
     if nom in scenarios_map:
         return scenarios_map[nom]
     elif nom == "custom" and req is not None:
+        # Validation: prevalence_grosses <= prevalence_petites (sous-ensemble)
+        if req.prevalence_grosses_pct > req.prevalence_petites_pct:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Erreur de validation: prevalence_grosses_pct ({req.prevalence_grosses_pct}%) "
+                       f"ne peut pas dépasser prevalence_petites_pct ({req.prevalence_petites_pct}%) "
+                       f"car les fuites significatives sont un sous-ensemble du total."
+            )
         # Utiliser les paramètres avancés personnalisés
         return ParametresFuites(
             utiliser_prevalence_differenciee=True,
@@ -273,8 +281,13 @@ def get_fuites(nom: str, req: CalculRequest = None) -> ParametresFuites:
             nom="Personnalisé",
         )
     else:
-        # Défaut: deux_stocks (avec tarification)
-        return FUITES_QUEBEC_DEUX_STOCKS
+        # Scénario inconnu → erreur explicite (pas de fallback silencieux)
+        valid_scenarios = list(scenarios_map.keys()) + ["custom"]
+        raise HTTPException(
+            status_code=400,
+            detail=f"Scénario de fuites inconnu: '{nom}'. "
+                   f"Valeurs acceptées: {', '.join(valid_scenarios)}"
+        )
 
 
 def get_compteur(req: CalculRequest) -> ParametresCompteur:
@@ -676,8 +689,8 @@ async def compare_fuites(req: CalculRequest):
     results = {}
 
     scenarios = [
-        ("standard", "Standard (20%, 35 m³/an)"),
-        ("quebec", "Québec (35%, 35 m³/an)"),
+        ("standard", "Standard sans coûts (20%)"),
+        ("quebec", "Québec (35%)"),
         ("deux_stocks", "Différencié QC"),
     ]
 
@@ -793,7 +806,7 @@ async def get_scenario_name(persistance: str = "realiste", fuites: str = "deux_s
     }
 
     fuites_noms = {
-        "standard": "Standard",
+        "standard": "Standard (sans coûts)",
         "quebec": "Québec",
         "deux_stocks": "Différencié",
         "deux_stocks_sans_tarif": "Différencié (sans tarif)",
