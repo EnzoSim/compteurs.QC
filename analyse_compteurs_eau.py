@@ -1805,9 +1805,9 @@ class ParametresFuites:
     # === DIFFÉRENCIATION PAR TYPE DE FUITE (NOUVEAU v3.10) ===
     # Multiplicateurs pour fuites significatives vs petites fuites
     # Base: petites fuites (any) ont les taux de détection/réparation de base
-    # Sig: grosses fuites peuvent être plus faciles à détecter mais plus dures à réparer
-    facteur_detection_sig: float = 1.2                 # Grosses fuites plus visibles
-    facteur_reparation_sig: float = 0.7                # Grosses fuites plus complexes
+    # Sig: grosses fuites sont plus visibles ET plus réparées (dommages = motivation)
+    facteur_detection_sig: float = 1.2                 # Grosses fuites plus visibles (détection facilitée)
+    facteur_reparation_sig: float = 1.4                # Grosses fuites = plus d'incitatif (dommages visibles)
     cout_reparation_any: float = 100.0                 # Coût réparation petite fuite ($)
     cout_reparation_sig: float = 400.0                 # Coût réparation grosse fuite ($)
 
@@ -2065,7 +2065,7 @@ def calculer_dynamique_fuites(
         d_any = d_eff  # Base detection rate for small leaks
         d_sig = min(1.0, d_eff * params_fuites.facteur_detection_sig)  # Higher for big leaks
         r_any = r_base
-        r_sig = r_base * params_fuites.facteur_reparation_sig  # Lower for complex repairs
+        r_sig = r_base * params_fuites.facteur_reparation_sig  # Higher due to visible damage incentive
 
         # Taux effectifs détection × réparation
         k_any = d_any * r_any
