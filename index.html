@@ -1084,11 +1084,11 @@
                     </div>
                     <div class="advanced-content" id="content-fuites">
                         <div class="param-section">
-                            <div class="section-title">Toutes fuites (prévalence totale)</div>
+                            <div class="section-title">Petites fuites (toilettes, robinets)</div>
                             <div class="input-group">
-                                <label>Prévalence totale <span class="value" id="val-prevalence-totale">30 %</span></label>
-                                <input type="range" id="prevalence-totale" min="5" max="50" step="1" value="30" oninput="onParamChange()">
-                                <small style="color: #666; font-size: 10px;">% de ménages avec fuite (petites + grosses)</small>
+                                <label>Prévalence petites <span class="value" id="val-prevalence-petites">24 %</span></label>
+                                <input type="range" id="prevalence-petites" min="0" max="40" step="1" value="24" oninput="onParamChange()">
+                                <small style="color: #666; font-size: 10px;">% de ménages avec petite fuite</small>
                             </div>
                             <div class="input-group">
                                 <label>Débit petites fuites <span class="value" id="val-debit-petites">10 m³/an</span></label>
@@ -1096,16 +1096,20 @@
                             </div>
                         </div>
                         <div class="param-section">
-                            <div class="section-title">Dont grosses fuites (sous-ensemble)</div>
+                            <div class="section-title">Grosses fuites (conduites, chauffe-eau)</div>
                             <div class="input-group">
                                 <label>Prévalence grosses <span class="value" id="val-prevalence-grosses">6 %</span></label>
                                 <input type="range" id="prevalence-grosses" min="0" max="20" step="0.5" value="6" oninput="onParamChange()">
-                                <small style="color: #666; font-size: 10px;">Inclus dans le total ci-dessus (ne peut pas le dépasser)</small>
+                                <small style="color: #666; font-size: 10px;">% de ménages avec grosse fuite</small>
                             </div>
                             <div class="input-group">
-                                <label>Débit moyen <span class="value" id="val-debit-grosses">50 m³/an</span></label>
+                                <label>Débit grosses fuites <span class="value" id="val-debit-grosses">50 m³/an</span></label>
                                 <input type="range" id="debit-grosses" min="20" max="150" step="5" value="50" oninput="onParamChange()">
                             </div>
+                        </div>
+                        <div class="info-badge" style="margin: 0.75rem 0; background: linear-gradient(135deg, #d1fae5, #a7f3d0); border: 1px solid #6ee7b7;">
+                            <span style="font-size: 1.1em;">📊</span>
+                            <span><strong>Total :</strong> <span id="val-prevalence-total-calc">30</span>% des ménages ont une fuite (petites + grosses)</span>
                         </div>
                         <div class="param-section">
                             <div class="section-title">Détection & Réparation</div>
@@ -1613,8 +1617,8 @@
 
             // Ajouter les paramètres avancés si mode custom
             if (params.scenario_fuites === 'custom') {
-                // Prévalence et débits
-                params.prevalence_totale_pct = parseFloat(document.getElementById('prevalence-totale').value);
+                // Prévalence et débits (petites + grosses séparément)
+                params.prevalence_petites_pct = parseFloat(document.getElementById('prevalence-petites').value);
                 params.debit_petites_m3 = parseFloat(document.getElementById('debit-petites').value);
                 params.prevalence_grosses_pct = parseFloat(document.getElementById('prevalence-grosses').value);
                 params.debit_grosses_m3 = parseFloat(document.getElementById('debit-grosses').value);
@@ -1706,9 +1710,13 @@
             document.getElementById('val-cout-variable').textContent = parseFloat(document.getElementById('cout-variable').value).toFixed(2) + ' $/m³';
 
             // Labels paramètres avancés fuites
-            document.getElementById('val-prevalence-totale').textContent = document.getElementById('prevalence-totale').value + ' %';
+            const prevPetites = parseFloat(document.getElementById('prevalence-petites').value);
+            const prevGrosses = parseFloat(document.getElementById('prevalence-grosses').value);
+            document.getElementById('val-prevalence-petites').textContent = prevPetites + ' %';
             document.getElementById('val-debit-petites').textContent = document.getElementById('debit-petites').value + ' m³/an';
-            document.getElementById('val-prevalence-grosses').textContent = document.getElementById('prevalence-grosses').value + ' %';
+            document.getElementById('val-prevalence-grosses').textContent = prevGrosses + ' %';
+            // Calculer et afficher le total
+            document.getElementById('val-prevalence-total-calc').textContent = (prevPetites + prevGrosses).toFixed(0);
             document.getElementById('val-debit-grosses').textContent = document.getElementById('debit-grosses').value + ' m³/an';
             document.getElementById('val-taux-detection').textContent = document.getElementById('taux-detection').value + ' %';
             document.getElementById('val-taux-reparation').textContent = document.getElementById('taux-reparation').value + ' %';
@@ -1881,11 +1889,15 @@
             const pp = data.params_persistance;
 
             // Table paramètres fuites
+            // Note: pf.prevalence_petites_pct = total (petites + grosses) dans l'API
+            const totalPrev = pf.prevalence_petites_pct;
+            const grossesPrev = pf.prevalence_grosses_pct;
+            const petitesPrev = totalPrev - grossesPrev;
+
             const fuitesHtml = pf.mode_deux_stocks ? `
-                <tr><td>Mode</td><td>Différencié (petites + grosses)</td></tr>
-                <tr><td>Prévalence totale</td><td>${pf.prevalence_petites_pct.toFixed(0)}% des ménages</td></tr>
-                <tr><td>→ dont petites fuites</td><td>${(pf.prevalence_petites_pct - pf.prevalence_grosses_pct).toFixed(0)}% à ${pf.debit_petites_m3.toFixed(0)} m³/an</td></tr>
-                <tr><td>→ dont grosses fuites</td><td>${pf.prevalence_grosses_pct.toFixed(1)}% à ${pf.debit_grosses_m3.toFixed(0)} m³/an</td></tr>
+                <tr><td>Petites fuites</td><td>${petitesPrev.toFixed(0)}% à ${pf.debit_petites_m3.toFixed(0)} m³/an</td></tr>
+                <tr><td>Grosses fuites</td><td>${grossesPrev.toFixed(1)}% à ${pf.debit_grosses_m3.toFixed(0)} m³/an</td></tr>
+                <tr><td><strong>Total prévalence</strong></td><td><strong>${totalPrev.toFixed(0)}% des ménages</strong></td></tr>
                 <tr><td>Taux détection AMI</td><td>${pf.taux_detection_pct.toFixed(0)}%</td></tr>
                 <tr><td>Taux réparation (base)</td><td>${pf.taux_reparation_pct.toFixed(0)}%</td></tr>
                 <tr><td>Nouvelles fuites/an</td><td>${pf.taux_nouvelles_fuites_pct.toFixed(1)}%</td></tr>
@@ -1893,7 +1905,7 @@
                 <tr><td><strong>Total réparations</strong></td><td><strong>${data.total_reparations.toLocaleString('fr-CA')}</strong></td></tr>
             ` : `
                 <tr><td>Mode</td><td>Stock unique agrégé</td></tr>
-                <tr><td>Prévalence</td><td>${pf.prevalence_petites_pct.toFixed(0)}%</td></tr>
+                <tr><td>Prévalence</td><td>${totalPrev.toFixed(0)}%</td></tr>
                 <tr><td>Débit moyen</td><td>${pf.debit_petites_m3.toFixed(0)} m³/an</td></tr>
                 <tr><td>Taux réparation</td><td>${pf.taux_reparation_pct.toFixed(0)}%</td></tr>
                 <tr><td><strong>Total réparations</strong></td><td><strong>${data.total_reparations.toLocaleString('fr-CA')}</strong></td></tr>

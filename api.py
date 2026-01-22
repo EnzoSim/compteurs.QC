@@ -112,16 +112,16 @@ class CalculRequest(BaseModel):
     )
 
     # === PARAMÈTRES AVANCÉS FUITES (utilisés si scenario_fuites = "custom") ===
-    # Prévalence totale (incluant les fuites significatives)
-    prevalence_totale_pct: float = Field(
-        30.0,
+    # Petites fuites (toilettes, robinets)
+    prevalence_petites_pct: float = Field(
+        24.0,
         ge=0,
-        le=50,
-        description="% ménages avec une fuite (TOTAL = petites + grosses)",
+        le=40,
+        description="% ménages avec petite fuite",
     )
     debit_petites_m3: float = Field(10.0, ge=1, le=30, description="Débit petites fuites (m³/an)")
-    # Prévalence grosses fuites (sous-ensemble de la prévalence totale)
-    prevalence_grosses_pct: float = Field(6.0, ge=0, le=20, description="% ménages avec grosse fuite (sous-ensemble du total)")
+    # Grosses fuites (conduites, chauffe-eau)
+    prevalence_grosses_pct: float = Field(6.0, ge=0, le=20, description="% ménages avec grosse fuite")
     debit_grosses_m3: float = Field(50.0, ge=20, le=150, description="Débit grosses fuites (m³/an)")
     # Taux de réparation et détection
     taux_reparation_pct: float = Field(55.0, ge=20, le=100, description="% fuites réparées après détection")
@@ -270,13 +270,15 @@ def get_fuites(nom: str, req: CalculRequest = None) -> ParametresFuites:
     if nom in scenarios_map:
         return scenarios_map[nom]
     elif nom == "custom" and req is not None:
-        # Validation: prevalence_grosses <= prevalence_totale (sous-ensemble)
-        if req.prevalence_grosses_pct > req.prevalence_totale_pct:
+        # Calculer le total = petites + grosses
+        prevalence_totale = req.prevalence_petites_pct + req.prevalence_grosses_pct
+
+        # Validation: total ne doit pas dépasser 60%
+        if prevalence_totale > 60:
             raise HTTPException(
                 status_code=422,
-                detail=f"Erreur de validation: prevalence_grosses_pct ({req.prevalence_grosses_pct}%) "
-                       f"ne peut pas dépasser prevalence_totale_pct ({req.prevalence_totale_pct}%) "
-                       f"car les fuites significatives sont un sous-ensemble du total."
+                detail=f"Erreur de validation: la prévalence totale ({prevalence_totale:.1f}%) "
+                       f"dépasse le maximum réaliste de 60%."
             )
         # Déterminer le mode de répartition des coûts
         if not req.inclure_cout_reparation:
@@ -289,9 +291,10 @@ def get_fuites(nom: str, req: CalculRequest = None) -> ParametresFuites:
             mode_rep = ModeRepartitionCouts.MENAGE_SEUL
 
         # Utiliser les paramètres avancés personnalisés
+        # Total = petites + grosses (calculé ci-dessus)
         return ParametresFuites(
             utiliser_prevalence_differenciee=True,
-            part_menages_fuite_any_pct=req.prevalence_totale_pct,
+            part_menages_fuite_any_pct=prevalence_totale,  # Total = petites + grosses
             debit_fuite_any_m3_an=req.debit_petites_m3,
             part_menages_fuite_significative_pct=req.prevalence_grosses_pct,
             debit_fuite_significative_m3_an=req.debit_grosses_m3,
