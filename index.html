@@ -1071,9 +1071,7 @@
                 <div class="input-group">
                     <label>Scénario de fuites</label>
                     <select id="scenario-fuites" onchange="onScenarioFuitesChange()">
-                        <option value="deux_stocks_sans_tarif" selected>Réaliste — petites + grosses fuites</option>
-                        <option value="quebec_sans_tarif">Simplifié — fuites agrégées (35%)</option>
-                        <option value="standard">Optimiste — sans coûts réparation</option>
+                        <option value="deux_stocks_sans_tarif" selected>Réaliste (calibré Québec)</option>
                         <option value="custom">Personnalisé...</option>
                     </select>
                 </div>
@@ -2233,9 +2231,7 @@
             };
 
             const fuitesNoms = {
-                'standard': 'Optimiste',
                 'deux_stocks_sans_tarif': 'Réaliste',
-                'quebec_sans_tarif': 'Simplifié',
                 'custom': 'Personnalisé'
             };
 
