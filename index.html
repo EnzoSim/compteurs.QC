@@ -1071,9 +1071,9 @@
                 <div class="input-group">
                     <label>Scénario de fuites</label>
                     <select id="scenario-fuites" onchange="onScenarioFuitesChange()">
-                        <option value="deux_stocks_sans_tarif" selected>Différencié — petites (24%) + significatives (6%)</option>
-                        <option value="quebec_sans_tarif">Stock unique — prévalence 35%</option>
-                        <option value="standard">Borne basse — sans coûts réparation</option>
+                        <option value="deux_stocks_sans_tarif" selected>Réaliste — petites + grosses fuites</option>
+                        <option value="quebec_sans_tarif">Simplifié — fuites agrégées (35%)</option>
+                        <option value="standard">Optimiste — sans coûts réparation</option>
                         <option value="custom">Personnalisé...</option>
                     </select>
                 </div>
@@ -1212,11 +1212,11 @@
                 <div class="scenario-icon">📊</div>
                 <div class="scenario-info">
                     <div class="scenario-label">Scénario actuel</div>
-                    <div class="scenario-name" id="scenario-name">Réaliste + Différencié QC</div>
+                    <div class="scenario-name" id="scenario-name">Réaliste + Réaliste</div>
                 </div>
                 <div class="scenario-details" id="scenario-details">
                     <span class="tag tag-persistance">Réaliste</span>
-                    <span class="tag tag-fuites">Différencié</span>
+                    <span class="tag tag-fuites">Réaliste</span>
                     <span class="tag tag-mode">Économique</span>
                 </div>
             </div>
@@ -2233,9 +2233,9 @@
             };
 
             const fuitesNoms = {
-                'standard': 'Borne basse',
-                'deux_stocks_sans_tarif': 'Différencié',
-                'quebec_sans_tarif': 'Stock unique',
+                'standard': 'Optimiste',
+                'deux_stocks_sans_tarif': 'Réaliste',
+                'quebec_sans_tarif': 'Simplifié',
                 'custom': 'Personnalisé'
             };
 
