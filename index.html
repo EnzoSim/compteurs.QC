@@ -1114,8 +1114,19 @@
                                 <input type="range" id="taux-detection" min="50" max="100" step="1" value="90" oninput="onParamChange()">
                             </div>
                             <div class="input-group">
-                                <label>Taux de réparation <span class="value" id="val-taux-reparation">85 %</span></label>
-                                <input type="range" id="taux-reparation" min="50" max="100" step="1" value="85" oninput="onParamChange()">
+                                <label>Taux de réparation (base) <span class="value" id="val-taux-reparation">55 %</span></label>
+                                <input type="range" id="taux-reparation" min="20" max="100" step="1" value="55" oninput="onParamChange()">
+                                <small style="color: #666; font-size: 10px;">Sans tarification volumétrique</small>
+                            </div>
+                            <div class="input-group">
+                                <label>Facteur détection grosses <span class="value" id="val-facteur-detection-sig">×1.2</span></label>
+                                <input type="range" id="facteur-detection-sig" min="0.5" max="2" step="0.1" value="1.2" oninput="onParamChange()">
+                                <small style="color: #666; font-size: 10px;">Grosses fuites plus visibles</small>
+                            </div>
+                            <div class="input-group">
+                                <label>Facteur réparation grosses <span class="value" id="val-facteur-reparation-sig">×1.4</span></label>
+                                <input type="range" id="facteur-reparation-sig" min="0.5" max="2" step="0.1" value="1.4" oninput="onParamChange()">
+                                <small style="color: #666; font-size: 10px;">Grosses fuites = plus d'incitatif (dommages)</small>
                             </div>
                         </div>
                         <div class="param-section">
@@ -1125,8 +1136,34 @@
                                 <input type="range" id="nouvelles-fuites" min="0" max="15" step="0.5" value="5" oninput="onParamChange()">
                             </div>
                             <div class="input-group">
-                                <label>Fuites persistantes <span class="value" id="val-persistantes">5 %</span></label>
-                                <input type="range" id="persistantes" min="0" max="20" step="1" value="5" oninput="onParamChange()">
+                                <label>Fuites persistantes <span class="value" id="val-persistantes">10 %</span></label>
+                                <input type="range" id="persistantes" min="0" max="30" step="1" value="10" oninput="onParamChange()">
+                                <small style="color: #666; font-size: 10px;">% jamais réparées</small>
+                            </div>
+                            <div class="input-group">
+                                <label>Facteur longue traîne <span class="value" id="val-longue-traine">×5.0</span></label>
+                                <input type="range" id="longue-traine" min="1" max="10" step="0.5" value="5" oninput="onParamChange()">
+                                <small style="color: #666; font-size: 10px;">Ralentissement réparations dans le temps</small>
+                            </div>
+                        </div>
+                        <div class="param-section">
+                            <div class="section-title">Coûts de réparation</div>
+                            <div class="input-group">
+                                <label>Coût petite fuite <span class="value" id="val-cout-petite">150 $</span></label>
+                                <input type="range" id="cout-petite" min="50" max="500" step="10" value="150" oninput="onParamChange()">
+                            </div>
+                            <div class="input-group">
+                                <label>Coût grosse fuite <span class="value" id="val-cout-grosse">600 $</span></label>
+                                <input type="range" id="cout-grosse" min="200" max="2000" step="50" value="600" oninput="onParamChange()">
+                            </div>
+                            <div class="input-group">
+                                <label>Part ville (subvention) <span class="value" id="val-part-ville">0 %</span></label>
+                                <input type="range" id="part-ville" min="0" max="100" step="5" value="0" oninput="onParamChange()">
+                                <small style="color: #666; font-size: 10px;">0% = ménage paie tout, 100% = ville paie tout</small>
+                            </div>
+                            <div class="input-group" style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" id="inclure-couts" checked onchange="onParamChange()">
+                                <label for="inclure-couts" style="margin: 0;">Inclure coûts de réparation dans la VAN</label>
                             </div>
                         </div>
                     </div>
@@ -1576,14 +1613,25 @@
 
             // Ajouter les paramètres avancés si mode custom
             if (params.scenario_fuites === 'custom') {
+                // Prévalence et débits
                 params.prevalence_petites_pct = parseFloat(document.getElementById('prevalence-petites').value);
                 params.debit_petites_m3 = parseFloat(document.getElementById('debit-petites').value);
                 params.prevalence_grosses_pct = parseFloat(document.getElementById('prevalence-grosses').value);
                 params.debit_grosses_m3 = parseFloat(document.getElementById('debit-grosses').value);
+                // Détection et réparation
                 params.taux_detection_pct = parseFloat(document.getElementById('taux-detection').value);
                 params.taux_reparation_pct = parseFloat(document.getElementById('taux-reparation').value);
+                params.facteur_detection_sig = parseFloat(document.getElementById('facteur-detection-sig').value);
+                params.facteur_reparation_sig = parseFloat(document.getElementById('facteur-reparation-sig').value);
+                // Dynamique temporelle
                 params.taux_nouvelles_fuites_pct = parseFloat(document.getElementById('nouvelles-fuites').value);
                 params.part_persistantes_pct = parseFloat(document.getElementById('persistantes').value);
+                params.facteur_duree_longue_traine = parseFloat(document.getElementById('longue-traine').value);
+                // Coûts de réparation
+                params.cout_reparation_petite = parseFloat(document.getElementById('cout-petite').value);
+                params.cout_reparation_grosse = parseFloat(document.getElementById('cout-grosse').value);
+                params.part_ville_pct = parseFloat(document.getElementById('part-ville').value);
+                params.inclure_cout_reparation = document.getElementById('inclure-couts').checked;
             }
 
             return params;
@@ -1664,8 +1712,14 @@
             document.getElementById('val-debit-grosses').textContent = document.getElementById('debit-grosses').value + ' m³/an';
             document.getElementById('val-taux-detection').textContent = document.getElementById('taux-detection').value + ' %';
             document.getElementById('val-taux-reparation').textContent = document.getElementById('taux-reparation').value + ' %';
+            document.getElementById('val-facteur-detection-sig').textContent = '×' + parseFloat(document.getElementById('facteur-detection-sig').value).toFixed(1);
+            document.getElementById('val-facteur-reparation-sig').textContent = '×' + parseFloat(document.getElementById('facteur-reparation-sig').value).toFixed(1);
             document.getElementById('val-nouvelles-fuites').textContent = document.getElementById('nouvelles-fuites').value + ' %';
             document.getElementById('val-persistantes').textContent = document.getElementById('persistantes').value + ' %';
+            document.getElementById('val-longue-traine').textContent = '×' + parseFloat(document.getElementById('longue-traine').value).toFixed(1);
+            document.getElementById('val-cout-petite').textContent = document.getElementById('cout-petite').value + ' $';
+            document.getElementById('val-cout-grosse').textContent = document.getElementById('cout-grosse').value + ' $';
+            document.getElementById('val-part-ville').textContent = document.getElementById('part-ville').value + ' %';
 
             const isAMI = document.getElementById('type-compteur').value === 'ami';
             document.getElementById('cout-reseau-group').style.display = isAMI ? 'block' : 'none';

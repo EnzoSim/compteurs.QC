@@ -124,12 +124,23 @@ class CalculRequest(BaseModel):
     prevalence_grosses_pct: float = Field(6.0, ge=0, le=20, description="% ménages avec grosse fuite (sous-ensemble)")
     debit_grosses_m3: float = Field(50.0, ge=20, le=150, description="Débit grosses fuites (m³/an)")
     # Taux de réparation et détection
-    taux_reparation_pct: float = Field(85.0, ge=50, le=100, description="% fuites réparées après détection")
+    taux_reparation_pct: float = Field(55.0, ge=20, le=100, description="% fuites réparées après détection")
     taux_detection_pct: float = Field(90.0, ge=50, le=100, description="% fuites détectées par AMI")
+    # Facteurs différenciés pour grosses fuites
+    facteur_detection_sig: float = Field(1.2, ge=0.5, le=2.0, description="Multiplicateur détection grosses fuites")
+    facteur_reparation_sig: float = Field(1.4, ge=0.5, le=2.0, description="Multiplicateur réparation grosses fuites")
     # Nouvelles fuites annuelles
     taux_nouvelles_fuites_pct: float = Field(5.0, ge=0, le=15, description="% ménages avec nouvelle fuite/an")
     # Fuites persistantes (jamais réparées)
-    part_persistantes_pct: float = Field(5.0, ge=0, le=20, description="% fuites jamais réparées")
+    part_persistantes_pct: float = Field(10.0, ge=0, le=30, description="% fuites jamais réparées")
+    # Longue traîne
+    facteur_duree_longue_traine: float = Field(5.0, ge=1.0, le=10.0, description="Facteur ralentissement réparations")
+    # Coûts de réparation
+    cout_reparation_petite: float = Field(150.0, ge=50, le=500, description="Coût réparation petite fuite ($)")
+    cout_reparation_grosse: float = Field(600.0, ge=200, le=2000, description="Coût réparation grosse fuite ($)")
+    inclure_cout_reparation: bool = Field(True, description="Inclure coûts réparation dans VAN")
+    # Partage des coûts
+    part_ville_pct: float = Field(0.0, ge=0, le=100, description="% coûts réparation payés par la ville")
 
     # Mode d'analyse
     mode_economique: bool = Field(True, description="True=économique, False=financier")
@@ -267,6 +278,16 @@ def get_fuites(nom: str, req: CalculRequest = None) -> ParametresFuites:
                        f"ne peut pas dépasser prevalence_petites_pct ({req.prevalence_petites_pct}%) "
                        f"car les fuites significatives sont un sous-ensemble du total."
             )
+        # Déterminer le mode de répartition des coûts
+        if not req.inclure_cout_reparation:
+            mode_rep = ModeRepartitionCouts.SANS_COUT
+        elif req.part_ville_pct >= 100:
+            mode_rep = ModeRepartitionCouts.VILLE_SEULE
+        elif req.part_ville_pct > 0:
+            mode_rep = ModeRepartitionCouts.SUBVENTION_PARTIELLE
+        else:
+            mode_rep = ModeRepartitionCouts.MENAGE_SEUL
+
         # Utiliser les paramètres avancés personnalisés
         return ParametresFuites(
             utiliser_prevalence_differenciee=True,
@@ -276,9 +297,16 @@ def get_fuites(nom: str, req: CalculRequest = None) -> ParametresFuites:
             debit_fuite_significative_m3_an=req.debit_grosses_m3,
             taux_reparation_pct=req.taux_reparation_pct,
             taux_detection_pct=req.taux_detection_pct,
+            facteur_detection_sig=req.facteur_detection_sig,
+            facteur_reparation_sig=req.facteur_reparation_sig,
             taux_nouvelles_fuites_pct=req.taux_nouvelles_fuites_pct,
             part_fuites_persistantes_pct=req.part_persistantes_pct,
-            mode_repartition=ModeRepartitionCouts.SANS_COUT,
+            facteur_duree_longue_traine=req.facteur_duree_longue_traine,
+            cout_reparation_any=req.cout_reparation_petite,
+            cout_reparation_sig=req.cout_reparation_grosse,
+            inclure_cout_reparation=req.inclure_cout_reparation,
+            mode_repartition=mode_rep,
+            part_ville_pct=req.part_ville_pct,
             nom="Personnalisé",
         )
     else:
