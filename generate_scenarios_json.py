@@ -28,6 +28,8 @@ from itertools import product
 from typing import Any
 
 from analyse_compteurs_eau import (
+    # Version
+    __version__ as MODEL_VERSION,
     # Classes et structures
     ParametresModele,
     ParametresCompteur,
@@ -291,7 +293,7 @@ def generer_scenarios_complets() -> dict:
         "metadata": {
             "version": "1.0.0",
             "generated_at": datetime.now().isoformat(),
-            "model_version": "3.10.0",
+            "model_version": MODEL_VERSION,
             "description": "Scénarios précalculés pour l'analyse coûts-bénéfices des compteurs d'eau",
         },
         "presets": {

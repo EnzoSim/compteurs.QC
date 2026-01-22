@@ -24,6 +24,7 @@ import math
 
 # Import du modèle
 from analyse_compteurs_eau import (
+    __version__ as MODEL_VERSION,
     ParametresModele,
     ParametresCompteur,
     TypeCompteur,
@@ -62,7 +63,7 @@ from analyse_compteurs_eau import (
 app = FastAPI(
     title="API Compteurs d'Eau Québec",
     description="Analyse coûts-bénéfices des compteurs d'eau intelligents",
-    version="3.11.0",
+    version=MODEL_VERSION,
 )
 
 # CORS pour permettre les appels depuis le frontend
@@ -337,7 +338,7 @@ async def root():
 @app.get("/api/health")
 async def health():
     """Health check."""
-    return {"status": "ok", "version": "3.10.0"}
+    return {"status": "ok", "version": MODEL_VERSION}
 
 
 @app.post("/api/calculate", response_model=CalculResponse)
