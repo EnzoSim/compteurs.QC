@@ -6,6 +6,7 @@
     <meta name="description" content="Calculateur d'analyse coûts-bénéfices pour les compteurs d'eau intelligents au Québec">
     <title>Analyse Coûts-Bénéfices — Compteurs d'Eau Intelligents</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <script src="translations.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -29,9 +30,46 @@
             --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04);
             --radius: 16px;
             --radius-sm: 8px;
+            --transition: 200ms ease;
+            --transition-fast: 150ms ease;
+            --hover-scale: 1.02;
+            --hover-lift: translateY(-2px);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        /* Global interactive elements */
+        button, .btn, .card[onclick], .preset-btn, .toggle, .tab-btn,
+        [role="button"], summary, label[for], .clickable {
+            cursor: pointer;
+        }
+
+        /* Lucide icons styling */
+        .lucide {
+            width: 1em;
+            height: 1em;
+            vertical-align: -0.125em;
+            stroke-width: 2;
+        }
+        .lucide-sm { width: 16px; height: 16px; }
+        .lucide-md { width: 20px; height: 20px; }
+        .lucide-lg { width: 24px; height: 24px; }
+        .lucide-xl { width: 32px; height: 32px; }
+
+        /* Toggle chevron animations */
+        .toggle-chevron {
+            display: inline-flex;
+            transition: transform var(--transition);
+        }
+        .toggle-chevron.open { transform: rotate(90deg); }
+        .toggle-chevron svg { width: 18px; height: 18px; }
+
+        /* Spin animation for loader */
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin { animation: spin 1s linear infinite; }
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -160,7 +198,7 @@
             padding: 1.5rem;
             box-shadow: var(--shadow);
             border: 1px solid var(--border);
-            transition: box-shadow 0.2s;
+            transition: box-shadow var(--transition);
         }
 
         .card:hover { box-shadow: var(--shadow-lg); }
@@ -181,9 +219,9 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.25rem;
             flex-shrink: 0;
         }
+        .card-icon svg { width: 22px; height: 22px; stroke-width: 2; }
 
         .card-icon.blue { background: linear-gradient(135deg, #e0f2fe, #bae6fd); color: #0369a1; }
         .card-icon.green { background: linear-gradient(135deg, #d1fae5, #a7f3d0); color: #047857; }
@@ -220,7 +258,7 @@
             font-size: 0.85rem;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all var(--transition);
             text-align: left;
         }
 
@@ -273,7 +311,7 @@
             background: var(--bg-dark);
             outline: none;
             -webkit-appearance: none;
-            transition: background 0.2s;
+            transition: background var(--transition);
         }
 
         input[type="range"]::-webkit-slider-thumb {
@@ -284,7 +322,7 @@
             background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
             cursor: pointer;
             box-shadow: 0 2px 6px rgba(15, 76, 117, 0.3);
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: transform var(--transition), box-shadow var(--transition);
             border: 3px solid white;
         }
 
@@ -307,7 +345,7 @@
             font-weight: 500;
             background: white;
             cursor: pointer;
-            transition: border-color 0.2s, box-shadow 0.2s;
+            transition: border-color var(--transition), box-shadow var(--transition);
             color: var(--text);
         }
 
@@ -335,7 +373,7 @@
             background: var(--bg-dark);
             border-radius: 15px;
             cursor: pointer;
-            transition: background 0.3s;
+            transition: background var(--transition);
             flex-shrink: 0;
         }
 
@@ -350,7 +388,7 @@
             height: 24px;
             background: white;
             border-radius: 50%;
-            transition: transform 0.3s;
+            transition: transform var(--transition);
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
 
@@ -388,6 +426,11 @@
             border: 1px solid var(--border);
             position: relative;
             overflow: hidden;
+            transition: transform var(--transition), box-shadow var(--transition);
+        }
+        .metric-card:hover {
+            transform: var(--hover-lift);
+            box-shadow: var(--shadow-lg);
         }
 
         .metric-card::before {
@@ -455,9 +498,9 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
             flex-shrink: 0;
         }
+        .recommendation-icon svg { width: 26px; height: 26px; stroke-width: 2.5; }
 
         .recommendation.positive {
             background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
@@ -609,7 +652,7 @@
             background-size: 200% 100%;
             transform: scaleX(0);
             transform-origin: left;
-            transition: transform 0.3s;
+            transition: transform var(--transition);
             z-index: 1000;
             animation: shimmer 1.5s infinite;
         }
@@ -725,7 +768,7 @@
             font-weight: 500;
             font-size: 0.85rem;
             color: var(--text-secondary);
-            transition: background 0.2s;
+            transition: background var(--transition);
         }
 
         .advanced-header:hover {
@@ -733,7 +776,7 @@
         }
 
         .chevron {
-            transition: transform 0.3s;
+            transition: transform var(--transition);
             font-size: 0.7rem;
         }
 
@@ -744,7 +787,7 @@
         .advanced-content {
             max-height: 0;
             overflow: hidden;
-            transition: max-height 0.3s ease-out;
+            transition: max-height var(--transition);
         }
 
         .advanced-content.open {
@@ -867,7 +910,7 @@
             font-size: 0.8rem;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all var(--transition);
         }
 
         .btn:hover {
@@ -930,7 +973,7 @@
             font-size: 0.8rem;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all var(--transition);
         }
 
         .btn-mc:hover {
@@ -964,7 +1007,7 @@
             align-items: center;
             justify-content: center;
             gap: 0.5rem;
-            transition: all 0.2s;
+            transition: all var(--transition);
         }
 
         .map-picker-btn:hover {
@@ -1041,7 +1084,7 @@
             justify-content: center;
             font-size: 1.2rem;
             color: var(--text-secondary);
-            transition: all 0.2s;
+            transition: all var(--transition);
         }
 
         .map-modal-close:hover {
@@ -1105,7 +1148,7 @@
             font-weight: 600;
             z-index: 10000;
             text-decoration: none;
-            transition: top 0.2s;
+            transition: top var(--transition);
         }
 
         .skip-link:focus {
@@ -1370,7 +1413,7 @@
             <!-- Project Parameters -->
             <div class="card">
                 <div class="card-header">
-                    <div class="card-icon green">📊</div>
+                    <div class="card-icon green"><i data-lucide="bar-chart-2"></i></div>
                     <div>
                         <div class="card-title" data-i18n="section.project">Paramètres du projet</div>
                         <div class="card-subtitle" data-i18n="section.project_sub">Configuration de base</div>
@@ -1395,7 +1438,7 @@
                 <!-- Calibrage automatique -->
                 <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
                     <button class="btn" style="width: 100%; font-size: 12px;" onclick="openCalibrationModal()">
-                        📈 <span data-i18n="calibration.btn">Calibrer depuis données</span>
+                        <i data-lucide="trending-up" class="lucide-sm"></i> <span data-i18n="calibration.btn">Calibrer depuis données</span>
                     </button>
                     <small style="color: #666; font-size: 10px; display: block; margin-top: 6px; text-align: center;" data-i18n="calibration.btn_help">
                         Importer un CSV de consommation mensuelle
@@ -1416,7 +1459,7 @@
             <!-- Meter Costs -->
             <div class="card">
                 <div class="card-header">
-                    <div class="card-icon purple">💧</div>
+                    <div class="card-icon purple"><i data-lucide="droplet"></i></div>
                     <div>
                         <div class="card-title" data-i18n="section.technology">Technologie de comptage</div>
                         <div class="card-subtitle" data-i18n="section.technology_sub">Coûts et installation</div>
@@ -1467,7 +1510,7 @@
             <!-- Behavior & Leaks -->
             <div class="card">
                 <div class="card-header">
-                    <div class="card-icon orange">🔧</div>
+                    <div class="card-icon orange"><i data-lucide="settings"></i></div>
                     <div>
                         <div class="card-title" data-i18n="section.behavior">Comportement & Fuites</div>
                         <div class="card-subtitle" data-i18n="section.behavior_sub">Paramètres d'économies</div>
@@ -1528,7 +1571,7 @@
                 <div class="advanced-params" id="advanced-fuites" style="display: none;">
                     <div class="advanced-header" onclick="toggleAdvanced()">
                         <span>Paramètres avancés des fuites</span>
-                        <span class="chevron" id="chevron-fuites">▼</span>
+                        <span class="chevron" id="chevron-fuites"><i data-lucide="chevron-down"></i></span>
                     </div>
                     <div class="advanced-content" id="content-fuites">
                         <div class="param-section">
@@ -1556,7 +1599,7 @@
                             </div>
                         </div>
                         <div class="info-badge" style="margin: 0.75rem 0; background: linear-gradient(135deg, #d1fae5, #a7f3d0); border: 1px solid #6ee7b7;">
-                            <span style="font-size: 1.1em;">📊</span>
+                            <i data-lucide="pie-chart" class="lucide-md"></i>
                             <span><strong>Total :</strong> <span id="val-prevalence-total-calc">30</span>% des ménages ont une fuite (petites + grosses)</span>
                         </div>
                         <div class="param-section">
@@ -1716,7 +1759,7 @@
             <!-- Economic Parameters -->
             <div class="card">
                 <div class="card-header">
-                    <div class="card-icon blue">💰</div>
+                    <div class="card-icon blue"><i data-lucide="wallet"></i></div>
                     <div>
                         <div class="card-title" data-i18n="section.economic">Paramètres économiques</div>
                         <div class="card-subtitle" data-i18n="section.economic_sub">Valorisation de l'eau</div>
@@ -1805,8 +1848,8 @@
                 <!-- Configuration distributions avancée -->
                 <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
                     <div style="font-weight: 600; color: #374151; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; cursor: pointer;" onclick="toggleMCDistributions()">
-                        <span>📊</span> <span data-i18n="mc.custom_distributions">Distributions personnalisées</span>
-                        <span id="mc-distrib-toggle" style="margin-left: auto;">▶</span>
+                        <i data-lucide="bar-chart-2" class="lucide-md"></i> <span data-i18n="mc.custom_distributions">Distributions personnalisées</span>
+                        <span id="mc-distrib-toggle" class="toggle-chevron" style="margin-left: auto;"><i data-lucide="chevron-right"></i></span>
                     </div>
 
                     <div id="mc-distributions-section" style="display: none;">
@@ -1913,7 +1956,7 @@
                         <div class="card-title" data-i18n="section.optimization">Optimisation</div>
                         <div class="card-subtitle" data-i18n="section.optimization_sub">Déploiement sous contraintes</div>
                     </div>
-                    <span id="optim-toggle-icon" style="margin-left: auto; font-size: 18px;">▶</span>
+                    <span id="optim-toggle-icon" class="toggle-chevron" style="margin-left: auto;"><i data-lucide="chevron-right"></i></span>
                 </div>
 
                 <div id="optimization-section" style="display: none;">
@@ -1959,7 +2002,7 @@
                         <div class="card-title" data-i18n="section.expert">Mode Expert</div>
                         <div class="card-subtitle" data-i18n="section.expert_sub">Paramètres avancés</div>
                     </div>
-                    <span id="expert-toggle-icon" style="margin-left: auto; font-size: 18px;">▶</span>
+                    <span id="expert-toggle-icon" class="toggle-chevron" style="margin-left: auto;"><i data-lucide="chevron-right"></i></span>
                 </div>
 
                 <div id="expert-section" style="display: none;">
@@ -1977,7 +2020,7 @@
                     <!-- MCF Section -->
                     <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
                         <div style="font-weight: 600; color: #374151; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
-                            <span>💰</span> <span data-i18n="expert.mcf">Coût Marginal des Fonds publics (MCF)</span>
+                            <i data-lucide="coins" class="lucide-md"></i> <span data-i18n="expert.mcf">Coût Marginal des Fonds publics (MCF)</span>
                         </div>
                         <small style="color: #666; font-size: 11px; display: block; margin-bottom: 12px;" data-i18n="expert.mcf_help">
                             Le MCF représente le coût social de lever 1$ de taxes. Treasury Board Canada: 0.20
@@ -2034,7 +2077,7 @@
                     <!-- OPEX détaillé -->
                     <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
                         <div style="font-weight: 600; color: #374151; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
-                            <span>📊</span> <span data-i18n="expert.opex_detailed">OPEX détaillé (AMI)</span>
+                            <i data-lucide="bar-chart-2" class="lucide-md"></i> <span data-i18n="expert.opex_detailed">OPEX détaillé (AMI)</span>
                         </div>
                         <small style="color: #666; font-size: 11px; display: block; margin-bottom: 12px;" data-i18n="expert.opex_detailed_help">
                             Ventilation des coûts opérationnels non-techniques AMI.
@@ -2119,7 +2162,7 @@
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <div style="font-weight: 600; color: #374151;">
-                            <span style="font-size: 1.2em;">📊</span> <span data-i18n="comparator.title">Scénarios sauvegardés</span>
+                            <i data-lucide="git-compare" class="lucide-md"></i> <span data-i18n="comparator.title">Scénarios sauvegardés</span>
                         </div>
                         <button class="btn" onclick="clearSavedScenarios()" style="background: #dc2626; font-size: 11px; padding: 5px 10px;" data-i18n="comparator.clear_all">Tout effacer</button>
                     </div>
@@ -2143,7 +2186,7 @@
 
             <!-- Scenario Badge -->
             <div class="scenario-badge" id="scenario-badge">
-                <div class="scenario-icon">📊</div>
+                <div class="scenario-icon"><i data-lucide="layers" class="lucide-lg"></i></div>
                 <div class="scenario-info">
                     <div class="scenario-label">Scénario actuel</div>
                     <div class="scenario-name" id="scenario-name">Réaliste + Réaliste</div>
@@ -2165,12 +2208,12 @@
                         <span style="font-weight: 600; color: #374151;" data-i18n="hypotheses.title">Hypothèses effectives</span>
                         <span style="font-size: 11px; color: #6b7280;" data-i18n="hypotheses.expand">(cliquer pour développer)</span>
                     </div>
-                    <span id="chevron-hypotheses" style="transition: transform 0.2s;">▼</span>
+                    <span id="chevron-hypotheses" class="toggle-chevron open"><i data-lucide="chevron-down"></i></span>
                 </div>
                 <div id="hypotheses-content" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; font-size: 12px;">
                         <div>
-                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">🏠 <span data-i18n="hypotheses.project">Projet</span></div>
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;"><i data-lucide="home" class="lucide-sm"></i> <span data-i18n="hypotheses.project">Projet</span></div>
                             <div id="hyp-projet"></div>
                         </div>
                         <div>
@@ -2182,15 +2225,15 @@
                             <div id="hyp-deploiement"></div>
                         </div>
                         <div>
-                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">💧 <span data-i18n="hypotheses.leaks">Fuites</span></div>
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;"><i data-lucide="droplet" class="lucide-sm"></i> <span data-i18n="hypotheses.leaks">Fuites</span></div>
                             <div id="hyp-fuites"></div>
                         </div>
                         <div>
-                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">📈 <span data-i18n="hypotheses.behavior">Comportement</span></div>
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;"><i data-lucide="trending-up" class="lucide-sm"></i> <span data-i18n="hypotheses.behavior">Comportement</span></div>
                             <div id="hyp-comportement"></div>
                         </div>
                         <div>
-                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">💰 <span data-i18n="hypotheses.valuation">Valorisation</span></div>
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;"><i data-lucide="badge-dollar-sign" class="lucide-sm"></i> <span data-i18n="hypotheses.valuation">Valorisation</span></div>
                             <div id="hyp-valorisation"></div>
                         </div>
                     </div>
@@ -2205,7 +2248,7 @@
                         <span style="font-weight: 600; color: #374151;" data-i18n="methodology.title">Méthodologie</span>
                         <span style="font-size: 11px; color: #6b7280;" data-i18n="methodology.expand">(formules et conventions)</span>
                     </div>
-                    <span id="chevron-methodo" style="transition: transform 0.2s;">▼</span>
+                    <span id="chevron-methodo" class="toggle-chevron open"><i data-lucide="chevron-down"></i></span>
                 </div>
                 <div id="methodo-content" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #4b5563; line-height: 1.7;">
                     <div style="margin-bottom: 12px;">
@@ -2238,7 +2281,7 @@
 
             <!-- Recommendation -->
             <div class="recommendation positive" id="recommendation">
-                <div class="recommendation-icon">✓</div>
+                <div class="recommendation-icon"><i data-lucide="loader" class="animate-spin"></i></div>
                 <div class="recommendation-text">Chargement de l'analyse...</div>
             </div>
 
@@ -2390,7 +2433,7 @@
                             <div class="chart-title" data-i18n="chart.monte_carlo">Monte Carlo — Distribution VAN</div>
                             <div class="chart-subtitle" data-i18n="chart.monte_carlo_sub">Simulation stochastique (500 tirages)</div>
                         </div>
-                        <button class="btn-mc" id="btn-run-mc" onclick="runMonteCarlo()">▶ <span data-i18n="action.run_mc">Lancer</span></button>
+                        <button class="btn-mc" id="btn-run-mc" onclick="runMonteCarlo()"><i data-lucide="play" class="lucide-sm"></i> <span data-i18n="action.run_mc">Lancer</span></button>
                     </div>
                     <div class="chart-wrapper">
                         <canvas id="chart-monte-carlo"></canvas>
@@ -2434,7 +2477,7 @@
 
                 <div class="card">
                     <div class="card-header">
-                        <div class="card-icon blue">💧</div>
+                        <div class="card-icon blue"><i data-lucide="droplets"></i></div>
                         <div>
                             <div class="card-title">Économies d'eau détaillées</div>
                             <div class="card-subtitle">Par ménage et par an</div>
@@ -3136,12 +3179,13 @@
                 const recEl = document.getElementById('recommendation');
                 recEl.className = 'recommendation negative';
                 recEl.innerHTML = `
-                    <div class="recommendation-icon">⚠</div>
+                    <div class="recommendation-icon"><i data-lucide="wifi-off"></i></div>
                     <div class="recommendation-text">
                         <strong>Erreur de connexion</strong><br>
                         Vérifiez que le serveur API est en cours d'exécution.
                     </div>
                 `;
+                lucide.createIcons();
             }
         }
 
@@ -3173,7 +3217,7 @@
             if (result.viable) {
                 recEl.className = 'recommendation positive';
                 recEl.innerHTML = `
-                    <div class="recommendation-icon">✓</div>
+                    <div class="recommendation-icon"><i data-lucide="check-circle"></i></div>
                     <div class="recommendation-text">
                         <strong>PROJET ÉCONOMIQUEMENT VIABLE</strong><br>
                         ${result.recommandation}
@@ -3182,7 +3226,7 @@
             } else if (result.van > 0) {
                 recEl.className = 'recommendation warning';
                 recEl.innerHTML = `
-                    <div class="recommendation-icon">!</div>
+                    <div class="recommendation-icon"><i data-lucide="alert-triangle"></i></div>
                     <div class="recommendation-text">
                         <strong>PROJET MARGINAL</strong><br>
                         ${result.recommandation}
@@ -3191,13 +3235,14 @@
             } else {
                 recEl.className = 'recommendation negative';
                 recEl.innerHTML = `
-                    <div class="recommendation-icon">✗</div>
+                    <div class="recommendation-icon"><i data-lucide="x-circle"></i></div>
                     <div class="recommendation-text">
                         <strong>PROJET NON RENTABLE</strong><br>
                         ${result.recommandation}
                     </div>
                 `;
             }
+            lucide.createIcons();
 
             charts.van.data.labels = result.annees;
             charts.van.data.datasets[0].data = result.van_cumulative.map(v => v / 1e6);
@@ -3381,7 +3426,7 @@
         function toggleOptimization() {
             optimizationOpen = !optimizationOpen;
             document.getElementById('optimization-section').style.display = optimizationOpen ? 'block' : 'none';
-            document.getElementById('optim-toggle-icon').textContent = optimizationOpen ? '▼' : '▶';
+            document.getElementById('optim-toggle-icon').classList.toggle('open', optimizationOpen);
         }
 
         function updateOptimLabels() {
@@ -3434,7 +3479,7 @@
             const section = document.getElementById('expert-section');
             const icon = document.getElementById('expert-toggle-icon');
             section.style.display = expertModeOpen ? 'block' : 'none';
-            icon.textContent = expertModeOpen ? '▼' : '▶';
+            icon.classList.toggle('open', expertModeOpen);
         }
 
         function onExpertPresetChange() {
@@ -3902,7 +3947,7 @@
             const icon = document.getElementById('mc-distrib-toggle');
             const isOpen = section.style.display !== 'none';
             section.style.display = isOpen ? 'none' : 'block';
-            icon.textContent = isOpen ? '▶' : '▼';
+            icon.classList.toggle('open', !isOpen);
         }
 
         function collectMCDistributions() {
@@ -4058,7 +4103,8 @@
             } finally {
                 btn.disabled = false;
                 btn.classList.remove('loading');
-                btn.textContent = '▶ Lancer';
+                btn.innerHTML = '<i data-lucide="play" class="lucide-sm"></i> Lancer';
+                lucide.createIcons();
                 mcRunning = false;
             }
         }
@@ -4630,8 +4676,9 @@
             // Show selected municipality
             const selectedEl = document.getElementById('selected-municipality');
             if (selectedEl) {
-                selectedEl.innerHTML = `<strong>✓ ${name}</strong> sélectionnée${population ? ` (${Math.round(population).toLocaleString('fr-CA')} hab. desservis)` : ''}`;
+                selectedEl.innerHTML = `<i data-lucide="map-pin" class="lucide-sm"></i> <strong>${name}</strong> sélectionnée${population ? ` (${Math.round(population).toLocaleString('fr-CA')} hab. desservis)` : ''}`;
                 selectedEl.classList.add('active');
+                lucide.createIcons();
             }
 
             updateLabels();
@@ -4639,6 +4686,7 @@
         }
 
         window.addEventListener("load", () => {
+            lucide.createIcons();
             loadFromPermalink();
         });
     </script>
@@ -4651,7 +4699,7 @@
                     <div class="map-modal-title" data-i18n="map.title">Sélectionner une municipalité</div>
                     <div class="map-modal-subtitle" data-i18n="map.subtitle">Cliquez sur une municipalité pour charger ses données</div>
                 </div>
-                <button class="map-modal-close" onclick="closeMapPicker()">✕</button>
+                <button class="map-modal-close" onclick="closeMapPicker()"><i data-lucide="x"></i></button>
             </div>
             <div class="map-modal-body">
                 <iframe src="map/index.html" id="map-iframe"></iframe>
@@ -4667,10 +4715,10 @@
         <div class="map-modal" style="max-width: 600px;">
             <div class="map-modal-header">
                 <div>
-                    <div class="map-modal-title">📈 <span data-i18n="calibration.title">Assistant de calibrage</span></div>
+                    <div class="map-modal-title"><i data-lucide="sliders-horizontal" class="lucide-md"></i> <span data-i18n="calibration.title">Assistant de calibrage</span></div>
                     <div class="map-modal-subtitle" data-i18n="calibration.subtitle">Importer des données de consommation pour calibrer les paramètres</div>
                 </div>
-                <button class="map-modal-close" onclick="closeCalibrationModal()">✕</button>
+                <button class="map-modal-close" onclick="closeCalibrationModal()"><i data-lucide="x"></i></button>
             </div>
             <div class="map-modal-body" style="padding: 20px; height: auto; max-height: 70vh; overflow-y: auto;">
                 <!-- Zone d'import -->
@@ -4717,7 +4765,7 @@
                     </div>
 
                     <div style="margin-top: 15px; display: flex; gap: 10px;">
-                        <button class="btn" style="flex: 1;" onclick="applyCalibration()">✓ <span data-i18n="calibration.apply">Appliquer les valeurs</span></button>
+                        <button class="btn" style="flex: 1;" onclick="applyCalibration()"><i data-lucide="check" class="lucide-sm"></i> <span data-i18n="calibration.apply">Appliquer les valeurs</span></button>
                         <button class="btn" style="flex: 1; background: #f1f5f9; color: #475569;" onclick="resetCalibration()" data-i18n="calibration.reset">Réinitialiser</button>
                     </div>
                 </div>
