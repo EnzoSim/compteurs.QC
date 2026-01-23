@@ -2313,15 +2313,14 @@
 
             <!-- Scenario Badge -->
             <div class="scenario-badge" id="scenario-badge">
-                <div class="scenario-icon"><i data-lucide="layers" class="lucide-lg"></i></div>
+                <div class="scenario-icon"><i data-lucide="settings-2" class="lucide-lg"></i></div>
                 <div class="scenario-info">
-                    <div class="scenario-label">Scénario actuel</div>
-                    <div class="scenario-name" id="scenario-name">Réaliste + Réaliste</div>
+                    <div class="scenario-label">Mode d'analyse</div>
+                    <div class="scenario-name" id="scenario-name">Économique</div>
                 </div>
                 <div class="scenario-details" id="scenario-details">
                     <span class="tag tag-persistance">Réaliste</span>
-                    <span class="tag tag-fuites">Réaliste</span>
-                    <span class="tag tag-mode">Économique</span>
+                    <span class="tag tag-fuites">Québec</span>
                 </div>
             </div>
 
@@ -4066,24 +4065,23 @@
                 'optimiste': 'Optimiste',
                 'realiste': 'Réaliste',
                 'pessimiste': 'Pessimiste',
-                'ultra': 'Ultra-pessimiste'
+                'ultra': 'Pessimiste+'
             };
 
             const fuitesNoms = {
-                'standard': 'Standard (20%)',
-                'quebec': 'Québec (35%)',
-                'deux_stocks_sans_tarif': 'QC différencié (30%)',
+                'standard': 'Standard',
+                'quebec': 'Québec',
+                'deux_stocks_sans_tarif': 'Québec',
                 'custom': 'Personnalisé'
             };
 
             const pNom = persistanceNoms[persistance] || persistance;
             const fNom = fuitesNoms[fuites] || fuites;
 
-            document.getElementById('scenario-name').textContent = `${pNom} + ${fNom}`;
+            document.getElementById('scenario-name').textContent = `${mode}`;
             document.getElementById('scenario-details').innerHTML = `
                 <span class="tag tag-persistance">${pNom}</span>
                 <span class="tag tag-fuites">${fNom}</span>
-                <span class="tag tag-mode">${mode}</span>
             `;
         }
 
