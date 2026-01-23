@@ -2269,7 +2269,8 @@
                 </div>
             </div>
 
-            <div class="actions-bar">
+            <!-- Actions bar hidden (too cluttered) -->
+            <div class="actions-bar" style="display: none;">
                 <button class="btn" onclick="exportJSON()" data-i18n="action.export_json">Exporter JSON</button>
                 <button class="btn" onclick="exportCSV()" data-i18n="action.export_csv">Exporter CSV</button>
                 <button class="btn" onclick="exportPDF()" data-i18n="action.export_pdf">Exporter PDF</button>
@@ -2278,7 +2279,7 @@
                 <button class="btn" onclick="toggleComparator()" style="background: #7c3aed;" data-i18n="action.comparator">Comparateur</button>
             </div>
 
-            <!-- Comparateur de scénarios -->
+            <!-- Comparateur de scénarios (hidden) -->
             <div id="comparator-panel" style="display: none; margin-top: 1rem;">
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
