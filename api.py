@@ -957,6 +957,7 @@ async def sensitivity(req: CalculRequest):
 async def get_presets():
     """Retourner les presets des villes."""
 
+    # Données BIL 2023 (MAMH)
     return {
         "longueuil": PresetResponse(
             nom="Longueuil",
@@ -966,21 +967,21 @@ async def get_presets():
         ),
         "montreal": PresetResponse(
             nom="Montréal",
-            nb_menages=750000,
-            taille_menage=2.1,
-            lpcd=332,
+            nb_menages=907801,
+            taille_menage=2.07,
+            lpcd=312,
         ),
         "quebec": PresetResponse(
             nom="Québec (ville)",
-            nb_menages=180000,
-            taille_menage=2.15,
-            lpcd=280,
+            nb_menages=301512,
+            taille_menage=1.97,
+            lpcd=206,
         ),
-        "winnipeg": PresetResponse(
-            nom="Winnipeg",
-            nb_menages=221000,
-            taille_menage=2.3,
-            lpcd=250,
+        "laval": PresetResponse(
+            nom="Laval",
+            nb_menages=185829,
+            taille_menage=2.39,
+            lpcd=235,
         ),
     }
 
