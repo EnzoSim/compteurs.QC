@@ -135,7 +135,7 @@ class MAMHCollector:
             'qte_eau_pers': 'lpcd_total',
 
             # Nombre de branchements/résidences desservies
-            'nb_resid_desservi': 'nb_branchements',
+            'nb_resid_desservi': 'nb_logements',
 
             # Personnes par résidence
             'nb_pers_resid': 'pers_par_residence',
@@ -230,7 +230,7 @@ class MAMHCollector:
                     "lpcd_total": self._parse_float(row.get('lpcd_total')),
                     "consommation": self._parse_float(row.get('consommation')),
                     "population_desservie": self._parse_int(row.get('population_desservie')),
-                    "nb_branchements": self._parse_int(row.get('nb_branchements')),
+                    "nb_logements": self._parse_int(row.get('nb_logements')),
                     "pers_par_residence": self._parse_float(row.get('pers_par_residence')),
                     "nb_reseaux": self._parse_int(row.get('nb_reseaux')),
                     "data_year": year,

@@ -150,7 +150,7 @@ class DataPipeline:
                 "lpcd_total": props.get("lpcd_total"),
                 "consommation": props.get("consommation"),
                 "population_desservie": props.get("population_desservie"),
-                "nb_branchements": props.get("nb_branchements"),
+                "nb_logements": props.get("nb_logements"),
                 "pers_par_residence": props.get("pers_par_residence"),
                 "nb_reseaux": props.get("nb_reseaux"),
                 "indice_fuites": props.get("indice_fuites"),

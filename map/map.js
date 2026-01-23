@@ -242,7 +242,7 @@ class QuebecMap {
                 props.lpcd_total = props.lpcd_total ?? statsMatch.lpcd_total;
                 props.consommation = props.consommation ?? statsMatch.consommation;
                 props.population_desservie = props.population_desservie ?? statsMatch.population_desservie;
-                props.nb_branchements = props.nb_branchements ?? statsMatch.nb_branchements;
+                props.nb_logements = props.nb_logements ?? statsMatch.nb_logements;
                 props.pers_par_residence = props.pers_par_residence ?? statsMatch.pers_par_residence;
                 props.nb_reseaux = props.nb_reseaux ?? statsMatch.nb_reseaux;
                 props.indice_fuites = props.indice_fuites ?? statsMatch.indice_fuites;
@@ -258,7 +258,7 @@ class QuebecMap {
                     props.lpcd_total = props.lpcd_total ?? mamhMatch.lpcd_total;
                     props.consommation = props.consommation ?? mamhMatch.consommation;
                     props.population_desservie = props.population_desservie ?? mamhMatch.population_desservie;
-                    props.nb_branchements = props.nb_branchements ?? mamhMatch.nb_branchements;
+                    props.nb_logements = props.nb_logements ?? mamhMatch.nb_logements;
                     props.pers_par_residence = props.pers_par_residence ?? mamhMatch.pers_par_residence;
                     props.nb_reseaux = props.nb_reseaux ?? mamhMatch.nb_reseaux;
                     props.indice_fuites = props.indice_fuites ?? mamhMatch.indice_fuites;
@@ -671,8 +671,8 @@ class QuebecMap {
                     </div>
                     <div class="stat-card">
                         <div class="stat-card-label">Logements</div>
-                        <div class="stat-card-value ${props.nb_branchements ? '' : 'na'}">
-                            ${props.nb_branchements ? this.formatNumber(props.nb_branchements) : 'N/D'}
+                        <div class="stat-card-value ${props.nb_logements ? '' : 'na'}">
+                            ${props.nb_logements ? this.formatNumber(props.nb_logements) : 'N/D'}
                         </div>
                     </div>
                     <div class="stat-card">

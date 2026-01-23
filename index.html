@@ -2555,7 +2555,7 @@
         async function loadFromMap(data) {
             const name = data.name || 'Municipalité';
             // Support both old (census) and new (BIL) field names
-            const households = data.nb_branchements || data.households;
+            const households = data.nb_logements || data.households;
             const householdSize = data.pers_par_residence || data.household_size;
             const lpcd = data.lpcd;
             const population = data.population_desservie || data.population;

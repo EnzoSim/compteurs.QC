@@ -239,7 +239,7 @@ class DataMerger:
                 props["lpcd_total"] = water_data.get("lpcd_total")
                 props["consommation"] = water_data.get("consommation")
                 props["population_desservie"] = water_data.get("population_desservie")
-                props["nb_branchements"] = water_data.get("nb_branchements")
+                props["nb_logements"] = water_data.get("nb_logements")
                 props["pers_par_residence"] = water_data.get("pers_par_residence")
                 props["nb_reseaux"] = water_data.get("nb_reseaux")
                 props["indice_fuites"] = water_data.get("indice_fuites")
@@ -255,7 +255,7 @@ class DataMerger:
                 props["lpcd_total"] = None
                 props["consommation"] = None
                 props["population_desservie"] = None
-                props["nb_branchements"] = None
+                props["nb_logements"] = None
                 props["pers_par_residence"] = None
                 props["nb_reseaux"] = None
                 props["indice_fuites"] = None
@@ -424,7 +424,7 @@ class DataMerger:
                 "lpcd_total": props.get("lpcd_total"),
                 "consommation": props.get("consommation"),
                 "population_desservie": props.get("population_desservie"),
-                "nb_branchements": props.get("nb_branchements"),
+                "nb_logements": props.get("nb_logements"),
                 "pers_par_residence": props.get("pers_par_residence"),
                 "nb_reseaux": props.get("nb_reseaux"),
                 "stat_data_year": props.get("stat_data_year"),
