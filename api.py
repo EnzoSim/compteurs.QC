@@ -542,8 +542,8 @@ def get_persistance(
             annees_fadeout=10,
             nom="Pessimiste",
         )
-    elif nom in ("ultra", "ultra_pessimiste"):
-        # Accepte les deux noms pour compatibilité UI/Core
+    elif nom == "ultra":
+        # ID standardisé: uniquement "ultra"
         return ParametresPersistance(
             mode=ModePersistance.CONSTANT,
             alpha_initial=0.0,
@@ -566,22 +566,19 @@ def get_fuites(nom: str, req: CalculRequest = None) -> ParametresFuites:
         menage_sans_tarif, quebec_sans_tarif, deux_stocks_sans_tarif
     - Personnalisé: custom (utilise les paramètres avancés)
     """
-    # Mapping des scénarios vers les presets
+    # Mapping des scénarios vers les presets (IDs standardisés)
     scenarios_map = {
-        # Avec tarification
+        # Avec signal-prix (taux réparation élevé ~85%)
         "standard": FUITES_SANS_COUT,
-        "sans_cout": FUITES_SANS_COUT,
         "quebec": FUITES_CONTEXTE_QUEBEC,
         "deux_stocks": FUITES_QUEBEC_DEUX_STOCKS,
-        "quebec_deux_stocks": FUITES_QUEBEC_DEUX_STOCKS,
         "menage": FUITES_MENAGE_SEUL,
         "subvention_50": FUITES_SUBVENTION_50,
         "ville": FUITES_VILLE_SEULE,
-        # Sans tarification (taux réparation réduit, persistance augmentée)
+        # Sans signal-prix (taux réparation réduit ~55%)
         "menage_sans_tarif": FUITES_MENAGE_SANS_TARIF,
         "quebec_sans_tarif": FUITES_QUEBEC_SANS_TARIF,
         "deux_stocks_sans_tarif": FUITES_QUEBEC_DEUX_STOCKS_SANS_TARIF,
-        "quebec_deux_stocks_sans_tarif": FUITES_QUEBEC_DEUX_STOCKS_SANS_TARIF,
     }
 
     if nom in scenarios_map:

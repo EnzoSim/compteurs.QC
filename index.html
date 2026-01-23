@@ -1497,7 +1497,7 @@
 
                 <div class="input-group">
                     <label><span data-i18n="param.households">Nombre de ménages</span> <span class="value" id="val-menages">116 258</span></label>
-                    <input type="range" id="nb-menages" min="10000" max="1000000" step="1000" value="116258" oninput="onParamChange()">
+                    <input type="range" id="nb-menages" min="1000" max="1000000" step="1000" value="116258" oninput="onParamChange()">
                 </div>
 
                 <div class="input-group">
@@ -1506,8 +1506,9 @@
                 </div>
 
                 <div class="input-group">
-                    <label><span data-i18n="param.lpcd">Consommation (L/pers/jour)</span> <span class="value" id="val-lpcd">236</span></label>
-                    <input type="range" id="lpcd" min="150" max="450" step="1" value="236" oninput="onParamChange()">
+                    <label title="LPCD = Litres Per Capita per Day. Consommation résidentielle moyenne par personne."><span data-i18n="param.lpcd">Consommation (L/pers/jour)</span> <span class="value" id="val-lpcd">236</span></label>
+                    <input type="range" id="lpcd" min="100" max="500" step="1" value="236" oninput="onParamChange()">
+                    <small style="color: #666; font-size: 10px;">LPCD résidentiel. Québec: 150-350 typ. • Objectif MAMH: ≤220</small>
                 </div>
 
                 <!-- Calibrage automatique -->
@@ -1520,14 +1521,26 @@
                     </small>
                 </div>
 
+                <!-- Baseline calculée -->
+                <div class="info-badge" id="baseline-display" style="margin-top: 1rem; background: #f0f9ff; border: 1px solid #bae6fd; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                    <i data-lucide="calculator" class="lucide-sm" style="color: #0284c7;"></i>
+                    <strong style="color: #0369a1;">Baseline:</strong>
+                    <span><span id="baseline-pop">—</span> hab.</span>
+                    <span>•</span>
+                    <span><span id="baseline-m3-an">—</span> m³/an</span>
+                    <span>•</span>
+                    <span><span id="baseline-m3-menage">—</span> m³/ménage/an</span>
+                </div>
+
                 <div class="input-group">
                     <label><span data-i18n="param.horizon">Horizon d'analyse (années)</span> <span class="value" id="val-horizon">20</span></label>
                     <input type="range" id="horizon" min="10" max="30" step="1" value="20" oninput="onParamChange()">
                 </div>
 
                 <div class="input-group">
-                    <label><span data-i18n="param.discount_rate">Taux d'actualisation (%)</span> <span class="value" id="val-taux">3.0</span></label>
+                    <label title="Taux pour ramener les flux futurs en valeur présente. Plus élevé = moins de poids aux bénéfices futurs."><span data-i18n="param.discount_rate">Taux d'actualisation (%)</span> <span class="value" id="val-taux">3.0</span></label>
                     <input type="range" id="taux-actualisation" min="1" max="8" step="0.1" value="3" oninput="onParamChange()">
+                    <small style="color: #666; font-size: 10px;">Secteur public: 3-4% • Privé: 6-8%</small>
                 </div>
             </div>
 
@@ -1604,13 +1617,14 @@
                 </div>
 
                 <div class="input-group">
-                    <label data-i18n="param.persistence">Persistance dans le temps</label>
-                    <select id="persistance" onchange="onParamChange()">
-                        <option value="optimiste" data-i18n="persistence.optimistic">Optimiste — Effet constant (8%)</option>
-                        <option value="realiste" selected data-i18n="persistence.realistic">Réaliste — Plateau à 2.5%</option>
-                        <option value="pessimiste" data-i18n="persistence.pessimistic">Pessimiste — Fadeout sur 10 ans</option>
-                        <option value="ultra" data-i18n="persistence.ultra">Ultra-pessimiste — Aucun effet</option>
+                    <label data-i18n="param.persistence" title="Durabilité des économies comportementales dans le temps">Persistance dans le temps</label>
+                    <select id="persistance" onchange="onParamChange()" title="Comment les économies comportementales évoluent après l'installation">
+                        <option value="optimiste" title="L'effet comportemental reste constant à 8% sur tout l'horizon">Optimiste — Effet constant (8%)</option>
+                        <option value="realiste" selected title="Décroissance exponentielle puis plateau stable à 2.5%">Réaliste — Plateau à 2.5%</option>
+                        <option value="pessimiste" title="Effet qui disparaît progressivement sur 10 ans">Pessimiste — Fadeout sur 10 ans</option>
+                        <option value="ultra" title="Aucun effet comportemental (test de sensibilité)">Ultra-pessimiste — Aucun effet</option>
                     </select>
+                    <small style="color: #666; font-size: 10px;">Durabilité de l'effet "feedback" sur la consommation</small>
                 </div>
             </div>
 
@@ -1626,12 +1640,15 @@
 
                 <div class="input-group">
                     <label data-i18n="param.leak_scenario">Scénario de prévalence</label>
-                    <select id="scenario-fuites" onchange="onScenarioFuitesChange()">
-                        <option value="standard">Standard — 20% des ménages</option>
-                        <option value="quebec">Québec — 35% des ménages</option>
-                        <option value="deux_stocks_sans_tarif" selected>Québec différencié — 24% petites + 6% grosses</option>
-                        <option value="custom">Personnalisé</option>
+                    <select id="scenario-fuites" onchange="onScenarioFuitesChange()" title="Les scénarios 'sans signal-prix' supposent un taux de réparation réduit (55% vs 85%) en l'absence d'incitation tarifaire">
+                        <option value="standard" title="Avec signal-prix: taux de réparation élevé (85%)">Standard — 20% des ménages</option>
+                        <option value="quebec" title="Avec signal-prix: taux de réparation élevé (85%)">Québec — 35% des ménages</option>
+                        <option value="deux_stocks_sans_tarif" selected title="Sans signal-prix: taux de réparation réduit (55%)">Québec différencié — 24% petites + 6% grosses</option>
+                        <option value="custom" title="Définir vos propres paramètres de fuites">Personnalisé</option>
                     </select>
+                    <small style="color: #666; font-size: 10px; margin-top: 4px; display: block;">
+                        <strong>Signal-prix:</strong> incitation tarifaire à réparer. Sans signal-prix = taux de réparation réduit (55% vs 85%)
+                    </small>
                 </div>
 
                 <!-- Paramètres avancés fuites (collapsible) -->
@@ -1667,7 +1684,12 @@
                         </div>
                         <div class="info-badge" style="margin: 0.75rem 0; background: linear-gradient(135deg, #d1fae5, #a7f3d0); border: 1px solid #6ee7b7;">
                             <i data-lucide="pie-chart" class="lucide-md"></i>
-                            <span><strong>Total :</strong> <span id="val-prevalence-total-calc">30</span>% des ménages ont une fuite</span>
+                            <div style="display: flex; flex-direction: column; gap: 4px;">
+                                <span><strong>Prévalence totale:</strong> <span id="val-prevalence-total-calc">30</span>% des ménages</span>
+                                <span style="font-size: 11px; color: #065f46;">
+                                    = <span id="val-prev-petites-recap">24</span>% petites + <span id="val-prev-grosses-recap">6</span>% grosses
+                                </span>
+                            </div>
                         </div>
                         <div class="param-section">
                             <div class="section-title">Détection & Réparation</div>
@@ -2892,13 +2914,33 @@
         }
 
         function updateHypotheses(params, result) {
+            // Source des données
+            const source = window.__municipality_source;
+            let sourceLabel = 'Manuel';
+            let sourceColor = '#6b7280';
+            if (source?.type === 'preset') {
+                sourceLabel = `Preset: ${source.nom || source.id}`;
+                sourceColor = '#7c3aed';
+            } else if (source?.type === 'map') {
+                sourceLabel = `Carte: ${source.nom}${source.data_year ? ` (BIL ${source.data_year})` : ''}`;
+                sourceColor = '#0891b2';
+            }
+
+            // Calcul baseline
+            const pop = params.nb_menages * params.taille_menage;
+            const m3An = pop * params.lpcd * 365.25 / 1000;
+
             // Projet
             document.getElementById('hyp-projet').innerHTML = `
                 <div style="color: #6b7280; line-height: 1.6;">
+                    <div style="margin-bottom: 6px; padding: 3px 8px; background: ${sourceColor}15; border-radius: 4px; display: inline-block;">
+                        <span style="color: ${sourceColor}; font-size: 11px; font-weight: 600;">📍 ${sourceLabel}</span>
+                    </div><br>
                     • Ménages: <b>${params.nb_menages.toLocaleString('fr-CA')}</b><br>
                     • Taille ménage: <b>${params.taille_menage} pers.</b><br>
-                    • Horizon: <b>${params.horizon} ans</b><br>
-                    • Taux actualisation: <b>${params.taux_actualisation}%</b>
+                    • LPCD: <b>${params.lpcd} L/j</b><br>
+                    • <span style="color: #0369a1;">Baseline: <b>${Math.round(pop).toLocaleString('fr-CA')}</b> hab. → <b>${(m3An/1e6).toFixed(2)} Mm³/an</b></span><br>
+                    • Horizon: <b>${params.horizon} ans</b> • Taux: <b>${params.taux_actualisation}%</b>
                 </div>
             `;
 
@@ -2955,13 +2997,17 @@
             };
             const fuitesParams = fuitesDefaults[scenarioFuites] || { taux_rep: '?', taux_det: '?', prev: '?' };
 
+            // Calcul explicite des fuites
+            const prevPetites = params.scenario_fuites === 'custom' ? params.prevalence_petites_pct : (scenarioFuites === 'deux_stocks_sans_tarif' ? 24 : (scenarioFuites === 'quebec' ? 35 : 20));
+            const prevGrosses = params.scenario_fuites === 'custom' ? params.prevalence_grosses_pct : (scenarioFuites === 'deux_stocks_sans_tarif' ? 6 : 0);
+            const prevTotal = prevPetites + prevGrosses;
+
             document.getElementById('hyp-fuites').innerHTML = `
                 <div style="color: #6b7280; line-height: 1.6;">
                     • Scénario: <b>${fuitesLabels[scenarioFuites] || scenarioFuites}</b><br>
-                    • Prévalence: <b>${params.scenario_fuites === 'custom' ? (params.prevalence_petites_pct + params.prevalence_grosses_pct) + '%' : fuitesParams.prev}</b><br>
-                    • Taux détection: <b>${params.scenario_fuites === 'custom' ? params.taux_detection_pct : fuitesParams.taux_det}%</b><br>
-                    • Taux réparation: <b>${params.scenario_fuites === 'custom' ? params.taux_reparation_pct : fuitesParams.taux_rep}%</b><br>
-                    • Économie: <b>${result.economie_fuite_menage.toFixed(1)} m³/an</b>
+                    • Prévalence: <b>${prevTotal}%</b> <span style="font-size: 10px;">(${prevPetites}% pet. + ${prevGrosses}% gros.)</span><br>
+                    • Détection: <b>${params.scenario_fuites === 'custom' ? params.taux_detection_pct : fuitesParams.taux_det}%</b> • Réparation: <b>${params.scenario_fuites === 'custom' ? params.taux_reparation_pct : fuitesParams.taux_rep}%</b><br>
+                    • <span style="color: #059669;">Économie/ménage: <b>${result.economie_fuite_menage.toFixed(1)} m³/an</b></span>
                 </div>
             `;
 
@@ -3098,8 +3144,10 @@
             document.getElementById('val-prevalence-petites').textContent = prevPetites + ' %';
             document.getElementById('val-debit-petites').textContent = document.getElementById('debit-petites').value + ' m³/an';
             document.getElementById('val-prevalence-grosses').textContent = prevGrosses + ' %';
-            // Calculer et afficher le total
+            // Calculer et afficher le total avec décomposition
             document.getElementById('val-prevalence-total-calc').textContent = (prevPetites + prevGrosses).toFixed(0);
+            document.getElementById('val-prev-petites-recap').textContent = prevPetites.toFixed(0);
+            document.getElementById('val-prev-grosses-recap').textContent = prevGrosses.toFixed(0);
             document.getElementById('val-debit-grosses').textContent = document.getElementById('debit-grosses').value + ' m³/an';
             document.getElementById('val-taux-detection').textContent = document.getElementById('taux-detection').value + ' %';
             document.getElementById('val-taux-reparation').textContent = document.getElementById('taux-reparation').value + ' %';
@@ -3145,6 +3193,23 @@
                 document.getElementById('val-opex-telecom').textContent = telecom.toFixed(2) + ' $/u/an';
                 document.getElementById('val-opex-total').textContent = (cyber + licences + stockage + telecom).toFixed(2) + ' $/u/an';
             }
+
+            // Mise à jour de la baseline calculée
+            updateBaseline();
+        }
+
+        function updateBaseline() {
+            const nbMenages = parseInt(document.getElementById('nb-menages').value) || 0;
+            const taille = parseFloat(document.getElementById('taille-menage').value) || 0;
+            const lpcd = parseInt(document.getElementById('lpcd').value) || 0;
+
+            const pop = nbMenages * taille;
+            const m3An = pop * lpcd * 365.25 / 1000;
+            const m3Menage = nbMenages > 0 ? m3An / nbMenages : 0;
+
+            document.getElementById('baseline-pop').textContent = Math.round(pop).toLocaleString('fr-CA');
+            document.getElementById('baseline-m3-an').textContent = Math.round(m3An).toLocaleString('fr-CA');
+            document.getElementById('baseline-m3-menage').textContent = m3Menage.toFixed(1);
         }
 
         async function updateModel() {
@@ -3156,8 +3221,8 @@
                 updateHypotheses(params, result);
                 updateScenarioBadge();
 
-                // Calibration warnings disabled (too noisy)
-                document.getElementById('calibration-warnings').style.display = 'none';
+                // Note: calibration-warnings peut être affiché par loadFromMap (bornes)
+                // Ne pas masquer ici pour laisser les warnings visibles
 
                 const [sensitivity, meters, persistence] = await Promise.all([
                     apiCall('/api/sensitivity', params),
@@ -3393,27 +3458,38 @@
             }
         }
 
+        // Cache pour les presets API
+        let PRESETS_CACHE = null;
+
+        async function getPresets() {
+            if (PRESETS_CACHE) return PRESETS_CACHE;
+            PRESETS_CACHE = await apiCall('/api/presets', {});
+            return PRESETS_CACHE;
+        }
+
         async function loadPreset(ville) {
-            const presets = {
-                longueuil: { nb_menages: 116258, taille_menage: 2.18, lpcd: 236 },
-                montreal: { nb_menages: 750000, taille_menage: 2.1, lpcd: 332 },
-                quebec: { nb_menages: 180000, taille_menage: 2.15, lpcd: 280 },
-                winnipeg: { nb_menages: 221000, taille_menage: 2.3, lpcd: 250 },
-            };
+            try {
+                const presets = await getPresets();
+                const preset = presets[ville];
+                if (!preset) {
+                    console.error(`Preset introuvable: ${ville}`);
+                    return;
+                }
 
-            const preset = presets[ville];
-            if (!preset) return;
+                document.getElementById('nb-menages').value = preset.nb_menages;
+                document.getElementById('taille-menage').value = preset.taille_menage;
+                document.getElementById('lpcd').value = preset.lpcd;
 
-            document.getElementById('nb-menages').value = preset.nb_menages;
-            document.getElementById('taille-menage').value = preset.taille_menage;
-            document.getElementById('lpcd').value = preset.lpcd;
+                document.querySelectorAll('.preset-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.textContent.toLowerCase().includes(ville));
+                });
 
-            document.querySelectorAll('.preset-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.textContent.toLowerCase().includes(ville));
-            });
-
-            updateLabels();
-            await updateModel();
+                window.__municipality_source = { type: 'preset', id: ville, nom: preset.nom };
+                updateLabels();
+                await updateModel();
+            } catch (e) {
+                console.error('Erreur presets:', e);
+            }
         }
 
         function setModeEconomique(value) {
@@ -4445,13 +4521,8 @@
             if (params.reduction_comportement != null) document.getElementById('reduction-comportement').value = params.reduction_comportement;
             if (params.persistance) document.getElementById('persistance').value = params.persistance;
             if (params.scenario_fuites) {
-                const fuitesMap = {
-                    "sans_cout": "standard",
-                    "quebec_deux_stocks": "deux_stocks",
-                    "quebec_deux_stocks_sans_tarif": "deux_stocks_sans_tarif",
-                };
-                const fuitesValue = fuitesMap[params.scenario_fuites] || params.scenario_fuites;
-                document.getElementById('scenario-fuites').value = fuitesValue;
+                // IDs standardisés - pas de mapping nécessaire
+                document.getElementById('scenario-fuites').value = params.scenario_fuites;
             }
 
             if (params.scenario_adoption) {
@@ -4670,49 +4741,82 @@
             }
         });
 
+        // Helper pour définir une valeur avec warning si bornée
+        function setInputWithWarning(id, value, {min=null, max=null, label=id}={}) {
+            if (value == null || Number.isNaN(value)) return [];
+            let v = Number(value);
+            let warnings = [];
+
+            if (min != null && v < min) {
+                warnings.push(`${label}: ${v.toLocaleString('fr-CA')} → borné à ${min.toLocaleString('fr-CA')} (minimum)`);
+                v = min;
+            }
+            if (max != null && v > max) {
+                warnings.push(`${label}: ${v.toLocaleString('fr-CA')} → borné à ${max.toLocaleString('fr-CA')} (maximum)`);
+                v = max;
+            }
+            document.getElementById(id).value = v;
+            return warnings;
+        }
+
         async function loadFromMap(data) {
             const name = data.name || 'Municipalité';
-            // Support both old (census) and new (BIL) field names
-            const households = data.nb_logements || data.households;
-            const householdSize = data.pers_par_residence || data.household_size;
-            const lpcd = data.lpcd;
-            const population = data.population_desservie || data.population;
+            // BIL data: nb_logements = logements desservis par le réseau d'eau
+            // (pas le total municipal, uniquement les connexions résidentielles)
+            const nbLogements = data.nb_logements || data.households;
+            const persParResidence = data.pers_par_residence || data.household_size;
+            const lpcdValue = data.lpcd;
+            const popDesservie = data.population_desservie || data.population;
 
-            // Calculate households from population if not available
-            let nbMenages = households;
-            if (!nbMenages && population && householdSize) {
-                nbMenages = Math.round(population / householdSize);
-            } else if (!nbMenages && population) {
-                nbMenages = Math.round(population / 2.2); // Default household size
+            // Calculate households from served population if not available
+            let nbMenages = nbLogements;
+            if (!nbMenages && popDesservie && persParResidence) {
+                nbMenages = Math.round(popDesservie / persParResidence);
+            } else if (!nbMenages && popDesservie) {
+                nbMenages = Math.round(popDesservie / 2.2); // Default household size
             }
 
-            // Set values if available
-            if (nbMenages && nbMenages >= 10000) {
-                document.getElementById('nb-menages').value = Math.min(nbMenages, 1000000);
-            } else if (nbMenages) {
-                // For small municipalities, set minimum
-                document.getElementById('nb-menages').value = 10000;
+            // Set values with explicit warnings (bounds aligned with backend)
+            const warnings = [];
+            if (nbMenages) {
+                warnings.push(...setInputWithWarning('nb-menages', nbMenages,
+                    {min: 1000, max: 1000000, label: 'Logements desservis'}));
+            }
+            if (persParResidence) {
+                warnings.push(...setInputWithWarning('taille-menage', persParResidence,
+                    {min: 1.5, max: 4, label: 'Pers./logement'}));
+            }
+            if (lpcdValue) {
+                warnings.push(...setInputWithWarning('lpcd', lpcdValue,
+                    {min: 100, max: 500, label: 'LPCD'}));
             }
 
-            if (householdSize) {
-                document.getElementById('taille-menage').value = Math.min(Math.max(householdSize, 1.5), 4);
-            }
-
-            if (lpcd) {
-                document.getElementById('lpcd').value = Math.min(Math.max(lpcd, 150), 450);
+            // Afficher warnings si des valeurs ont été bornées
+            const wDiv = document.getElementById('calibration-warnings');
+            if (warnings.length > 0) {
+                wDiv.style.display = 'block';
+                wDiv.innerHTML = `<div class="recommendation neutral" style="background: #fef3c7; border: 1px solid #fcd34d; padding: 0.75rem; border-radius: 8px;">
+                    <strong style="color: #92400e;">⚠️ Valeurs ajustées:</strong><br>
+                    <span style="color: #78350f; font-size: 12px;">${warnings.join('<br>')}</span>
+                </div>`;
+            } else {
+                wDiv.style.display = 'none';
             }
 
             // Clear active presets
             document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
 
-            // Show selected municipality
+            // Show selected municipality with data source info
             const selectedEl = document.getElementById('selected-municipality');
             if (selectedEl) {
-                selectedEl.innerHTML = `<i data-lucide="map-pin" class="lucide-sm"></i> <strong>${name}</strong> sélectionnée${population ? ` (${Math.round(population).toLocaleString('fr-CA')} hab. desservis)` : ''}`;
+                const dataYear = data.lpcd_data_year || data.data_year || '';
+                const yearStr = dataYear ? ` • BIL ${dataYear}` : '';
+                selectedEl.innerHTML = `<i data-lucide="map-pin" class="lucide-sm"></i> <strong>${name}</strong>${popDesservie ? ` — ${Math.round(popDesservie).toLocaleString('fr-CA')} hab. desservis` : ''}${yearStr}`;
                 selectedEl.classList.add('active');
                 lucide.createIcons();
             }
 
+            window.__municipality_source = { type: 'map', nom: name, data_year: data.lpcd_data_year };
             updateLabels();
             await updateModel();
         }
