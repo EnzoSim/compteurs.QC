@@ -142,11 +142,11 @@ const TRANSLATIONS = {
         "leaks.include_costs": "Inclure coûts de réparation dans la VAN",
 
         // Adoption scenarios
-        "adoption.mandatory": "Obligatoire (100% dès l'année 1)",
-        "adoption.fast": "Rapide",
-        "adoption.progressive": "Progressif",
-        "adoption.slow": "Lent",
-        "adoption.new_households": "Nouveaux ménages",
+        "adoption.mandatory": "Obligatoire — 100% an 1",
+        "adoption.fast": "Rapide — 80% an 3, 95% an 5",
+        "adoption.progressive": "Progressif — 50% an 5, 85% an 10",
+        "adoption.slow": "Lent — 35% an 10, 70% an 20",
+        "adoption.new_households": "Nouveaux logements seulement",
         "adoption.by_sector": "Par secteur",
         "adoption.custom": "Personnalisé",
         "adoption.disabled": "Désactivé (test)",
@@ -522,11 +522,11 @@ const TRANSLATIONS = {
         "leaks.include_costs": "Include repair costs in NPV",
 
         // Adoption scenarios
-        "adoption.mandatory": "Mandatory (100% from year 1)",
-        "adoption.fast": "Fast",
-        "adoption.progressive": "Progressive",
-        "adoption.slow": "Slow",
-        "adoption.new_households": "New households",
+        "adoption.mandatory": "Mandatory — 100% year 1",
+        "adoption.fast": "Fast — 80% yr 3, 95% yr 5",
+        "adoption.progressive": "Progressive — 50% yr 5, 85% yr 10",
+        "adoption.slow": "Slow — 35% yr 10, 70% yr 20",
+        "adoption.new_households": "New connections only",
         "adoption.by_sector": "By sector",
         "adoption.custom": "Custom",
         "adoption.disabled": "Disabled (test)",
