@@ -2517,6 +2517,16 @@
         let modeEconomique = true;
         let debounceTimer = null;
         let charts = {};
+        const chartColors = {
+            primary: '#0f4c75',
+            primaryLight: '#3282b8',
+            secondary: '#00b4d8',
+            success: '#06d6a0',
+            warning: '#ffd166',
+            danger: '#ef476f',
+            info: '#17a2b8',
+            grid: '#e2e8f0'
+        };
         let suppressParamChange = false;
         let currentAbortController = null;  // Pour annuler les requêtes en cours
         let permalinkApplied = false;
@@ -3454,15 +3464,7 @@
         }
 
         function initCharts() {
-            const chartColors = {
-                primary: '#0f4c75',
-                primaryLight: '#3282b8',
-                secondary: '#00b4d8',
-                success: '#06d6a0',
-                warning: '#ffd166',
-                danger: '#ef476f',
-                grid: '#e2e8f0'
-            };
+            // chartColors is defined globally above
 
             const defaultOptions = {
                 responsive: true,
