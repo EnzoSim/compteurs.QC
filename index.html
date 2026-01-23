@@ -1778,6 +1778,11 @@
                     </select>
                 </div>
 
+                <div id="adoption-slider-container" class="input-group" style="display:none;">
+                    <label><span data-i18n="adoption.pct_year5">% adoption à l'an 5</span> <span class="value" id="val-adoption-pct5">50%</span></label>
+                    <input type="range" id="adoption-pct5" min="10" max="100" step="5" value="50" oninput="onAdoptionPct5Change()">
+                </div>
+
                 <div id="advanced-adoption" style="display:none;">
                     <div class="input-group">
                         <label><span data-i18n="adoption.max">Adoption max (%)</span> <span class="value" id="val-adoption-max">95</span></label>
@@ -2868,7 +2873,62 @@
 
         function onScenarioAdoptionChange() {
             const scenario = document.getElementById('scenario-adoption').value;
-            document.getElementById('advanced-adoption').style.display = (scenario === "custom") ? "block" : "none";
+            const sliderContainer = document.getElementById('adoption-slider-container');
+            const advancedSection = document.getElementById('advanced-adoption');
+
+            // Show slider for non-obligatoire, non-none scenarios
+            const showSlider = !['obligatoire', 'none', 'nouveaux', 'par_secteur'].includes(scenario);
+            sliderContainer.style.display = showSlider ? 'block' : 'none';
+
+            // Show advanced only for custom
+            advancedSection.style.display = (scenario === "custom") ? "block" : "none";
+
+            // Update slider value based on preset
+            if (scenario === 'rapide') {
+                document.getElementById('adoption-pct5').value = 95;
+                document.getElementById('val-adoption-pct5').textContent = '95%';
+            } else if (scenario === 'progressive') {
+                document.getElementById('adoption-pct5').value = 50;
+                document.getElementById('val-adoption-pct5').textContent = '50%';
+            } else if (scenario === 'lent') {
+                document.getElementById('adoption-pct5').value = 25;
+                document.getElementById('val-adoption-pct5').textContent = '25%';
+            } else if (scenario === 'custom') {
+                // Keep current slider value
+            }
+
+            onParamChange();
+        }
+
+        function onAdoptionPct5Change() {
+            const pct5 = parseFloat(document.getElementById('adoption-pct5').value);
+            document.getElementById('val-adoption-pct5').textContent = pct5 + '%';
+
+            // Switch to custom mode when user adjusts slider
+            const scenarioSelect = document.getElementById('scenario-adoption');
+            if (scenarioSelect.value !== 'custom') {
+                scenarioSelect.value = 'custom';
+                document.getElementById('advanced-adoption').style.display = 'block';
+            }
+
+            // Calculate k and t0 to achieve pct5 at year 5
+            // Using logistic: A(t) = Amax / (1 + exp(-k * (t - t0)))
+            // With fixed k=1.0 and Amax=95%, solve for t0
+            const Amax = 95;
+            const k = 1.0;
+            const target = Math.min(pct5, Amax - 1); // Ensure target < Amax
+
+            // t0 = 5 + ln(Amax/target - 1) / k
+            const t0 = 5 + Math.log(Amax / target - 1) / k;
+
+            // Update the advanced sliders
+            document.getElementById('adoption-max').value = Amax;
+            document.getElementById('val-adoption-max').textContent = Amax;
+            document.getElementById('adoption-k').value = k;
+            document.getElementById('val-adoption-k').textContent = k.toFixed(2);
+            document.getElementById('adoption-t0').value = Math.max(1, Math.min(20, Math.round(t0)));
+            document.getElementById('val-adoption-t0').textContent = Math.round(t0);
+
             onParamChange();
         }
 
