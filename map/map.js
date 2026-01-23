@@ -7,7 +7,7 @@ class QuebecMap {
     constructor(containerId, options = {}) {
         this.containerId = containerId;
         this.options = {
-            center: [47.5, -73.0],
+            center: [46.8, -73.0],
             zoom: 6,
             minZoom: 5,
             maxZoom: 13,
