@@ -1001,44 +1001,6 @@
             display: block;
         }
 
-        /* Signal-prix indicator box */
-        .signal-prix-box {
-            margin-top: 0.5rem;
-            padding: 0.75rem;
-            background: linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%);
-            border: 1px solid #fcd34d;
-            border-radius: var(--radius-sm);
-            font-size: 0.8rem;
-        }
-
-        .signal-prix-box.active {
-            background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%);
-            border-color: #6ee7b7;
-        }
-
-        .signal-prix-indicator {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-weight: 600;
-            color: #92400e;
-            margin-bottom: 0.5rem;
-        }
-
-        .signal-prix-box.active .signal-prix-indicator {
-            color: #047857;
-        }
-
-        .signal-prix-rate {
-            margin-left: auto;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-
-        .signal-prix-box .help-text {
-            margin-top: 0.5rem;
-            line-height: 1.5;
-        }
 
         /* Monte Carlo Stats Grid */
         .mc-stats-grid {
@@ -1625,78 +1587,57 @@
                 </div>
             </div>
 
-            <!-- Behavior & Leaks -->
+            <!-- Comportement -->
             <div class="card">
                 <div class="card-header">
-                    <div class="card-icon orange"><i data-lucide="settings"></i></div>
+                    <div class="card-icon orange"><i data-lucide="brain"></i></div>
                     <div>
-                        <div class="card-title" data-i18n="section.behavior">Comportement & Fuites</div>
-                        <div class="card-subtitle" data-i18n="section.behavior_sub">Paramètres d'économies</div>
+                        <div class="card-title" data-i18n="section.behavior">Comportement</div>
+                        <div class="card-subtitle" data-i18n="section.behavior_sub">Économies par changement d'habitudes</div>
                     </div>
                 </div>
 
                 <div class="input-group">
-                    <label><span data-i18n="param.behavior_reduction">Réduction comportementale</span> <span class="value" id="val-reduction">8.0 %</span></label>
+                    <label><span data-i18n="param.behavior_reduction">Réduction initiale</span> <span class="value" id="val-reduction">8.0 %</span></label>
                     <input type="range" id="reduction-comportement" min="0" max="15" step="0.5" value="8" oninput="onParamChange()">
+                    <small style="color: #666; font-size: 10px;">Réduction de consommation après installation du compteur</small>
                 </div>
 
                 <div class="input-group">
-                    <label data-i18n="param.persistence">Scénario de persistance</label>
+                    <label data-i18n="param.persistence">Persistance dans le temps</label>
                     <select id="persistance" onchange="onParamChange()">
-                        <option value="optimiste" data-i18n="persistence.optimistic">Optimiste — Effet constant (α = 8%)</option>
+                        <option value="optimiste" data-i18n="persistence.optimistic">Optimiste — Effet constant (8%)</option>
                         <option value="realiste" selected data-i18n="persistence.realistic">Réaliste — Plateau à 2.5%</option>
                         <option value="pessimiste" data-i18n="persistence.pessimistic">Pessimiste — Fadeout sur 10 ans</option>
                         <option value="ultra" data-i18n="persistence.ultra">Ultra-pessimiste — Aucun effet</option>
                     </select>
                 </div>
+            </div>
+
+            <!-- Fuites -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon blue"><i data-lucide="droplets"></i></div>
+                    <div>
+                        <div class="card-title">Détection des fuites</div>
+                        <div class="card-subtitle">Économies par réparation des fuites détectées</div>
+                    </div>
+                </div>
 
                 <div class="input-group">
-                    <label data-i18n="param.leak_scenario">Scénario de fuites</label>
+                    <label data-i18n="param.leak_scenario">Scénario de prévalence</label>
                     <select id="scenario-fuites" onchange="onScenarioFuitesChange()">
-                        <optgroup label="Avec signal-prix (réparation plus probable)" data-i18n="leaks.group_with_price">
-                            <option value="standard" data-i18n="leaks.standard">Standard (20%)</option>
-                            <option value="quebec" data-i18n="leaks.quebec">Québec (35%)</option>
-                            <option value="deux_stocks" data-i18n="leaks.two_stocks">Québec différencié (2 stocks)</option>
-                            <option value="menage" data-i18n="leaks.household">Ménage (40%)</option>
-                            <option value="subvention_50" data-i18n="leaks.subsidy_50">Subvention 50%</option>
-                            <option value="ville" data-i18n="leaks.city">Ville (meilleure détection)</option>
-                        </optgroup>
-
-                        <optgroup label="Sans signal-prix (sans tarification volumétrique)" data-i18n="leaks.group_without_price">
-                            <option value="menage_sans_tarif" data-i18n="leaks.household_no_tariff">Ménage (sans tarif)</option>
-                            <option value="quebec_sans_tarif" data-i18n="leaks.quebec_no_tariff">Québec (sans tarif)</option>
-                            <option value="deux_stocks_sans_tarif" selected data-i18n="leaks.two_stocks_no_tariff">QC différencié (sans tarif)</option>
-                        </optgroup>
-
-                        <optgroup label="Avancé" data-i18n="leaks.group_advanced">
-                            <option value="custom" data-i18n="leaks.custom">Personnalisé</option>
-                        </optgroup>
+                        <option value="standard">Standard — 20% des ménages</option>
+                        <option value="quebec">Québec — 35% des ménages</option>
+                        <option value="deux_stocks_sans_tarif" selected>Québec différencié — 24% petites + 6% grosses</option>
+                        <option value="custom">Personnalisé</option>
                     </select>
-
-                    <div class="input-group" style="margin-top:0.75rem;">
-                        <label style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
-                            <span data-i18n="param.pricing">Signal-prix actif</span>
-                            <input type="checkbox" id="tarification" onchange="onTarificationToggle()">
-                        </label>
-                        <div class="signal-prix-box" id="signal-prix-box">
-                            <div class="signal-prix-indicator">
-                                <i data-lucide="info" class="lucide-sm"></i>
-                                <span id="signal-prix-status">Sans signal-prix</span>
-                                <span class="signal-prix-rate" id="signal-prix-rate">→ Taux réparation: <b>55%</b></span>
-                            </div>
-                            <small class="help-text">
-                                <b>Signal-prix</b> = tarification au m³ (le ménage paie selon sa consommation).<br>
-                                <span style="color:#059669;">● Avec:</span> facture ↑ si fuite → forte motivation à réparer (<b>85%</b>)<br>
-                                <span style="color:#dc2626;">● Sans (Québec):</span> eau incluse dans taxes → motivation réduite (<b>55%</b>)
-                            </small>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- Paramètres avancés fuites (collapsible) -->
                 <div class="advanced-params" id="advanced-fuites" style="display: none;">
                     <div class="advanced-header" onclick="toggleAdvanced()">
-                        <span>Paramètres avancés des fuites</span>
+                        <span>Paramètres avancés</span>
                         <span class="chevron" id="chevron-fuites"><i data-lucide="chevron-down"></i></span>
                     </div>
                     <div class="advanced-content" id="content-fuites">
@@ -1726,7 +1667,7 @@
                         </div>
                         <div class="info-badge" style="margin: 0.75rem 0; background: linear-gradient(135deg, #d1fae5, #a7f3d0); border: 1px solid #6ee7b7;">
                             <i data-lucide="pie-chart" class="lucide-md"></i>
-                            <span><strong>Total :</strong> <span id="val-prevalence-total-calc">30</span>% des ménages ont une fuite (petites + grosses)</span>
+                            <span><strong>Total :</strong> <span id="val-prevalence-total-calc">30</span>% des ménages ont une fuite</span>
                         </div>
                         <div class="param-section">
                             <div class="section-title">Détection & Réparation</div>
@@ -1735,9 +1676,9 @@
                                 <input type="range" id="taux-detection" min="50" max="100" step="1" value="90" oninput="onParamChange()">
                             </div>
                             <div class="input-group">
-                                <label>Taux de réparation (base) <span class="value" id="val-taux-reparation">55 %</span></label>
+                                <label>Taux de réparation <span class="value" id="val-taux-reparation">55 %</span></label>
                                 <input type="range" id="taux-reparation" min="20" max="100" step="1" value="55" oninput="onParamChange()">
-                                <small style="color: #666; font-size: 10px;">Sans tarification volumétrique</small>
+                                <small style="color: #666; font-size: 10px;">% des fuites détectées qui sont réparées</small>
                             </div>
                             <div class="input-group">
                                 <label>Facteur détection grosses <span class="value" id="val-facteur-detection-sig">×1.2</span></label>
@@ -2887,14 +2828,6 @@
             return params;
         }
 
-        function isSansTarifScenario(key) {
-            return (key || "").endsWith("_sans_tarif");
-        }
-
-        function hasOption(selectEl, value) {
-            return Array.from(selectEl.options).some(o => o.value === value);
-        }
-
         function onScenarioFuitesChange() {
             const scenario = document.getElementById('scenario-fuites').value;
             const advancedSection = document.getElementById('advanced-fuites');
@@ -2907,47 +2840,8 @@
                 advancedSection.style.display = 'none';
             }
 
-            const hasSignalPrix = !isSansTarifScenario(scenario);
-            document.getElementById('tarification').checked = hasSignalPrix;
-            updateSignalPrixIndicator(hasSignalPrix);
-
             updateScenarioBadge();
             onParamChange();
-        }
-
-        function onTarificationToggle() {
-            const checked = document.getElementById('tarification').checked;
-            const sel = document.getElementById('scenario-fuites');
-            const key = sel.value;
-
-            if (checked && isSansTarifScenario(key)) {
-                const base = key.replace("_sans_tarif", "");
-                if (hasOption(sel, base)) sel.value = base;
-            }
-
-            if (!checked && !isSansTarifScenario(key)) {
-                const sans = key + "_sans_tarif";
-                if (hasOption(sel, sans)) sel.value = sans;
-            }
-
-            updateSignalPrixIndicator(checked);
-            onScenarioFuitesChange();
-        }
-
-        function updateSignalPrixIndicator(hasSignalPrix) {
-            const box = document.getElementById('signal-prix-box');
-            const status = document.getElementById('signal-prix-status');
-            const rate = document.getElementById('signal-prix-rate');
-
-            if (hasSignalPrix) {
-                box.classList.add('active');
-                status.textContent = 'Avec signal-prix';
-                rate.innerHTML = '→ Taux réparation: <b>85%</b>';
-            } else {
-                box.classList.remove('active');
-                status.textContent = 'Sans signal-prix';
-                rate.innerHTML = '→ Taux réparation: <b>55%</b>';
-            }
         }
 
         function onScenarioAdoptionChange() {
@@ -3046,25 +2940,24 @@
                 </div>
             `;
 
-            // Fuites (enrichi avec paramètres du modèle)
+            // Fuites
             const scenarioFuites = params.scenario_fuites;
-            const hasTarif = !scenarioFuites.includes('sans_tarif');
-            const tarifNote = hasTarif ? ' <span style="color:#059669;">(avec signal-prix)</span>' : ' <span style="color:#dc2626;">(sans signal-prix)</span>';
-
-            // Paramètres fuites selon scénario (valeurs utilisées par le modèle)
+            const fuitesLabels = {
+                'standard': 'Standard (20%)',
+                'quebec': 'Québec (35%)',
+                'deux_stocks_sans_tarif': 'Québec différencié (30%)',
+                'custom': 'Personnalisé'
+            };
             const fuitesDefaults = {
                 'deux_stocks_sans_tarif': { taux_rep: 55, taux_det: 90, prev: '24+6%' },
-                'deux_stocks': { taux_rep: 70, taux_det: 90, prev: '24+6%' },
-                'quebec_sans_tarif': { taux_rep: 55, taux_det: 85, prev: '35%' },
-                'quebec': { taux_rep: 70, taux_det: 85, prev: '35%' },
-                'menage_sans_tarif': { taux_rep: 55, taux_det: 80, prev: '20%' },
-                'standard': { taux_rep: 70, taux_det: 80, prev: '20%' },
+                'quebec': { taux_rep: 55, taux_det: 85, prev: '35%' },
+                'standard': { taux_rep: 55, taux_det: 80, prev: '20%' },
             };
             const fuitesParams = fuitesDefaults[scenarioFuites] || { taux_rep: '?', taux_det: '?', prev: '?' };
 
             document.getElementById('hyp-fuites').innerHTML = `
                 <div style="color: #6b7280; line-height: 1.6;">
-                    • Scénario: <b>${scenarioFuites}</b>${tarifNote}<br>
+                    • Scénario: <b>${fuitesLabels[scenarioFuites] || scenarioFuites}</b><br>
                     • Prévalence: <b>${params.scenario_fuites === 'custom' ? (params.prevalence_petites_pct + params.prevalence_grosses_pct) + '%' : fuitesParams.prev}</b><br>
                     • Taux détection: <b>${params.scenario_fuites === 'custom' ? params.taux_detection_pct : fuitesParams.taux_det}%</b><br>
                     • Taux réparation: <b>${params.scenario_fuites === 'custom' ? params.taux_reparation_pct : fuitesParams.taux_rep}%</b><br>
@@ -4045,13 +3938,7 @@
             const fuitesNoms = {
                 'standard': 'Standard (20%)',
                 'quebec': 'Québec (35%)',
-                'deux_stocks': 'QC différencié',
-                'menage': 'Ménage (40%)',
-                'subvention_50': 'Subvention 50%',
-                'ville': 'Ville (détection ↑)',
-                'menage_sans_tarif': 'Ménage sans tarif',
-                'quebec_sans_tarif': 'Québec sans tarif',
-                'deux_stocks_sans_tarif': 'QC différencié sans tarif',
+                'deux_stocks_sans_tarif': 'QC différencié (30%)',
                 'custom': 'Personnalisé'
             };
 
@@ -4619,7 +4506,6 @@
             } else {
                 advancedFuites.style.display = 'none';
             }
-            document.getElementById('tarification').checked = !isSansTarifScenario(scenario);
 
             const adoptionScenario = document.getElementById('scenario-adoption').value;
             document.getElementById('advanced-adoption').style.display = (adoptionScenario === "custom") ? "block" : "none";
