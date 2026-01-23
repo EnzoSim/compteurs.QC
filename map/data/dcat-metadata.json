@@ -1,0 +1,124 @@
+{
+  "@context": "https://www.w3.org/ns/dcat#",
+  "@type": "Dataset",
+  "title": {
+    "fr": "AquaMap QC - Données de consommation d'eau des municipalités du Québec",
+    "en": "AquaMap QC - Quebec Municipalities Water Consumption Data"
+  },
+  "description": {
+    "fr": "Jeu de données géographiques et statistiques sur la consommation d'eau potable des municipalités du Québec. Inclut les indicateurs LPCD (litres par personne par jour), les volumes distribués et les données démographiques. Données compilées à partir des sources officielles MAMH SQEEP et Statistique Canada.",
+    "en": "Geographic and statistical dataset on drinking water consumption of Quebec municipalities. Includes LPCD (liters per capita per day) indicators, distributed volumes and demographic data. Data compiled from official MAMH SQEEP and Statistics Canada sources."
+  },
+  "issued": "2026-01-22",
+  "modified": "2026-01-22",
+  "publisher": {
+    "@type": "Organization",
+    "name": "AquaMap QC Project"
+  },
+  "contactPoint": {
+    "@type": "ContactPoint",
+    "contactType": "Project Lead"
+  },
+  "keyword": [
+    "eau potable",
+    "consommation d'eau",
+    "municipalités",
+    "Québec",
+    "LPCD",
+    "drinking water",
+    "water consumption",
+    "municipalities",
+    "Quebec"
+  ],
+  "language": ["fr", "en"],
+  "spatial": {
+    "@type": "Place",
+    "name": "Québec, Canada",
+    "geo": {
+      "@type": "GeoShape",
+      "box": "45.0 -79.8 62.6 -57.1"
+    }
+  },
+  "temporal": {
+    "@type": "PeriodOfTime",
+    "startDate": "2019",
+    "endDate": "2025"
+  },
+  "accrualPeriodicity": "annual",
+  "license": "https://creativecommons.org/licenses/by/4.0/",
+  "rights": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+  "accessRights": "public",
+  "distribution": [
+    {
+      "@type": "Distribution",
+      "title": "GeoJSON - Municipalités du Québec",
+      "description": "Fichier GeoJSON contenant les géométries et données des municipalités",
+      "format": "application/geo+json",
+      "mediaType": "application/geo+json",
+      "downloadURL": "data/current/quebec-municipalities.geojson",
+      "byteSize": null
+    },
+    {
+      "@type": "Distribution",
+      "title": "JSON - Statistiques municipales",
+      "description": "Fichier JSON avec statistiques indexées par identifiant CSD",
+      "format": "application/json",
+      "mediaType": "application/json",
+      "downloadURL": "data/current/municipalities-stats.json",
+      "byteSize": null
+    },
+    {
+      "@type": "Distribution",
+      "title": "JSON - Données MAMH",
+      "description": "Données brutes LPCD du MAMH SQEEP",
+      "format": "application/json",
+      "mediaType": "application/json",
+      "downloadURL": "data/current/mamh-data.json",
+      "byteSize": null
+    }
+  ],
+  "source": [
+    {
+      "@type": "Dataset",
+      "title": "SQEEP 2019-2025",
+      "description": "Système québécois d'évaluation de l'eau potable",
+      "publisher": {
+        "@type": "Organization",
+        "name": "Ministère des Affaires municipales et de l'Habitation (MAMH)"
+      },
+      "landingPage": "https://www.donneesquebec.ca/recherche/dataset/sqeep-2019-2025"
+    },
+    {
+      "@type": "Dataset",
+      "title": "Recensement de la population 2021",
+      "description": "Données démographiques par subdivision de recensement",
+      "publisher": {
+        "@type": "Organization",
+        "name": "Statistique Canada"
+      },
+      "landingPage": "https://www12.statcan.gc.ca/census-recensement/2021/dp-pd/prof/index.cfm"
+    }
+  ],
+  "conformsTo": [
+    {
+      "@type": "Standard",
+      "title": "DCAT 3.0",
+      "url": "https://www.w3.org/TR/vocab-dcat-3/"
+    },
+    {
+      "@type": "Standard",
+      "title": "GeoJSON",
+      "url": "https://geojson.org/"
+    }
+  ],
+  "qualifiedRelation": [
+    {
+      "@type": "Relationship",
+      "relation": "derivedFrom",
+      "hadRole": "Source",
+      "target": "https://www.donneesquebec.ca/recherche/dataset/sqeep-2019-2025"
+    }
+  ],
+  "version": "2023.1.0",
+  "versionNotes": "Initial public release with 2023 MAMH data"
+}

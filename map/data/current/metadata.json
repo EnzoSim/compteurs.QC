@@ -1,0 +1,76 @@
+{
+  "last_update": "2026-01-22T22:55:09.276072",
+  "version": "2023.1.0",
+  "sources": {
+    "bil": {
+      "name": "BIL - Bilan des infrastructures en eau",
+      "file": "/Users/enzo_simier/Desktop/BIL_base_donnees_2023.xlsx",
+      "date": "2023",
+      "count": 1106,
+      "success": true,
+      "error": null
+    },
+    "statcan": {
+      "url": "https://www12.statcan.gc.ca/",
+      "date": "2021",
+      "count": 1282,
+      "success": true,
+      "error": null
+    },
+    "merge": {
+      "success": true,
+      "error": null,
+      "total_features": 1282,
+      "lpcd_matched": 667
+    }
+  },
+  "coverage": {
+    "lpcd": 52.0,
+    "total_municipalities": 1282,
+    "with_lpcd": 667
+  },
+  "warnings": [
+    "Couverture LPCD faible: 52.0% (667/1282)",
+    "7 valeurs LPCD inhabituelles",
+    "55 noms de municipalités en double (homonymes possibles)"
+  ],
+  "qa_summary": {
+    "total_features": 1282,
+    "with_lpcd": 667,
+    "with_population": 0,
+    "lpcd_coverage_pct": 52.0,
+    "population_coverage_pct": 0.0,
+    "errors_count": 0,
+    "warnings_count": 3,
+    "lpcd_stats": {
+      "min": 90.0,
+      "max": 787.0,
+      "median": 205.0,
+      "mean": 222.5
+    }
+  },
+  "data_dictionary": {
+    "lpcd": {
+      "unit": "L/pers/jour",
+      "definition": "Consommation résidentielle d'eau potable en litres par personne par jour",
+      "source": "MAMH SQEEP - champ consom_resid"
+    },
+    "consommation": {
+      "unit": "ML/an (stocké), m³/jour (affiché)",
+      "definition": "Volume total d'eau distribué par le réseau municipal",
+      "source": "MAMH SQEEP - champ vol_eau_dist",
+      "conversion": "m³/jour = ML/an × 1000 ÷ 365"
+    },
+    "population": {
+      "unit": "habitants",
+      "definition": "Population de la municipalité selon le recensement",
+      "source": "Statistique Canada, Recensement 2021"
+    },
+    "population_desservie": {
+      "unit": "habitants",
+      "definition": "Population desservie par le réseau d'eau potable",
+      "source": "MAMH SQEEP"
+    }
+  },
+  "total_municipalities": 1282
+}

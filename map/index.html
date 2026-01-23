@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carte de la consommation d'eau - Quebec</title>
+    <meta name="description" content="Carte interactive de la consommation d'eau des municipalités du Québec">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin="">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="map.css">
+</head>
+<body>
+    <div class="map-container">
+        <!-- Header -->
+        <header class="map-header">
+            <div class="header-content">
+                <div class="header-left">
+                    <!-- Logo -->
+                    <a href="../index.html" class="logo">
+                        <div class="logo-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="logo-text">AquaMap QC</div>
+                            <div class="logo-subtitle">Consommation d'eau</div>
+                        </div>
+                    </a>
+
+                    <!-- Search -->
+                    <div class="search-container">
+                        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <input type="text" id="search-input" class="search-input" placeholder="Rechercher une municipalité..." autocomplete="off">
+                        <div id="search-results" class="search-results"></div>
+                    </div>
+                </div>
+
+                <!-- Stats Bar -->
+                <div class="stats-bar">
+                    <div class="stat-item">
+                        <span id="stat-average" class="stat-value">—</span>
+                        <span class="stat-label">Moyenne QC</span>
+                    </div>
+                    <div class="stat-item stat-item-target">
+                        <span class="stat-value">220</span>
+                        <span class="stat-label">Cible QC</span>
+                    </div>
+                    <div class="stat-item">
+                        <span id="stat-count" class="stat-value">—</span>
+                        <span class="stat-label">Municipalités</span>
+                    </div>
+                    <div class="stat-item">
+                        <span id="stat-coverage" class="stat-value">—</span>
+                        <span class="stat-label">Couverture</span>
+                    </div>
+                </div>
+
+                <!-- Data Status -->
+                <div id="data-status" class="data-status">
+                    <span class="data-status-dot"></span>
+                    <span>Chargement...</span>
+                </div>
+
+                <!-- Action buttons -->
+                <div class="header-actions">
+                    <button id="btn-methodology" class="header-btn" title="Méthodologie et sources">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                        </svg>
+                    </button>
+                    <button id="btn-export-pdf" class="header-btn" title="Exporter en PDF" onclick="window.print()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="12" y1="18" x2="12" y2="12"></line>
+                            <line x1="9" y1="15" x2="15" y2="15"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Map -->
+        <div id="map"></div>
+
+        <!-- Info Panel -->
+        <div id="info-panel"></div>
+
+        <!-- Methodology Overlay -->
+        <div id="methodology-overlay" class="methodology-overlay"></div>
+
+        <!-- Methodology Panel -->
+        <div id="methodology-panel" class="methodology-panel">
+            <div class="methodology-header">
+                <h2>Méthodologie et Sources</h2>
+                <button class="methodology-close" onclick="window.quebecMap.closeMethodologyPanel()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="methodology-body">
+                <section class="methodology-section">
+                    <h3>Indicateurs</h3>
+                    <dl>
+                        <dt>LPCD (Consommation résidentielle)</dt>
+                        <dd>Litres par personne par jour - Consommation d'eau résidentielle moyenne par habitant desservi. Exclut les usages commerciaux, industriels et les pertes de réseau.</dd>
+
+                        <dt>Volume distribué</dt>
+                        <dd>Volume total d'eau distribuée par le réseau municipal, converti en m³/jour à partir des données annuelles (ML/an × 1000 ÷ 365).</dd>
+
+                        <dt>Indice de Fuites (IFI)</dt>
+                        <dd>
+                            <strong>Indice de Fuites dans les Infrastructures</strong> - Ratio entre les pertes réelles et les pertes inévitables du <strong>réseau de distribution</strong> (et non chez le résident).
+                            <br><br>
+                            <code>IFI = Pertes réelles du réseau ÷ Pertes inévitables</code>
+                            <br><br>
+                            <strong>Interprétation :</strong>
+                            <ul style="margin: 8px 0; padding-left: 20px;">
+                                <li><strong>1-2</strong> : Excellent (proche du minimum technique)</li>
+                                <li><strong>2-4</strong> : Bon</li>
+                                <li><strong>4-8</strong> : Moyen (marge d'amélioration)</li>
+                                <li><strong>8-16</strong> : Élevé (pertes importantes)</li>
+                                <li><strong>&gt;16</strong> : Critique</li>
+                            </ul>
+                            <em>Note : L'IFI mesure les fuites entre l'usine de traitement et le compteur du client (conduites principales, branchements de service). Il ne mesure pas les pertes après compteur chez le résident.</em>
+                        </dd>
+
+                        <dt>Cible provinciale LPCD</dt>
+                        <dd><strong>220 L/pers/jour</strong> - Objectif fixé par la Stratégie québécoise d'économie d'eau potable du Gouvernement du Québec.</dd>
+                    </dl>
+                </section>
+
+                <section class="methodology-section">
+                    <h3>Sources de données</h3>
+                    <ul>
+                        <li>
+                            <strong>BIL - Bilan des Infrastructures en Eau 2023</strong><br>
+                            Base de données complète incluant : LPCD, volume distribué, population desservie, nombre de logements, indice de fuites (IFI), longueur du réseau.<br>
+                            Source : Ministère des Affaires municipales et de l'Habitation (MAMH)
+                        </li>
+                        <li>
+                            <strong>MAMH SQEEP 2019-2025</strong><br>
+                            Système québécois d'évaluation de l'eau potable<br>
+                            <a href="https://www.donneesquebec.ca/recherche/dataset/sqeep-2019-2025" target="_blank" rel="noopener">donneesquebec.ca/sqeep</a>
+                        </li>
+                        <li>
+                            <strong>Statistique Canada</strong><br>
+                            Recensement 2021 - Limites géographiques des subdivisions de recensement (CSD)<br>
+                            <a href="https://www12.statcan.gc.ca/" target="_blank" rel="noopener">statcan.gc.ca</a>
+                        </li>
+                    </ul>
+                </section>
+
+                <section class="methodology-section">
+                    <h3>Limites et couverture</h3>
+                    <p>Les données LPCD ne sont pas disponibles pour toutes les municipalités. Les municipalités sans réseau d'eau potable municipal ou avec des données incomplètes apparaissent en gris.</p>
+                    <p id="methodology-coverage"></p>
+                </section>
+
+                <section class="methodology-section">
+                    <h3>Mise à jour</h3>
+                    <p id="methodology-update-date">Dernière mise à jour : —</p>
+                </section>
+
+                <section class="methodology-section">
+                    <h3>Contact</h3>
+                    <p>Pour toute question concernant ces données, veuillez contacter le responsable du projet.</p>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+
+    <!-- Quebec Map Component -->
+    <script src="map.js"></script>
+
+    <!-- Initialize Map -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const map = new QuebecMap('map', {
+                center: [46.8, -71.2],
+                zoom: 6,
+                dataPath: 'data/current/quebec-municipalities.geojson',
+                statsPath: 'data/current/municipalities-stats.json',
+                metadataPath: 'data/current/metadata.json',
+                mamhPath: 'data/current/mamh-data.json'
+            });
+
+            window.quebecMap = map;
+        });
+    </script>
+</body>
+</html>

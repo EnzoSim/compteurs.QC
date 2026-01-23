@@ -905,6 +905,146 @@
         .btn-mc.loading {
             background: #a78bfa;
         }
+
+        /* Map Picker Button */
+        .map-picker-btn {
+            width: 100%;
+            margin-top: 1rem;
+            padding: 1rem;
+            background: linear-gradient(135deg, #0891b2 0%, #06b6d4 100%);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .map-picker-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(8, 145, 178, 0.3);
+        }
+
+        .map-picker-icon {
+            font-size: 1.2rem;
+        }
+
+        /* Map Modal */
+        .map-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 9999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .map-modal-overlay.active {
+            display: flex;
+        }
+
+        .map-modal {
+            background: white;
+            border-radius: var(--radius);
+            width: 100%;
+            max-width: 1200px;
+            height: 80vh;
+            max-height: 800px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+
+        .map-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg);
+        }
+
+        .map-modal-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .map-modal-subtitle {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .map-modal-close {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: var(--border);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .map-modal-close:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        .map-modal-body {
+            flex: 1;
+            position: relative;
+        }
+
+        .map-modal-body iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .map-modal-footer {
+            padding: 0.75rem 1.5rem;
+            border-top: 1px solid var(--border);
+            background: var(--bg);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        /* Selected municipality indicator */
+        .selected-municipality {
+            display: none;
+            margin-top: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+            border-radius: var(--radius-sm);
+            font-size: 0.85rem;
+            color: #047857;
+        }
+
+        .selected-municipality.active {
+            display: block;
+        }
+
+        .selected-municipality strong {
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -960,6 +1100,11 @@
                         <span class="info">221K ménages • 250 LPCD</span>
                     </button>
                 </div>
+                <button class="map-picker-btn" onclick="openMapPicker()">
+                    <span class="map-picker-icon">🗺️</span>
+                    <span class="map-picker-text">Choisir sur la carte du Québec</span>
+                </button>
+                <div class="selected-municipality" id="selected-municipality"></div>
             </div>
 
             <!-- Project Parameters -->
@@ -2382,6 +2527,95 @@
                 mcRunning = false;
             }
         }
+
+        // ========================================
+        // Map Picker Integration
+        // ========================================
+
+        function openMapPicker() {
+            document.getElementById('map-modal-overlay').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeMapPicker() {
+            document.getElementById('map-modal-overlay').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        // Listen for municipality selection from the map iframe
+        window.addEventListener('message', async function(event) {
+            // Verify origin for security (adjust if needed)
+            if (event.data && event.data.type === 'municipalitySelected') {
+                const data = event.data.data;
+                await loadFromMap(data);
+                closeMapPicker();
+            }
+        });
+
+        async function loadFromMap(data) {
+            const name = data.name || 'Municipalité';
+            // Support both old (census) and new (BIL) field names
+            const households = data.nb_branchements || data.households;
+            const householdSize = data.pers_par_residence || data.household_size;
+            const lpcd = data.lpcd;
+            const population = data.population_desservie || data.population;
+
+            // Calculate households from population if not available
+            let nbMenages = households;
+            if (!nbMenages && population && householdSize) {
+                nbMenages = Math.round(population / householdSize);
+            } else if (!nbMenages && population) {
+                nbMenages = Math.round(population / 2.2); // Default household size
+            }
+
+            // Set values if available
+            if (nbMenages && nbMenages >= 10000) {
+                document.getElementById('nb-menages').value = Math.min(nbMenages, 1000000);
+            } else if (nbMenages) {
+                // For small municipalities, set minimum
+                document.getElementById('nb-menages').value = 10000;
+            }
+
+            if (householdSize) {
+                document.getElementById('taille-menage').value = Math.min(Math.max(householdSize, 1.5), 4);
+            }
+
+            if (lpcd) {
+                document.getElementById('lpcd').value = Math.min(Math.max(lpcd, 150), 450);
+            }
+
+            // Clear active presets
+            document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
+
+            // Show selected municipality
+            const selectedEl = document.getElementById('selected-municipality');
+            if (selectedEl) {
+                selectedEl.innerHTML = `<strong>✓ ${name}</strong> sélectionnée${population ? ` (${Math.round(population).toLocaleString('fr-CA')} hab. desservis)` : ''}`;
+                selectedEl.classList.add('active');
+            }
+
+            updateLabels();
+            await updateModel();
+        }
     </script>
+
+    <!-- Map Modal -->
+    <div class="map-modal-overlay" id="map-modal-overlay" onclick="if(event.target === this) closeMapPicker()">
+        <div class="map-modal">
+            <div class="map-modal-header">
+                <div>
+                    <div class="map-modal-title">Sélectionner une municipalité</div>
+                    <div class="map-modal-subtitle">Cliquez sur une municipalité pour charger ses données</div>
+                </div>
+                <button class="map-modal-close" onclick="closeMapPicker()">✕</button>
+            </div>
+            <div class="map-modal-body">
+                <iframe src="map/index.html" id="map-iframe"></iframe>
+            </div>
+            <div class="map-modal-footer">
+                Données: BIL 2023 (MAMH) • Statistique Canada Recensement 2021
+            </div>
+        </div>
+    </div>
 </body>
 </html>
