@@ -1764,45 +1764,24 @@
                     </div>
                 </div>
 
+                <!-- Hidden select for API compatibility -->
+                <select id="scenario-adoption" style="display:none;">
+                    <option value="obligatoire">Obligatoire</option>
+                    <option value="custom">Personnalisé</option>
+                </select>
+
                 <div class="input-group">
-                    <label data-i18n="param.adoption_scenario">Scénario d'adoption</label>
-                    <select id="scenario-adoption" onchange="onScenarioAdoptionChange()">
-                        <option value="obligatoire" selected data-i18n="adoption.mandatory">Obligatoire — 100% an 1</option>
-                        <option value="rapide" data-i18n="adoption.fast">Rapide — 80% an 3, 95% an 5</option>
-                        <option value="progressive" data-i18n="adoption.progressive">Progressif — 50% an 5, 85% an 10</option>
-                        <option value="lent" data-i18n="adoption.slow">Lent — 35% an 10, 70% an 20</option>
-                        <option value="nouveaux" data-i18n="adoption.new_households">Nouveaux logements seulement</option>
-                        <option value="par_secteur" data-i18n="adoption.by_sector">Par secteur</option>
-                        <option value="custom" data-i18n="adoption.custom">Personnalisé</option>
-                        <option value="none" data-i18n="adoption.disabled">Désactivé (test)</option>
-                    </select>
+                    <label><span data-i18n="adoption.pct_year5">% adoption à l'an 5</span> <span class="value" id="val-adoption-pct5">100%</span></label>
+                    <input type="range" id="adoption-pct5" min="20" max="100" step="5" value="100" oninput="onAdoptionPct5Change()">
+                    <small style="color: #666; font-size: 10px;" data-i18n="adoption.slider_help">100% = immédiat, &lt;100% = déploiement progressif</small>
                 </div>
 
-                <div id="adoption-slider-container" class="input-group" style="display:none;">
-                    <label><span data-i18n="adoption.pct_year5">% adoption à l'an 5</span> <span class="value" id="val-adoption-pct5">50%</span></label>
-                    <input type="range" id="adoption-pct5" min="10" max="100" step="5" value="50" oninput="onAdoptionPct5Change()">
-                </div>
-
+                <!-- Hidden advanced params for internal calculations -->
                 <div id="advanced-adoption" style="display:none;">
-                    <div class="input-group">
-                        <label><span data-i18n="adoption.max">Adoption max (%)</span> <span class="value" id="val-adoption-max">95</span></label>
-                        <input type="range" id="adoption-max" min="0" max="100" step="1" value="95" oninput="onParamChange()">
-                    </div>
-
-                    <div class="input-group">
-                        <label><span data-i18n="adoption.speed">Vitesse (k)</span> <span class="value" id="val-adoption-k">0.50</span></label>
-                        <input type="range" id="adoption-k" min="0.1" max="2.0" step="0.05" value="0.5" oninput="onParamChange()">
-                    </div>
-
-                    <div class="input-group">
-                        <label><span data-i18n="adoption.midpoint">Point médian (t0)</span> <span class="value" id="val-adoption-t0">5</span></label>
-                        <input type="range" id="adoption-t0" min="1" max="20" step="1" value="5" oninput="onParamChange()">
-                    </div>
-
-                    <div class="input-group" style="display: flex; align-items: center; gap: 10px;">
-                        <input type="checkbox" id="adoption-etaler-capex" checked onchange="onParamChange()">
-                        <label for="adoption-etaler-capex" style="margin: 0;" data-i18n="adoption.spread_capex">Étaler le CAPEX</label>
-                    </div>
+                    <input type="range" id="adoption-max" min="0" max="100" step="1" value="100">
+                    <input type="range" id="adoption-k" min="0.1" max="2.0" step="0.05" value="1.0">
+                    <input type="range" id="adoption-t0" min="1" max="20" step="1" value="1">
+                    <input type="checkbox" id="adoption-etaler-capex" checked>
                 </div>
             </div>
 
@@ -2698,6 +2677,7 @@
 
             initCharts();
             updateLabels();
+            onAdoptionPct5Change(); // Initialize adoption params from slider
 
             try {
                 // Étape 1: Connexion API
@@ -2872,31 +2852,7 @@
         }
 
         function onScenarioAdoptionChange() {
-            const scenario = document.getElementById('scenario-adoption').value;
-            const sliderContainer = document.getElementById('adoption-slider-container');
-            const advancedSection = document.getElementById('advanced-adoption');
-
-            // Show slider for non-obligatoire, non-none scenarios
-            const showSlider = !['obligatoire', 'none', 'nouveaux', 'par_secteur'].includes(scenario);
-            sliderContainer.style.display = showSlider ? 'block' : 'none';
-
-            // Show advanced only for custom
-            advancedSection.style.display = (scenario === "custom") ? "block" : "none";
-
-            // Update slider value based on preset
-            if (scenario === 'rapide') {
-                document.getElementById('adoption-pct5').value = 95;
-                document.getElementById('val-adoption-pct5').textContent = '95%';
-            } else if (scenario === 'progressive') {
-                document.getElementById('adoption-pct5').value = 50;
-                document.getElementById('val-adoption-pct5').textContent = '50%';
-            } else if (scenario === 'lent') {
-                document.getElementById('adoption-pct5').value = 25;
-                document.getElementById('val-adoption-pct5').textContent = '25%';
-            } else if (scenario === 'custom') {
-                // Keep current slider value
-            }
-
+            // Simplified - always custom mode now
             onParamChange();
         }
 
@@ -2904,30 +2860,28 @@
             const pct5 = parseFloat(document.getElementById('adoption-pct5').value);
             document.getElementById('val-adoption-pct5').textContent = pct5 + '%';
 
-            // Switch to custom mode when user adjusts slider
-            const scenarioSelect = document.getElementById('scenario-adoption');
-            if (scenarioSelect.value !== 'custom') {
-                scenarioSelect.value = 'custom';
-                document.getElementById('advanced-adoption').style.display = 'block';
+            // 100% = obligatoire (immediate deployment)
+            if (pct5 >= 100) {
+                document.getElementById('scenario-adoption').value = 'obligatoire';
+                document.getElementById('adoption-max').value = 100;
+                document.getElementById('adoption-k').value = 2.0;
+                document.getElementById('adoption-t0').value = 0;
+            } else {
+                document.getElementById('scenario-adoption').value = 'custom';
+
+                // Calculate k and t0 to achieve pct5 at year 5
+                // Using logistic: A(t) = Amax / (1 + exp(-k * (t - t0)))
+                const Amax = 95;
+                const k = 1.0;
+                const target = Math.min(pct5, Amax - 1);
+
+                // t0 = 5 + ln(Amax/target - 1) / k
+                const t0 = 5 + Math.log(Amax / target - 1) / k;
+
+                document.getElementById('adoption-max').value = Amax;
+                document.getElementById('adoption-k').value = k;
+                document.getElementById('adoption-t0').value = Math.max(1, Math.min(20, Math.round(t0)));
             }
-
-            // Calculate k and t0 to achieve pct5 at year 5
-            // Using logistic: A(t) = Amax / (1 + exp(-k * (t - t0)))
-            // With fixed k=1.0 and Amax=95%, solve for t0
-            const Amax = 95;
-            const k = 1.0;
-            const target = Math.min(pct5, Amax - 1); // Ensure target < Amax
-
-            // t0 = 5 + ln(Amax/target - 1) / k
-            const t0 = 5 + Math.log(Amax / target - 1) / k;
-
-            // Update the advanced sliders
-            document.getElementById('adoption-max').value = Amax;
-            document.getElementById('val-adoption-max').textContent = Amax;
-            document.getElementById('adoption-k').value = k;
-            document.getElementById('val-adoption-k').textContent = k.toFixed(2);
-            document.getElementById('adoption-t0').value = Math.max(1, Math.min(20, Math.round(t0)));
-            document.getElementById('val-adoption-t0').textContent = Math.round(t0);
 
             onParamChange();
         }
