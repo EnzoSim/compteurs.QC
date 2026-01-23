@@ -177,7 +177,11 @@ const TRANSLATIONS = {
         "economic.scarcity": "Rareté",
         "economic.quebec_mcf": "Québec + MCF",
         "economic.social_value": "Valeur sociale de l'eau",
+        "economic.social_value_help": "Coût financier complet de fournir l'eau (source: MAMH/SQEEP). Inclut OPEX variable + OPEX fixe + CAPEX. Chaque m³ économisé = ce montant de coûts évités pour la collectivité.",
+        "economic.social_value_detail": "Coût complet: OPEX variable (0.50) + OPEX fixe (1.24) + CAPEX (2.95) = 4.69 $/m³",
         "economic.variable_cost": "Coût variable de production",
+        "economic.variable_cost_help": "Coûts qui varient directement avec le volume d'eau produit: traitement chimique, énergie de pompage, consommables. C'est l'économie réelle immédiate pour la ville.",
+        "economic.variable_cost_detail": "Chimie, énergie, pompage — coûts qui varient avec le volume produit",
         "economic.economies_scale": "Économies d'échelle (>10k compteurs)",
         "economic.economies_scale_help": "Réduction 5-20% sur coûts matériel selon volume",
         "economic.infra_deferral": "Report d'infrastructure (optionnel)",
@@ -559,7 +563,11 @@ const TRANSLATIONS = {
         "economic.scarcity": "Scarcity",
         "economic.quebec_mcf": "Quebec + MCF",
         "economic.social_value": "Social value of water",
+        "economic.social_value_help": "Full financial cost of water supply (source: MAMH/SQEEP). Includes variable OPEX + fixed OPEX + CAPEX. Each m³ saved = this amount in avoided costs for the community.",
+        "economic.social_value_detail": "Full cost: Variable OPEX (0.50) + Fixed OPEX (1.24) + CAPEX (2.95) = 4.69 $/m³",
         "economic.variable_cost": "Variable production cost",
+        "economic.variable_cost_help": "Costs that vary directly with water volume produced: chemical treatment, pumping energy, consumables. This is the immediate real savings for the city.",
+        "economic.variable_cost_detail": "Chemistry, energy, pumping — costs that vary with volume produced",
         "economic.economies_scale": "Economies of scale (>10k meters)",
         "economic.economies_scale_help": "5-20% reduction on equipment costs by volume",
         "economic.infra_deferral": "Infrastructure deferral (optional)",
@@ -825,6 +833,12 @@ function updateUILanguage() {
     document.querySelectorAll('[data-i18n-aria]').forEach(el => {
         const key = el.getAttribute('data-i18n-aria');
         el.setAttribute('aria-label', t(key));
+    });
+
+    // Mettre à jour les tooltips
+    document.querySelectorAll('[data-tooltip-key]').forEach(el => {
+        const key = el.getAttribute('data-tooltip-key');
+        el.setAttribute('data-tooltip', t(key));
     });
 
     // Mettre à jour le toggle de langue

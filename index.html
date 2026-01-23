@@ -303,6 +303,59 @@
             border-radius: 4px;
         }
 
+        /* Help Icon with Tooltip */
+        .help-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            font-size: 10px;
+            font-weight: 700;
+            color: #6b7280;
+            background: #e5e7eb;
+            border-radius: 50%;
+            cursor: help;
+            margin-left: 4px;
+            position: relative;
+            transition: all 0.2s;
+        }
+
+        .help-icon:hover, .help-icon:focus {
+            background: var(--primary);
+            color: white;
+        }
+
+        .help-icon:hover::after, .help-icon:focus::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1f2937;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 400;
+            white-space: normal;
+            width: 250px;
+            line-height: 1.5;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .help-icon:hover::before, .help-icon:focus::before {
+            content: '';
+            position: absolute;
+            bottom: calc(100% + 2px);
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: #1f2937;
+            z-index: 1001;
+        }
+
         /* Custom Range Slider */
         input[type="range"] {
             width: 100%;
@@ -1856,13 +1909,23 @@
                 </div>
 
                 <div class="input-group">
-                    <label><span data-i18n="economic.social_value">Valeur sociale de l'eau</span> <span class="value" id="val-valeur-sociale">4.69 $/m³</span></label>
+                    <label>
+                        <span data-i18n="economic.social_value">Valeur sociale de l'eau</span>
+                        <span class="help-icon" tabindex="0" data-tooltip-key="economic.social_value_help">?</span>
+                        <span class="value" id="val-valeur-sociale">4.69 $/m³</span>
+                    </label>
                     <input type="range" id="valeur-sociale" min="1" max="12" step="0.1" value="4.69" oninput="onParamChange()">
+                    <small style="color: #666; font-size: 10px;" data-i18n="economic.social_value_detail">Coût complet: OPEX variable (0.50) + OPEX fixe (1.24) + CAPEX (2.95) = 4.69 $/m³</small>
                 </div>
 
                 <div class="input-group">
-                    <label><span data-i18n="economic.variable_cost">Coût variable de production</span> <span class="value" id="val-cout-variable">0.50 $/m³</span></label>
+                    <label>
+                        <span data-i18n="economic.variable_cost">Coût variable de production</span>
+                        <span class="help-icon" tabindex="0" data-tooltip-key="economic.variable_cost_help">?</span>
+                        <span class="value" id="val-cout-variable">0.50 $/m³</span>
+                    </label>
                     <input type="range" id="cout-variable" min="0.1" max="2" step="0.05" value="0.5" oninput="onParamChange()">
+                    <small style="color: #666; font-size: 10px;" data-i18n="economic.variable_cost_detail">Chimie, énergie, pompage — coûts qui varient avec le volume produit</small>
                 </div>
 
                 <!-- Report d'infrastructure -->
