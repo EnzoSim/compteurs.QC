@@ -4612,6 +4612,13 @@
         function openMapPicker() {
             document.getElementById('map-modal-overlay').classList.add('active');
             document.body.style.overflow = 'hidden';
+            // Demander à la carte de se recentrer après ouverture du modal
+            setTimeout(() => {
+                const iframe = document.getElementById('map-iframe');
+                if (iframe?.contentWindow) {
+                    iframe.contentWindow.postMessage({ type: 'invalidateSize' }, '*');
+                }
+            }, 100);
         }
 
         function closeMapPicker() {

@@ -1137,3 +1137,23 @@ class QuebecMap {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = QuebecMap;
 }
+
+// Listen for invalidateSize message from parent (modal open)
+window.addEventListener('message', function(event) {
+    if (event.data?.type === 'invalidateSize' && window.quebecMap?.map) {
+        window.quebecMap.map.invalidateSize();
+        // Re-fit bounds after invalidating size
+        if (window.quebecMap.geojsonLayers?.length > 0) {
+            let bounds = null;
+            for (const layer of window.quebecMap.geojsonLayers) {
+                const layerBounds = layer.getBounds();
+                if (layerBounds.isValid()) {
+                    bounds = bounds ? bounds.extend(layerBounds) : layerBounds;
+                }
+            }
+            if (bounds) {
+                window.quebecMap.map.fitBounds(bounds, { padding: [20, 20] });
+            }
+        }
+    }
+});
