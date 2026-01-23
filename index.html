@@ -3463,7 +3463,7 @@
 
         async function getPresets() {
             if (PRESETS_CACHE) return PRESETS_CACHE;
-            PRESETS_CACHE = await apiCall('/api/presets', {});
+            PRESETS_CACHE = await apiCall('/api/presets');
             return PRESETS_CACHE;
         }
 
