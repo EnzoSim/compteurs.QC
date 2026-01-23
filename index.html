@@ -2,9 +2,11 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <meta name="description" content="Calculateur d'analyse coûts-bénéfices pour les compteurs d'eau intelligents au Québec">
     <title>Analyse Coûts-Bénéfices — Compteurs d'Eau Intelligents</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="translations.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -1078,28 +1080,246 @@
         .selected-municipality strong {
             font-weight: 600;
         }
+
+        /* =========================
+           ACCESSIBILITÉ (a11y)
+           ========================= */
+
+        /* Skip link */
+        .skip-link {
+            position: absolute;
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary);
+            color: white;
+            padding: 12px 24px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            z-index: 10000;
+            text-decoration: none;
+            transition: top 0.2s;
+        }
+
+        .skip-link:focus {
+            top: 10px;
+            outline: 3px solid var(--warning);
+            outline-offset: 2px;
+        }
+
+        /* Focus visible amélioré */
+        :focus-visible {
+            outline: 3px solid var(--secondary);
+            outline-offset: 2px;
+        }
+
+        button:focus-visible,
+        .btn:focus-visible,
+        input:focus-visible,
+        select:focus-visible {
+            outline: 3px solid var(--primary-light);
+            outline-offset: 2px;
+            box-shadow: 0 0 0 4px rgba(15, 76, 117, 0.2);
+        }
+
+        /* Contraste amélioré pour texte secondaire */
+        .card-subtitle,
+        .metric-change,
+        small {
+            color: #4a5568; /* Ratio 7:1 sur blanc */
+        }
+
+        /* Touch-friendly sliders */
+        input[type="range"] {
+            height: 8px;
+            cursor: pointer;
+            touch-action: pan-x;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            width: 24px;
+            height: 24px;
+            cursor: grab;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            cursor: grab;
+        }
+
+        input[type="range"]:active::-webkit-slider-thumb {
+            cursor: grabbing;
+        }
+
+        /* =========================
+           RESPONSIVE MOBILE
+           ========================= */
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 1rem 1.5rem;
+            }
+
+            .header h1 {
+                font-size: 1.25rem;
+            }
+
+            .header-subtitle {
+                font-size: 0.8rem;
+            }
+
+            .container {
+                flex-direction: column;
+                padding: 1rem;
+                gap: 1rem;
+            }
+
+            .sidebar {
+                width: 100%;
+                max-width: 100%;
+                order: 2;
+            }
+
+            .main {
+                width: 100%;
+                order: 1;
+            }
+
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.75rem;
+            }
+
+            .metric-card {
+                padding: 1rem;
+            }
+
+            .metric-value {
+                font-size: 1.25rem;
+            }
+
+            .chart-card {
+                padding: 1rem;
+            }
+
+            .card {
+                padding: 1rem;
+            }
+
+            .card-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+
+            .input-group label {
+                font-size: 0.8rem;
+            }
+
+            .actions-bar {
+                flex-wrap: wrap;
+            }
+
+            .btn {
+                flex: 1 1 45%;
+                min-width: 120px;
+            }
+
+            /* Sidebar collapsible */
+            .sidebar-toggle {
+                display: flex;
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                width: 56px;
+                height: 56px;
+                background: var(--primary);
+                color: white;
+                border: none;
+                border-radius: 50%;
+                font-size: 24px;
+                align-items: center;
+                justify-content: center;
+                box-shadow: var(--shadow-lg);
+                z-index: 1000;
+                cursor: pointer;
+            }
+
+            .sidebar.collapsed {
+                display: none;
+            }
+
+            /* Charts responsive */
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .btn {
+                flex: 1 1 100%;
+            }
+        }
+
+        /* Préférence mouvement réduit */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* Mode sombre (préparation) */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #1a202c;
+                --bg-dark: #2d3748;
+                --card: #2d3748;
+                --text: #f7fafc;
+                --text-secondary: #e2e8f0;
+                --text-muted: #a0aec0;
+                --border: #4a5568;
+            }
+        }
+
+        /* Bouton toggle sidebar (caché par défaut, visible sur mobile) */
+        .sidebar-toggle {
+            display: none;
+        }
     </style>
 </head>
 <body>
-    <div class="loading" id="loading"></div>
+    <!-- Skip link pour accessibilité -->
+    <a href="#main-content" class="skip-link" data-i18n="skip_link">Aller au contenu principal</a>
+
+    <div class="loading" id="loading" aria-hidden="true"></div>
 
     <!-- Overlay de chargement initial -->
-    <div class="loading-overlay" id="loading-overlay">
+    <div class="loading-overlay" id="loading-overlay" role="status" aria-live="polite">
         <div class="loading-content">
             <div class="loading-spinner"></div>
-            <div class="loading-text">Connexion au serveur...</div>
-            <div class="loading-subtext">Initialisation du modèle</div>
+            <div class="loading-text" data-i18n="loading.connecting">Connexion au serveur...</div>
+            <div class="loading-subtext" data-i18n="loading.init">Initialisation du modèle</div>
         </div>
     </div>
 
     <div class="header">
         <div class="header-content">
             <div>
-                <h1>Analyse Coûts-Bénéfices</h1>
-                <p class="header-subtitle">Compteurs d'eau intelligents — Modèle économique v3.11</p>
+                <h1 data-i18n="header.title">Analyse Coûts-Bénéfices</h1>
+                <p class="header-subtitle" data-i18n="header.subtitle">Compteurs d'eau intelligents — Modèle économique v3.11</p>
             </div>
-            <div class="header-badge">
-                <span class="api-status disconnected" id="api-status">Connexion API...</span>
+            <div class="header-badge" style="display: flex; align-items: center; gap: 12px;">
+                <button id="lang-toggle" onclick="toggleLanguage()" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 12px;" aria-label="Changer de langue">FR</button>
+                <span class="api-status disconnected" id="api-status" data-i18n="header.api_connecting">Connexion API...</span>
             </div>
         </div>
     </div>
@@ -1111,8 +1331,8 @@
                 <div class="card-header">
                     <div class="card-icon blue">🏙️</div>
                     <div>
-                        <div class="card-title">Municipalités</div>
-                        <div class="card-subtitle">Sélectionner un profil prédéfini</div>
+                        <div class="card-title" data-i18n="section.municipalities">Municipalités</div>
+                        <div class="card-subtitle" data-i18n="section.municipalities_sub">Sélectionner un profil prédéfini</div>
                     </div>
                 </div>
                 <div class="preset-grid">
@@ -1135,7 +1355,7 @@
                 </div>
                 <button class="map-picker-btn" onclick="openMapPicker()">
                     <span class="map-picker-icon">🗺️</span>
-                    <span class="map-picker-text">Choisir sur la carte du Québec</span>
+                    <span class="map-picker-text" data-i18n="section.map_picker">Choisir sur la carte du Québec</span>
                 </button>
                 <div class="selected-municipality" id="selected-municipality"></div>
             </div>
@@ -1145,33 +1365,43 @@
                 <div class="card-header">
                     <div class="card-icon green">📊</div>
                     <div>
-                        <div class="card-title">Paramètres du projet</div>
-                        <div class="card-subtitle">Configuration de base</div>
+                        <div class="card-title" data-i18n="section.project">Paramètres du projet</div>
+                        <div class="card-subtitle" data-i18n="section.project_sub">Configuration de base</div>
                     </div>
                 </div>
 
                 <div class="input-group">
-                    <label>Nombre de ménages <span class="value" id="val-menages">116 258</span></label>
+                    <label><span data-i18n="param.households">Nombre de ménages</span> <span class="value" id="val-menages">116 258</span></label>
                     <input type="range" id="nb-menages" min="10000" max="1000000" step="1000" value="116258" oninput="onParamChange()">
                 </div>
 
                 <div class="input-group">
-                    <label>Taille du ménage (pers.) <span class="value" id="val-taille">2.18</span></label>
+                    <label><span data-i18n="param.household_size">Taille du ménage (pers.)</span> <span class="value" id="val-taille">2.18</span></label>
                     <input type="range" id="taille-menage" min="1.5" max="4" step="0.01" value="2.18" oninput="onParamChange()">
                 </div>
 
                 <div class="input-group">
-                    <label>Consommation (L/pers/jour) <span class="value" id="val-lpcd">236</span></label>
+                    <label><span data-i18n="param.lpcd">Consommation (L/pers/jour)</span> <span class="value" id="val-lpcd">236</span></label>
                     <input type="range" id="lpcd" min="150" max="450" step="1" value="236" oninput="onParamChange()">
                 </div>
 
+                <!-- Calibrage automatique -->
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
+                    <button class="btn" style="width: 100%; font-size: 12px;" onclick="openCalibrationModal()">
+                        📈 <span data-i18n="calibration.btn">Calibrer depuis données</span>
+                    </button>
+                    <small style="color: #666; font-size: 10px; display: block; margin-top: 6px; text-align: center;" data-i18n="calibration.btn_help">
+                        Importer un CSV de consommation mensuelle
+                    </small>
+                </div>
+
                 <div class="input-group">
-                    <label>Horizon d'analyse (années) <span class="value" id="val-horizon">20</span></label>
+                    <label><span data-i18n="param.horizon">Horizon d'analyse (années)</span> <span class="value" id="val-horizon">20</span></label>
                     <input type="range" id="horizon" min="10" max="30" step="1" value="20" oninput="onParamChange()">
                 </div>
 
                 <div class="input-group">
-                    <label>Taux d'actualisation (%) <span class="value" id="val-taux">3.0</span></label>
+                    <label><span data-i18n="param.discount_rate">Taux d'actualisation (%)</span> <span class="value" id="val-taux">3.0</span></label>
                     <input type="range" id="taux-actualisation" min="1" max="8" step="0.1" value="3" oninput="onParamChange()">
                 </div>
             </div>
@@ -1181,49 +1411,49 @@
                 <div class="card-header">
                     <div class="card-icon purple">💧</div>
                     <div>
-                        <div class="card-title">Technologie de comptage</div>
-                        <div class="card-subtitle">Coûts et installation</div>
+                        <div class="card-title" data-i18n="section.technology">Technologie de comptage</div>
+                        <div class="card-subtitle" data-i18n="section.technology_sub">Coûts et installation</div>
                     </div>
                 </div>
 
                 <div class="input-group">
-                    <label>Type de compteur</label>
+                    <label data-i18n="param.meter_type">Type de compteur</label>
                     <select id="type-compteur" onchange="onParamChange()">
-                        <option value="ami">AMI — Intelligent (temps réel)</option>
-                        <option value="amr">AMR — Lecture automatique</option>
-                        <option value="manuel">Manuel — Relevé traditionnel</option>
+                        <option value="ami" data-i18n="meter.ami">AMI — Intelligent (temps réel)</option>
+                        <option value="amr" data-i18n="meter.amr">AMR — Lecture automatique</option>
+                        <option value="manuel" data-i18n="meter.manual">Manuel — Relevé traditionnel</option>
                     </select>
                 </div>
 
                 <div class="input-group">
-                    <label>Coût unitaire du compteur <span class="value" id="val-cout-compteur">250 $</span></label>
+                    <label><span data-i18n="param.meter_cost">Coût unitaire du compteur</span> <span class="value" id="val-cout-compteur">250 $</span></label>
                     <input type="range" id="cout-compteur" min="50" max="600" step="10" value="250" oninput="onParamChange()">
                 </div>
 
                 <div class="input-group">
-                    <label>Heures d'installation <span class="value" id="val-heures">3.0 h</span></label>
+                    <label><span data-i18n="param.install_hours">Heures d'installation</span> <span class="value" id="val-heures">3.0 h</span></label>
                     <input type="range" id="heures-install" min="0.5" max="8" step="0.5" value="3" oninput="onParamChange()">
                 </div>
 
                 <div class="input-group">
-                    <label>Taux horaire installation <span class="value" id="val-taux-horaire">125 $/h</span></label>
+                    <label><span data-i18n="param.hourly_rate">Taux horaire installation</span> <span class="value" id="val-taux-horaire">125 $/h</span></label>
                     <input type="range" id="taux-horaire" min="75" max="200" step="5" value="125" oninput="onParamChange()">
                 </div>
 
                 <div class="input-group" id="cout-reseau-group">
-                    <label>Infrastructure réseau <span class="value" id="val-cout-reseau">50 $/u</span></label>
+                    <label><span data-i18n="param.network_cost">Infrastructure réseau</span> <span class="value" id="val-cout-reseau">50 $/u</span></label>
                     <input type="range" id="cout-reseau" min="0" max="200" step="10" value="50" oninput="onParamChange()">
                 </div>
 
                 <div class="input-group" id="cout-infra-fixe-group">
-                    <label>Coût infra fixe (IT, intégration) <span class="value" id="val-cout-infra-fixe">0 $</span></label>
+                    <label><span data-i18n="param.fixed_infra">Coût infra fixe (IT, intégration)</span> <span class="value" id="val-cout-infra-fixe">0 $</span></label>
                     <input type="range" id="cout-infra-fixe" min="0" max="2000000" step="50000" value="0" oninput="onParamChange()">
                 </div>
 
                 <div class="input-group" id="opex-ami-group">
-                    <label>OPEX AMI non-tech <span class="value" id="val-opex-ami">15 $/an</span></label>
+                    <label><span data-i18n="param.opex_ami">OPEX AMI non-tech</span> <span class="value" id="val-opex-ami">15 $/an</span></label>
                     <input type="range" id="opex-ami" min="0" max="50" step="1" value="15" oninput="onParamChange()">
-                    <small style="color: #666; font-size: 10px;">Cyber, logiciels, stockage, télécom (Bas=10, Médian=15, Haut=35)</small>
+                    <small style="color: #666; font-size: 10px;" data-i18n="param.opex_ami_help">Cyber, logiciels, stockage, télécom (Bas=10, Médian=15, Haut=35)</small>
                 </div>
             </div>
 
@@ -1232,56 +1462,56 @@
                 <div class="card-header">
                     <div class="card-icon orange">🔧</div>
                     <div>
-                        <div class="card-title">Comportement & Fuites</div>
-                        <div class="card-subtitle">Paramètres d'économies</div>
+                        <div class="card-title" data-i18n="section.behavior">Comportement & Fuites</div>
+                        <div class="card-subtitle" data-i18n="section.behavior_sub">Paramètres d'économies</div>
                     </div>
                 </div>
 
                 <div class="input-group">
-                    <label>Réduction comportementale <span class="value" id="val-reduction">8.0 %</span></label>
+                    <label><span data-i18n="param.behavior_reduction">Réduction comportementale</span> <span class="value" id="val-reduction">8.0 %</span></label>
                     <input type="range" id="reduction-comportement" min="0" max="15" step="0.5" value="8" oninput="onParamChange()">
                 </div>
 
                 <div class="input-group">
-                    <label>Scénario de persistance</label>
+                    <label data-i18n="param.persistence">Scénario de persistance</label>
                     <select id="persistance" onchange="onParamChange()">
-                        <option value="optimiste">Optimiste — Effet constant (α = 8%)</option>
-                        <option value="realiste" selected>Réaliste — Plateau à 2.5%</option>
-                        <option value="pessimiste">Pessimiste — Fadeout sur 10 ans</option>
-                        <option value="ultra">Ultra-pessimiste — Aucun effet</option>
+                        <option value="optimiste" data-i18n="persistence.optimistic">Optimiste — Effet constant (α = 8%)</option>
+                        <option value="realiste" selected data-i18n="persistence.realistic">Réaliste — Plateau à 2.5%</option>
+                        <option value="pessimiste" data-i18n="persistence.pessimistic">Pessimiste — Fadeout sur 10 ans</option>
+                        <option value="ultra" data-i18n="persistence.ultra">Ultra-pessimiste — Aucun effet</option>
                     </select>
                 </div>
 
                 <div class="input-group">
-                    <label>Scénario de fuites</label>
+                    <label data-i18n="param.leak_scenario">Scénario de fuites</label>
                     <select id="scenario-fuites" onchange="onScenarioFuitesChange()">
-                        <optgroup label="Avec signal-prix (réparation plus probable)">
-                            <option value="standard">Standard (20%)</option>
-                            <option value="quebec">Québec (35%)</option>
-                            <option value="deux_stocks">Québec différencié (2 stocks)</option>
-                            <option value="menage">Ménage (40%)</option>
-                            <option value="subvention_50">Subvention 50%</option>
-                            <option value="ville">Ville (meilleure détection)</option>
+                        <optgroup label="Avec signal-prix (réparation plus probable)" data-i18n="leaks.group_with_price">
+                            <option value="standard" data-i18n="leaks.standard">Standard (20%)</option>
+                            <option value="quebec" data-i18n="leaks.quebec">Québec (35%)</option>
+                            <option value="deux_stocks" data-i18n="leaks.two_stocks">Québec différencié (2 stocks)</option>
+                            <option value="menage" data-i18n="leaks.household">Ménage (40%)</option>
+                            <option value="subvention_50" data-i18n="leaks.subsidy_50">Subvention 50%</option>
+                            <option value="ville" data-i18n="leaks.city">Ville (meilleure détection)</option>
                         </optgroup>
 
-                        <optgroup label="Sans signal-prix (sans tarification volumétrique)">
-                            <option value="menage_sans_tarif">Ménage (sans tarif)</option>
-                            <option value="quebec_sans_tarif">Québec (sans tarif)</option>
-                            <option value="deux_stocks_sans_tarif" selected>QC différencié (sans tarif)</option>
+                        <optgroup label="Sans signal-prix (sans tarification volumétrique)" data-i18n="leaks.group_without_price">
+                            <option value="menage_sans_tarif" data-i18n="leaks.household_no_tariff">Ménage (sans tarif)</option>
+                            <option value="quebec_sans_tarif" data-i18n="leaks.quebec_no_tariff">Québec (sans tarif)</option>
+                            <option value="deux_stocks_sans_tarif" selected data-i18n="leaks.two_stocks_no_tariff">QC différencié (sans tarif)</option>
                         </optgroup>
 
-                        <optgroup label="Avancé">
-                            <option value="custom">Personnalisé</option>
+                        <optgroup label="Avancé" data-i18n="leaks.group_advanced">
+                            <option value="custom" data-i18n="leaks.custom">Personnalisé</option>
                         </optgroup>
                     </select>
 
                     <div class="input-group" style="margin-top:0.75rem;">
                         <label style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
-                            <span>Tarification volumétrique en place</span>
+                            <span data-i18n="param.pricing">Tarification volumétrique en place</span>
                             <input type="checkbox" id="tarification" onchange="onTarificationToggle()">
                         </label>
-                        <small class="help-text">
-                            Note: le modèle ne simule pas une tarification (facturation). Ici, c’est juste un “signal-prix”
+                        <small class="help-text" data-i18n="param.pricing_help">
+                            Note: le modèle ne simule pas une tarification (facturation). Ici, c'est juste un "signal-prix"
                             qui influence la dynamique de réparation des fuites.
                         </small>
                     </div>
@@ -1390,44 +1620,44 @@
                 <div class="card-header">
                     <div class="card-icon blue">🚀</div>
                     <div>
-                        <div class="card-title">Déploiement (adoption)</div>
-                        <div class="card-subtitle">Simule un déploiement progressif</div>
+                        <div class="card-title" data-i18n="section.deployment">Déploiement (adoption)</div>
+                        <div class="card-subtitle" data-i18n="section.deployment_sub">Simule un déploiement progressif</div>
                     </div>
                 </div>
 
                 <div class="input-group">
-                    <label>Scénario d’adoption</label>
+                    <label data-i18n="param.leak_scenario">Scénario d'adoption</label>
                     <select id="scenario-adoption" onchange="onScenarioAdoptionChange()">
-                        <option value="obligatoire" selected>Obligatoire (100% dès l’année 1)</option>
-                        <option value="rapide">Rapide</option>
-                        <option value="progressive">Progressif</option>
-                        <option value="lent">Lent</option>
-                        <option value="nouveaux">Nouveaux ménages</option>
-                        <option value="par_secteur">Par secteur</option>
-                        <option value="custom">Personnalisé</option>
-                        <option value="none">Désactivé (test)</option>
+                        <option value="obligatoire" selected data-i18n="adoption.mandatory">Obligatoire (100% dès l'année 1)</option>
+                        <option value="rapide" data-i18n="adoption.fast">Rapide</option>
+                        <option value="progressive" data-i18n="adoption.progressive">Progressif</option>
+                        <option value="lent" data-i18n="adoption.slow">Lent</option>
+                        <option value="nouveaux" data-i18n="adoption.new_households">Nouveaux ménages</option>
+                        <option value="par_secteur" data-i18n="adoption.by_sector">Par secteur</option>
+                        <option value="custom" data-i18n="adoption.custom">Personnalisé</option>
+                        <option value="none" data-i18n="adoption.disabled">Désactivé (test)</option>
                     </select>
                 </div>
 
                 <div id="advanced-adoption" style="display:none;">
                     <div class="input-group">
-                        <label>Adoption max (%) <span class="value" id="val-adoption-max">95</span></label>
+                        <label><span data-i18n="adoption.max">Adoption max (%)</span> <span class="value" id="val-adoption-max">95</span></label>
                         <input type="range" id="adoption-max" min="0" max="100" step="1" value="95" oninput="onParamChange()">
                     </div>
 
                     <div class="input-group">
-                        <label>Vitesse (k) <span class="value" id="val-adoption-k">0.50</span></label>
+                        <label><span data-i18n="adoption.speed">Vitesse (k)</span> <span class="value" id="val-adoption-k">0.50</span></label>
                         <input type="range" id="adoption-k" min="0.1" max="2.0" step="0.05" value="0.5" oninput="onParamChange()">
                     </div>
 
                     <div class="input-group">
-                        <label>Point médian (t0) <span class="value" id="val-adoption-t0">5</span></label>
+                        <label><span data-i18n="adoption.midpoint">Point médian (t0)</span> <span class="value" id="val-adoption-t0">5</span></label>
                         <input type="range" id="adoption-t0" min="1" max="20" step="1" value="5" oninput="onParamChange()">
                     </div>
 
                     <div class="input-group" style="display: flex; align-items: center; gap: 10px;">
                         <input type="checkbox" id="adoption-etaler-capex" checked onchange="onParamChange()">
-                        <label for="adoption-etaler-capex" style="margin: 0;">Étaler le CAPEX</label>
+                        <label for="adoption-etaler-capex" style="margin: 0;" data-i18n="adoption.spread_capex">Étaler le CAPEX</label>
                     </div>
                 </div>
             </div>
@@ -1437,41 +1667,41 @@
                 <div class="card-header">
                     <div class="card-icon orange">🌐</div>
                     <div>
-                        <div class="card-title">Fuites réseau</div>
-                        <div class="card-subtitle">Réduction des pertes réseau (optionnel)</div>
+                        <div class="card-title" data-i18n="section.network">Fuites réseau</div>
+                        <div class="card-subtitle" data-i18n="section.network_sub">Réduction des pertes réseau (optionnel)</div>
                     </div>
                 </div>
 
                 <div class="input-group">
-                    <label><input type="checkbox" id="reseau-activer" onchange="onReseauToggle()"> Activer</label>
+                    <label><input type="checkbox" id="reseau-activer" onchange="onReseauToggle()"> <span data-i18n="network.enable">Activer</span></label>
                 </div>
 
                 <div id="advanced-reseau" style="display:none;">
                     <div class="input-group">
-                        <label>Pertes réseau (m³/an)</label>
+                        <label data-i18n="network.losses">Pertes réseau (m³/an)</label>
                         <input type="number" id="reseau-volume" value="0" min="0" step="1000" oninput="onParamChange()">
                     </div>
 
                     <div class="input-group">
-                        <label>Réduction max (%) <span class="value" id="val-reseau-reduc-max">0</span></label>
+                        <label><span data-i18n="network.max_reduction">Réduction max (%)</span> <span class="value" id="val-reseau-reduc-max">0</span></label>
                         <input type="range" id="reseau-reduc-max" min="0" max="100" step="1" value="0" oninput="onParamChange()">
                     </div>
 
                     <div class="input-group">
-                        <label>Mode</label>
+                        <label data-i18n="network.mode">Mode</label>
                         <select id="reseau-mode" onchange="onParamChange()">
-                            <option value="lineaire" selected>Linéaire</option>
-                            <option value="exponentiel">Exponentiel</option>
+                            <option value="lineaire" selected data-i18n="network.linear">Linéaire</option>
+                            <option value="exponentiel" data-i18n="network.exponential">Exponentiel</option>
                         </select>
                     </div>
 
                     <div class="input-group">
-                        <label>Années pour atteindre</label>
+                        <label data-i18n="network.years">Années pour atteindre</label>
                         <input type="number" id="reseau-annees" value="5" min="1" max="40" step="1" oninput="onParamChange()">
                     </div>
 
                     <div class="input-group">
-                        <label><input type="checkbox" id="reseau-pondere" checked onchange="onParamChange()"> Pondérer par adoption</label>
+                        <label><input type="checkbox" id="reseau-pondere" checked onchange="onParamChange()"> <span data-i18n="network.weight_adoption">Pondérer par adoption</span></label>
                     </div>
                 </div>
             </div>
@@ -1481,43 +1711,43 @@
                 <div class="card-header">
                     <div class="card-icon blue">💰</div>
                     <div>
-                        <div class="card-title">Paramètres économiques</div>
-                        <div class="card-subtitle">Valorisation de l'eau</div>
+                        <div class="card-title" data-i18n="section.economic">Paramètres économiques</div>
+                        <div class="card-subtitle" data-i18n="section.economic_sub">Valorisation de l'eau</div>
                     </div>
                 </div>
 
                 <div class="toggle-container">
                     <div class="toggle" id="mode-toggle" onclick="toggleMode()"></div>
-                    <span class="toggle-label" id="mode-label">Mode Économique (valeur sociale)</span>
+                    <span class="toggle-label" id="mode-label" data-i18n="economic.mode_economic">Mode Économique (valeur sociale)</span>
                 </div>
 
                 <div class="input-group">
-                    <label>Valeur de l’eau (preset)</label>
+                    <label data-i18n="economic.water_preset">Valeur de l'eau (preset)</label>
                     <select id="valeur-eau-preset" onchange="onValeurEauPresetChange()">
-                        <option value="custom" selected>Personnalisé</option>
-                        <option value="quebec">Québec</option>
-                        <option value="conservateur">Conservateur</option>
-                        <option value="rarete">Rareté</option>
-                        <option value="quebec_mcf">Québec + MCF</option>
+                        <option value="custom" selected data-i18n="economic.custom">Personnalisé</option>
+                        <option value="quebec" data-i18n="economic.quebec">Québec</option>
+                        <option value="conservateur" data-i18n="economic.conservative">Conservateur</option>
+                        <option value="rarete" data-i18n="economic.scarcity">Rareté</option>
+                        <option value="quebec_mcf" data-i18n="economic.quebec_mcf">Québec + MCF</option>
                     </select>
                 </div>
 
                 <div class="input-group">
-                    <label>Valeur sociale de l'eau <span class="value" id="val-valeur-sociale">4.69 $/m³</span></label>
+                    <label><span data-i18n="economic.social_value">Valeur sociale de l'eau</span> <span class="value" id="val-valeur-sociale">4.69 $/m³</span></label>
                     <input type="range" id="valeur-sociale" min="1" max="12" step="0.1" value="4.69" oninput="onParamChange()">
                 </div>
 
                 <div class="input-group">
-                    <label>Coût variable de production <span class="value" id="val-cout-variable">0.50 $/m³</span></label>
+                    <label><span data-i18n="economic.variable_cost">Coût variable de production</span> <span class="value" id="val-cout-variable">0.50 $/m³</span></label>
                     <input type="range" id="cout-variable" min="0.1" max="2" step="0.05" value="0.5" oninput="onParamChange()">
                 </div>
 
                 <div class="input-group" style="margin-top: 15px;">
                     <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                         <input type="checkbox" id="economies-echelle" onchange="onParamChange()" style="width: 18px; height: 18px;">
-                        Économies d'échelle (>10k compteurs)
+                        <span data-i18n="economic.economies_scale">Économies d'échelle (>10k compteurs)</span>
                     </label>
-                    <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">
+                    <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;" data-i18n="economic.economies_scale_help">
                         Réduction 5-20% sur coûts matériel selon volume
                     </small>
                 </div>
@@ -1525,22 +1755,22 @@
                 <!-- Report d'infrastructure -->
                 <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
                     <div style="font-weight: 600; color: #374151; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
-                        <span>🏗️</span> Report d'infrastructure (optionnel)
+                        <span>🏗️</span> <span data-i18n="economic.infra_deferral">Report d'infrastructure (optionnel)</span>
                     </div>
-                    <small style="color: #666; font-size: 11px; display: block; margin-bottom: 12px;">
+                    <small style="color: #666; font-size: 11px; display: block; margin-bottom: 12px;" data-i18n="economic.infra_deferral_help">
                         Valorise les économies en eau par le report d'investissements en infrastructure (stations, réseaux).
                     </small>
 
                     <div class="input-group">
-                        <label>Bénéfice annuel fixe <span class="value" id="val-report-infra-annuel">0 $/an</span></label>
+                        <label><span data-i18n="economic.annual_benefit">Bénéfice annuel fixe</span> <span class="value" id="val-report-infra-annuel">0 $/an</span></label>
                         <input type="range" id="report-infra-annuel" min="0" max="500000" step="10000" value="0" oninput="onParamChange()">
-                        <small style="color: #666; font-size: 10px;">Report capacité: usine, réservoirs ($/an)</small>
+                        <small style="color: #666; font-size: 10px;" data-i18n="economic.annual_benefit_help">Report capacité: usine, réservoirs ($/an)</small>
                     </div>
 
                     <div class="input-group">
-                        <label>Bénéfice par m³ économisé <span class="value" id="val-report-infra-m3">0.00 $/m³</span></label>
+                        <label><span data-i18n="economic.benefit_per_m3">Bénéfice par m³ économisé</span> <span class="value" id="val-report-infra-m3">0.00 $/m³</span></label>
                         <input type="range" id="report-infra-m3" min="0" max="5" step="0.1" value="0" oninput="onParamChange()">
-                        <small style="color: #666; font-size: 10px;">Coût marginal infrastructure évité</small>
+                        <small style="color: #666; font-size: 10px;" data-i18n="economic.benefit_per_m3_help">Coût marginal infrastructure évité</small>
                     </div>
                 </div>
             </div>
@@ -1550,26 +1780,292 @@
                 <div class="card-header">
                     <div class="card-icon purple">🎲</div>
                     <div>
-                        <div class="card-title">Monte Carlo</div>
-                        <div class="card-subtitle">Paramètres de simulation</div>
+                        <div class="card-title" data-i18n="section.monte_carlo">Monte Carlo</div>
+                        <div class="card-subtitle" data-i18n="section.monte_carlo_sub">Paramètres de simulation</div>
                     </div>
                 </div>
 
                 <div class="input-group">
-                    <label>Monte Carlo – Simulations</label>
+                    <label data-i18n="mc.simulations">Monte Carlo – Simulations</label>
                     <input type="number" id="montecarlo-sims" value="500" min="100" step="50">
                 </div>
 
                 <div class="input-group">
-                    <label>Monte Carlo – Seed</label>
+                    <label data-i18n="mc.seed">Monte Carlo – Seed</label>
                     <input type="number" id="montecarlo-seed" value="42" min="0" step="1">
+                </div>
+
+                <!-- Configuration distributions avancée -->
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
+                    <div style="font-weight: 600; color: #374151; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; cursor: pointer;" onclick="toggleMCDistributions()">
+                        <span>📊</span> <span data-i18n="mc.custom_distributions">Distributions personnalisées</span>
+                        <span id="mc-distrib-toggle" style="margin-left: auto;">▶</span>
+                    </div>
+
+                    <div id="mc-distributions-section" style="display: none;">
+                        <small style="color: #666; font-size: 11px; display: block; margin-bottom: 12px;" data-i18n="mc.custom_distributions_help">
+                            Configurez les distributions pour chaque paramètre clé.
+                        </small>
+
+                        <!-- Alpha0 (réduction comportementale) -->
+                        <div class="mc-param-config" style="margin-bottom: 12px; padding: 10px; background: #f9fafb; border-radius: 8px;">
+                            <label style="font-size: 12px; font-weight: 600; color: #374151;" data-i18n="mc.behavior_reduction">Réduction comportementale (%)</label>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 6px;">
+                                <div>
+                                    <small style="color: #666;" data-i18n="mc.min">Min</small>
+                                    <input type="number" id="mc-alpha0-min" value="4" step="0.5" style="width: 100%; padding: 4px;">
+                                </div>
+                                <div>
+                                    <small style="color: #666;" data-i18n="mc.mode">Mode</small>
+                                    <input type="number" id="mc-alpha0-mode" value="8" step="0.5" style="width: 100%; padding: 4px;">
+                                </div>
+                                <div>
+                                    <small style="color: #666;" data-i18n="mc.max">Max</small>
+                                    <input type="number" id="mc-alpha0-max" value="12" step="0.5" style="width: 100%; padding: 4px;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- LPCD -->
+                        <div class="mc-param-config" style="margin-bottom: 12px; padding: 10px; background: #f9fafb; border-radius: 8px;">
+                            <label style="font-size: 12px; font-weight: 600; color: #374151;" data-i18n="mc.lpcd">LPCD (L/pers/jour)</label>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 6px;">
+                                <div>
+                                    <small style="color: #666;" data-i18n="mc.min">Min</small>
+                                    <input type="number" id="mc-lpcd-min" value="200" step="10" style="width: 100%; padding: 4px;">
+                                </div>
+                                <div>
+                                    <small style="color: #666;" data-i18n="mc.mode">Mode</small>
+                                    <input type="number" id="mc-lpcd-mode" value="236" step="10" style="width: 100%; padding: 4px;">
+                                </div>
+                                <div>
+                                    <small style="color: #666;" data-i18n="mc.max">Max</small>
+                                    <input type="number" id="mc-lpcd-max" value="280" step="10" style="width: 100%; padding: 4px;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Coût compteur -->
+                        <div class="mc-param-config" style="margin-bottom: 12px; padding: 10px; background: #f9fafb; border-radius: 8px;">
+                            <label style="font-size: 12px; font-weight: 600; color: #374151;" data-i18n="mc.meter_cost">Coût compteur ($)</label>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 6px;">
+                                <div>
+                                    <small style="color: #666;" data-i18n="mc.min">Min</small>
+                                    <input type="number" id="mc-cout-min" value="180" step="10" style="width: 100%; padding: 4px;">
+                                </div>
+                                <div>
+                                    <small style="color: #666;" data-i18n="mc.mode">Mode</small>
+                                    <input type="number" id="mc-cout-mode" value="250" step="10" style="width: 100%; padding: 4px;">
+                                </div>
+                                <div>
+                                    <small style="color: #666;" data-i18n="mc.max">Max</small>
+                                    <input type="number" id="mc-cout-max" value="350" step="10" style="width: 100%; padding: 4px;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Valeur eau -->
+                        <div class="mc-param-config" style="margin-bottom: 12px; padding: 10px; background: #f9fafb; border-radius: 8px;">
+                            <label style="font-size: 12px; font-weight: 600; color: #374151;" data-i18n="mc.water_value">Valeur eau ($/m³)</label>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 6px;">
+                                <div>
+                                    <small style="color: #666;" data-i18n="mc.min">Min</small>
+                                    <input type="number" id="mc-valeur-min" value="3.5" step="0.1" style="width: 100%; padding: 4px;">
+                                </div>
+                                <div>
+                                    <small style="color: #666;" data-i18n="mc.mode">Mode</small>
+                                    <input type="number" id="mc-valeur-mode" value="4.69" step="0.1" style="width: 100%; padding: 4px;">
+                                </div>
+                                <div>
+                                    <small style="color: #666;" data-i18n="mc.max">Max</small>
+                                    <input type="number" id="mc-valeur-max" value="6.5" step="0.1" style="width: 100%; padding: 4px;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="input-group" style="margin-top: 10px;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" id="mc-use-custom" style="width: 18px; height: 18px;">
+                                <span data-i18n="mc.use_custom">Utiliser distributions personnalisées</span>
+                            </label>
+                        </div>
+
+                        <div style="display: flex; gap: 8px; margin-top: 10px;">
+                            <button class="btn" style="flex: 1; font-size: 11px; padding: 6px;" onclick="exportMCConfig()" data-i18n="mc.export_config">Exporter config</button>
+                            <button class="btn" style="flex: 1; font-size: 11px; padding: 6px;" onclick="importMCConfig()" data-i18n="mc.import_config">Importer config</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Optimisation déploiement -->
+            <div class="card">
+                <div class="card-header" style="cursor: pointer;" onclick="toggleOptimization()">
+                    <div class="card-icon blue">🎯</div>
+                    <div>
+                        <div class="card-title" data-i18n="section.optimization">Optimisation</div>
+                        <div class="card-subtitle" data-i18n="section.optimization_sub">Déploiement sous contraintes</div>
+                    </div>
+                    <span id="optim-toggle-icon" style="margin-left: auto; font-size: 18px;">▶</span>
+                </div>
+
+                <div id="optimization-section" style="display: none;">
+                    <div class="input-group">
+                        <label><span data-i18n="optim.budget_max">Budget annuel max</span> <span class="value" id="val-budget-max">5 M$</span></label>
+                        <input type="range" id="budget-max" min="500000" max="20000000" step="500000" value="5000000" oninput="updateOptimLabels()">
+                    </div>
+
+                    <div class="input-group">
+                        <label><span data-i18n="optim.capacity_max">Capacité installation</span> <span class="value" id="val-capacite-max">20 000 /an</span></label>
+                        <input type="range" id="capacite-max" min="5000" max="100000" step="5000" value="20000" oninput="updateOptimLabels()">
+                    </div>
+
+                    <div class="input-group">
+                        <label data-i18n="optim.objective">Objectif</label>
+                        <select id="optim-objectif">
+                            <option value="van" data-i18n="optim.maximize_van">Maximiser la VAN</option>
+                            <option value="payback" data-i18n="optim.minimize_payback">Minimiser le payback</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label><span data-i18n="optim.horizon">Horizon déploiement</span> <span class="value" id="val-horizon-deploy">10 ans</span></label>
+                        <input type="range" id="horizon-deploy" min="3" max="15" step="1" value="10" oninput="updateOptimLabels()">
+                    </div>
+
+                    <button class="btn" style="width: 100%; margin-top: 10px;" onclick="runOptimization()">
+                        🎯 <span data-i18n="optim.run">Optimiser le déploiement</span>
+                    </button>
+
+                    <div id="optim-results" style="display: none; margin-top: 15px; padding: 12px; background: #f0fdf4; border-radius: 8px;">
+                        <div style="font-weight: 600; color: #166534; margin-bottom: 8px;" data-i18n="optim.optimal">Scénario optimal</div>
+                        <div style="font-size: 12px; color: #15803d;" id="optim-result-text"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mode Expert -->
+            <div class="card">
+                <div class="card-header" style="cursor: pointer;" onclick="toggleExpertMode()">
+                    <div class="card-icon orange">⚙️</div>
+                    <div>
+                        <div class="card-title" data-i18n="section.expert">Mode Expert</div>
+                        <div class="card-subtitle" data-i18n="section.expert_sub">Paramètres avancés</div>
+                    </div>
+                    <span id="expert-toggle-icon" style="margin-left: auto; font-size: 18px;">▶</span>
+                </div>
+
+                <div id="expert-section" style="display: none;">
+                    <!-- Presets Expert -->
+                    <div class="input-group">
+                        <label data-i18n="expert.preset">Preset expert</label>
+                        <select id="expert-preset" onchange="onExpertPresetChange()">
+                            <option value="standard" selected data-i18n="expert.standard">Standard (défaut)</option>
+                            <option value="conservateur" data-i18n="expert.conservative">Conservateur (prudent)</option>
+                            <option value="agressif" data-i18n="expert.aggressive">Agressif (optimiste)</option>
+                            <option value="custom" data-i18n="expert.custom">Personnalisé</option>
+                        </select>
+                    </div>
+
+                    <!-- MCF Section -->
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
+                        <div style="font-weight: 600; color: #374151; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                            <span>💰</span> <span data-i18n="expert.mcf">Coût Marginal des Fonds publics (MCF)</span>
+                        </div>
+                        <small style="color: #666; font-size: 11px; display: block; margin-bottom: 12px;" data-i18n="expert.mcf_help">
+                            Le MCF représente le coût social de lever 1$ de taxes. Treasury Board Canada: 0.20
+                        </small>
+
+                        <div class="input-group">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" id="appliquer-mcf" onchange="onParamChange()" style="width: 18px; height: 18px;">
+                                <span data-i18n="expert.apply_mcf">Appliquer le MCF aux dépenses publiques</span>
+                            </label>
+                        </div>
+
+                        <div class="input-group">
+                            <label><span data-i18n="expert.mcf_value">Valeur MCF</span> <span class="value" id="val-mcf">0.20</span></label>
+                            <input type="range" id="mcf" min="0.05" max="0.50" step="0.01" value="0.20" oninput="onParamChange()">
+                        </div>
+                    </div>
+
+                    <!-- Persistance avancée -->
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
+                        <div style="font-weight: 600; color: #374151; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                            <span>📉</span> <span data-i18n="expert.persistence_advanced">Persistance comportementale (avancé)</span>
+                        </div>
+                        <small style="color: #666; font-size: 11px; display: block; margin-bottom: 12px;" data-i18n="expert.persistence_help">
+                            Paramètres fins pour le modèle de décroissance comportementale.
+                        </small>
+
+                        <div class="input-group">
+                            <label><span data-i18n="expert.lambda_decay">Lambda décroissance</span> <span class="value" id="val-lambda-decay">0.15</span></label>
+                            <input type="range" id="lambda-decay" min="0.05" max="0.40" step="0.01" value="0.15" oninput="onParamChange()">
+                            <small style="color: #666; font-size: 10px;" data-i18n="expert.lambda_decay_help">Vitesse de déclin vers le plateau (mode réaliste)</small>
+                        </div>
+
+                        <div class="input-group">
+                            <label><span data-i18n="expert.alpha_plateau">Alpha plateau (%)</span> <span class="value" id="val-alpha-plateau">2.5</span></label>
+                            <input type="range" id="alpha-plateau" min="0" max="10" step="0.5" value="2.5" oninput="onParamChange()">
+                            <small style="color: #666; font-size: 10px;" data-i18n="expert.alpha_plateau_help">Réduction résiduelle à long terme</small>
+                        </div>
+                    </div>
+
+                    <!-- Externalités -->
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
+                        <div style="font-weight: 600; color: #374151; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                            <span>🌍</span> <span data-i18n="expert.externalities">Externalités environnementales</span>
+                        </div>
+
+                        <div class="input-group">
+                            <label><span data-i18n="expert.externalities_value">Valeur externalités</span> <span class="value" id="val-externalites">0.50 $/m³</span></label>
+                            <input type="range" id="externalites" min="0" max="3" step="0.1" value="0.5" oninput="onParamChange()">
+                            <small style="color: #666; font-size: 10px;" data-i18n="expert.externalities_help">Carbone, écosystèmes (inclus dans valeur sociale)</small>
+                        </div>
+                    </div>
+
+                    <!-- OPEX détaillé -->
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
+                        <div style="font-weight: 600; color: #374151; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                            <span>📊</span> <span data-i18n="expert.opex_detailed">OPEX détaillé (AMI)</span>
+                        </div>
+                        <small style="color: #666; font-size: 11px; display: block; margin-bottom: 12px;" data-i18n="expert.opex_detailed_help">
+                            Ventilation des coûts opérationnels non-techniques AMI.
+                        </small>
+
+                        <div class="input-group">
+                            <label><span data-i18n="expert.cyber">Cybersécurité</span> <span class="value" id="val-opex-cyber">3.00 $/u/an</span></label>
+                            <input type="range" id="opex-cyber" min="0" max="10" step="0.5" value="3" oninput="onParamChange()">
+                        </div>
+
+                        <div class="input-group">
+                            <label><span data-i18n="expert.licenses">Licences logicielles</span> <span class="value" id="val-opex-licences">5.00 $/u/an</span></label>
+                            <input type="range" id="opex-licences" min="0" max="15" step="0.5" value="5" oninput="onParamChange()">
+                        </div>
+
+                        <div class="input-group">
+                            <label><span data-i18n="expert.storage">Stockage données</span> <span class="value" id="val-opex-stockage">2.00 $/u/an</span></label>
+                            <input type="range" id="opex-stockage" min="0" max="8" step="0.5" value="2" oninput="onParamChange()">
+                        </div>
+
+                        <div class="input-group">
+                            <label><span data-i18n="expert.telecom">Télécom</span> <span class="value" id="val-opex-telecom">5.00 $/u/an</span></label>
+                            <input type="range" id="opex-telecom" min="0" max="15" step="0.5" value="5" oninput="onParamChange()">
+                        </div>
+
+                        <div style="margin-top: 10px; padding: 8px 12px; background: #f3f4f6; border-radius: 6px;">
+                            <small style="color: #374151;">
+                                <strong data-i18n="expert.opex_total">Total OPEX non-tech:</strong> <span id="val-opex-total">15.00 $/u/an</span>
+                            </small>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="main">
+        <main class="main" id="main-content" role="main">
             <!-- Metrics -->
-            <div class="metrics-grid">
+            <div class="metrics-grid" role="region" aria-label="Indicateurs clés">
                 <div class="metric-card primary">
                     <div class="metric-label">Valeur Actualisée Nette</div>
                     <div class="metric-value" id="metric-van">—</div>
@@ -1603,12 +2099,12 @@
             </div>
 
             <div class="actions-bar">
-                <button class="btn" onclick="exportJSON()">Exporter JSON</button>
-                <button class="btn" onclick="exportCSV()">Exporter CSV</button>
-                <button class="btn" onclick="exportPDF()">Exporter PDF</button>
-                <button class="btn" onclick="copyPermalink()">Copier lien</button>
-                <button class="btn" onclick="saveScenario()" style="background: #059669;">Sauvegarder</button>
-                <button class="btn" onclick="toggleComparator()" style="background: #7c3aed;">Comparateur</button>
+                <button class="btn" onclick="exportJSON()" data-i18n="action.export_json">Exporter JSON</button>
+                <button class="btn" onclick="exportCSV()" data-i18n="action.export_csv">Exporter CSV</button>
+                <button class="btn" onclick="exportPDF()" data-i18n="action.export_pdf">Exporter PDF</button>
+                <button class="btn" onclick="copyPermalink()" data-i18n="action.copy_link">Copier lien</button>
+                <button class="btn" onclick="saveScenario()" style="background: #059669;" data-i18n="action.save">Sauvegarder</button>
+                <button class="btn" onclick="toggleComparator()" style="background: #7c3aed;" data-i18n="action.comparator">Comparateur</button>
             </div>
 
             <!-- Comparateur de scénarios -->
@@ -1616,20 +2112,20 @@
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <div style="font-weight: 600; color: #374151;">
-                            <span style="font-size: 1.2em;">📊</span> Scénarios sauvegardés
+                            <span style="font-size: 1.2em;">📊</span> <span data-i18n="comparator.title">Scénarios sauvegardés</span>
                         </div>
-                        <button class="btn" onclick="clearSavedScenarios()" style="background: #dc2626; font-size: 11px; padding: 5px 10px;">Tout effacer</button>
+                        <button class="btn" onclick="clearSavedScenarios()" style="background: #dc2626; font-size: 11px; padding: 5px 10px;" data-i18n="comparator.clear_all">Tout effacer</button>
                     </div>
                     <div id="saved-scenarios-list" style="font-size: 12px;"></div>
                     <div id="comparison-table" style="margin-top: 15px; display: none;">
                         <table class="breakdown-table" style="font-size: 11px;">
                             <thead>
                                 <tr>
-                                    <th>Scénario</th>
+                                    <th data-i18n="comparator.scenario">Scénario</th>
                                     <th>VAN</th>
                                     <th>RBC</th>
                                     <th>Payback</th>
-                                    <th>Actions</th>
+                                    <th data-i18n="comparator.actions">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="comparison-body"></tbody>
@@ -1659,27 +2155,35 @@
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="font-size: 1.2em;">📋</span>
-                        <span style="font-weight: 600; color: #374151;">Hypothèses effectives</span>
-                        <span style="font-size: 11px; color: #6b7280;">(cliquer pour développer)</span>
+                        <span style="font-weight: 600; color: #374151;" data-i18n="hypotheses.title">Hypothèses effectives</span>
+                        <span style="font-size: 11px; color: #6b7280;" data-i18n="hypotheses.expand">(cliquer pour développer)</span>
                     </div>
                     <span id="chevron-hypotheses" style="transition: transform 0.2s;">▼</span>
                 </div>
                 <div id="hypotheses-content" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; font-size: 12px;">
                         <div>
-                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">🏠 Projet</div>
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">🏠 <span data-i18n="hypotheses.project">Projet</span></div>
                             <div id="hyp-projet"></div>
                         </div>
                         <div>
-                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">💧 Fuites</div>
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">💵 <span data-i18n="hypotheses.costs">Coûts</span></div>
+                            <div id="hyp-couts"></div>
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">🚀 <span data-i18n="hypotheses.deployment">Déploiement</span></div>
+                            <div id="hyp-deploiement"></div>
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">💧 <span data-i18n="hypotheses.leaks">Fuites</span></div>
                             <div id="hyp-fuites"></div>
                         </div>
                         <div>
-                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">📈 Comportement</div>
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">📈 <span data-i18n="hypotheses.behavior">Comportement</span></div>
                             <div id="hyp-comportement"></div>
                         </div>
                         <div>
-                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">💰 Valorisation</div>
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">💰 <span data-i18n="hypotheses.valuation">Valorisation</span></div>
                             <div id="hyp-valorisation"></div>
                         </div>
                     </div>
@@ -1691,35 +2195,35 @@
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="font-size: 1.2em;">📐</span>
-                        <span style="font-weight: 600; color: #374151;">Méthodologie</span>
-                        <span style="font-size: 11px; color: #6b7280;">(formules et conventions)</span>
+                        <span style="font-weight: 600; color: #374151;" data-i18n="methodology.title">Méthodologie</span>
+                        <span style="font-size: 11px; color: #6b7280;" data-i18n="methodology.expand">(formules et conventions)</span>
                     </div>
                     <span id="chevron-methodo" style="transition: transform 0.2s;">▼</span>
                 </div>
                 <div id="methodo-content" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #4b5563; line-height: 1.7;">
                     <div style="margin-bottom: 12px;">
-                        <strong>Valeur Actualisée Nette (VAN)</strong><br>
+                        <strong data-i18n="methodology.van_formula">Valeur Actualisée Nette (VAN)</strong><br>
                         <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-size: 11px;">
                             VAN = Σ (Bénéfices_t - Coûts_t) / (1+r)^t - Investissement_0
                         </code>
                     </div>
                     <div style="margin-bottom: 12px;">
-                        <strong>Conventions de signes</strong><br>
-                        • <span style="color: #10b981;">Bénéfices (+)</span>: économies d'eau valorisées, report d'infrastructure<br>
-                        • <span style="color: #ef4444;">Coûts (−)</span>: investissement initial (CAPEX), exploitation (OPEX)
+                        <strong data-i18n="methodology.sign_conventions">Conventions de signes</strong><br>
+                        • <span style="color: #10b981;" data-i18n="methodology.benefits">Bénéfices (+)</span>: <span data-i18n="methodology.benefits_desc">économies d'eau valorisées, report d'infrastructure</span><br>
+                        • <span style="color: #ef4444;" data-i18n="methodology.costs">Coûts (−)</span>: <span data-i18n="methodology.costs_desc">investissement initial (CAPEX), exploitation (OPEX)</span>
                     </div>
                     <div style="margin-bottom: 12px;">
-                        <strong>Perspectives d'analyse</strong><br>
-                        • <b>Économique</b>: valorise l'eau au coût social complet (inclut externalités)<br>
-                        • <b>Financier</b>: valorise l'eau au coût variable évité uniquement
+                        <strong data-i18n="methodology.perspectives">Perspectives d'analyse</strong><br>
+                        • <b>Économique</b>: <span data-i18n="methodology.economic_desc">valorise l'eau au coût social complet (inclut externalités)</span><br>
+                        • <b>Financier</b>: <span data-i18n="methodology.financial_desc">valorise l'eau au coût variable évité uniquement</span>
                     </div>
                     <div style="margin-bottom: 12px;">
-                        <strong>Indicateurs clés</strong><br>
-                        • <b>RBC</b> (Ratio Bénéfices/Coûts): viable si > 1<br>
-                        • <b>LCSW</b>: coût pour économiser 1 m³ d'eau<br>
-                        • <b>Payback</b>: années pour récupérer l'investissement
+                        <strong data-i18n="methodology.indicators">Indicateurs clés</strong><br>
+                        • <b>RBC</b>: <span data-i18n="methodology.rbc_desc">viable si > 1</span><br>
+                        • <b>LCSW</b>: <span data-i18n="methodology.lcsw_desc">coût pour économiser 1 m³ d'eau</span><br>
+                        • <b>Payback</b>: <span data-i18n="methodology.payback_desc">années pour récupérer l'investissement</span>
                     </div>
-                    <div style="font-size: 11px; color: #9ca3af;">
+                    <div style="font-size: 11px; color: #9ca3af;" data-i18n="methodology.sources">
                         Sources: MAMH (2019-2025), méthodologie CBA standard du Conseil du Trésor.
                     </div>
                 </div>
@@ -1734,19 +2238,19 @@
             <!-- Monte Carlo Stats -->
             <div class="mc-stats-grid" id="mc-stats" style="display: none;">
                 <div class="mc-stat-card">
-                    <div class="mc-stat-label">P(VAN > 0)</div>
+                    <div class="mc-stat-label" data-i18n="mc.prob_positive">P(VAN > 0)</div>
                     <div class="mc-stat-value" id="mc-prob">—</div>
                 </div>
                 <div class="mc-stat-card">
-                    <div class="mc-stat-label">VAN Médiane</div>
+                    <div class="mc-stat-label" data-i18n="mc.median">VAN Médiane</div>
                     <div class="mc-stat-value" id="mc-median">—</div>
                 </div>
                 <div class="mc-stat-card">
-                    <div class="mc-stat-label">IC 90% (P5-P95)</div>
+                    <div class="mc-stat-label" data-i18n="mc.ci_90">IC 90% (P5-P95)</div>
                     <div class="mc-stat-value" id="mc-ic">—</div>
                 </div>
                 <div class="mc-stat-card">
-                    <div class="mc-stat-label">Écart-type</div>
+                    <div class="mc-stat-label" data-i18n="mc.std">Écart-type</div>
                     <div class="mc-stat-value" id="mc-std">—</div>
                 </div>
             </div>
@@ -1756,8 +2260,8 @@
                 <div class="chart-card">
                     <div class="chart-header">
                         <div>
-                            <div class="chart-title">VAN Cumulative</div>
-                            <div class="chart-subtitle">Évolution sur l'horizon d'analyse</div>
+                            <div class="chart-title" data-i18n="chart.van_cumulative">VAN Cumulative</div>
+                            <div class="chart-subtitle" data-i18n="chart.van_cumulative_sub">Évolution sur l'horizon d'analyse</div>
                         </div>
                     </div>
                     <div class="chart-wrapper">
@@ -1768,8 +2272,8 @@
                 <div class="chart-card">
                     <div class="chart-header">
                         <div>
-                            <div class="chart-title">Sensibilité des Paramètres (Tornado)</div>
-                            <div class="chart-subtitle">Impact d'une variation de ±10%</div>
+                            <div class="chart-title" data-i18n="chart.sensitivity">Sensibilité des Paramètres (Tornado)</div>
+                            <div class="chart-subtitle" data-i18n="chart.sensitivity_sub">Impact d'une variation de ±10%</div>
                         </div>
                     </div>
                     <div class="chart-wrapper">
@@ -1780,8 +2284,8 @@
                 <div class="chart-card">
                     <div class="chart-header">
                         <div>
-                            <div class="chart-title">Contribution à la VAN (Waterfall)</div>
-                            <div class="chart-subtitle">Décomposition des bénéfices et coûts</div>
+                            <div class="chart-title" data-i18n="chart.waterfall">Contribution à la VAN (Waterfall)</div>
+                            <div class="chart-subtitle" data-i18n="chart.waterfall_sub">Décomposition des bénéfices et coûts</div>
                         </div>
                     </div>
                     <div class="chart-wrapper">
@@ -1792,8 +2296,8 @@
                 <div class="chart-card">
                     <div class="chart-header">
                         <div>
-                            <div class="chart-title">Comparaison des Technologies</div>
-                            <div class="chart-subtitle">VAN selon le type de compteur</div>
+                            <div class="chart-title" data-i18n="chart.technologies">Comparaison des Technologies</div>
+                            <div class="chart-subtitle" data-i18n="chart.technologies_sub">VAN selon le type de compteur</div>
                         </div>
                     </div>
                     <div class="chart-wrapper">
@@ -1804,8 +2308,8 @@
                 <div class="chart-card">
                     <div class="chart-header">
                         <div>
-                            <div class="chart-title">Scénarios de Persistance</div>
-                            <div class="chart-subtitle">Impact du maintien des comportements</div>
+                            <div class="chart-title" data-i18n="chart.persistence">Scénarios de Persistance</div>
+                            <div class="chart-subtitle" data-i18n="chart.persistence_sub">Impact du maintien des comportements</div>
                         </div>
                     </div>
                     <div class="chart-wrapper">
@@ -1816,8 +2320,8 @@
                 <div class="chart-card">
                     <div class="chart-header">
                         <div>
-                            <div class="chart-title">Courbe α — Effet Comportemental</div>
-                            <div class="chart-subtitle">Évolution du coefficient de réduction</div>
+                            <div class="chart-title" data-i18n="chart.alpha">Courbe α — Effet Comportemental</div>
+                            <div class="chart-subtitle" data-i18n="chart.alpha_sub">Évolution du coefficient de réduction</div>
                         </div>
                     </div>
                     <div class="chart-wrapper">
@@ -1828,8 +2332,8 @@
                 <div class="chart-card">
                     <div class="chart-header">
                         <div>
-                            <div class="chart-title">Perspectives par Acteur</div>
-                            <div class="chart-subtitle">VAN: Société / Ville / Ménages</div>
+                            <div class="chart-title" data-i18n="chart.perspectives">Perspectives par Acteur</div>
+                            <div class="chart-subtitle" data-i18n="chart.perspectives_sub">VAN: Société / Ville / Ménages</div>
                         </div>
                     </div>
                     <div class="chart-wrapper">
@@ -1840,8 +2344,8 @@
                 <div class="chart-card">
                     <div class="chart-header">
                         <div>
-                            <div class="chart-title">Dynamique des Fuites</div>
-                            <div class="chart-subtitle">Évolution du stock de fuites actives</div>
+                            <div class="chart-title" data-i18n="chart.leaks">Dynamique des Fuites</div>
+                            <div class="chart-subtitle" data-i18n="chart.leaks_sub">Évolution du stock de fuites actives</div>
                         </div>
                     </div>
                     <div class="chart-wrapper">
@@ -1852,8 +2356,8 @@
                 <div class="chart-card">
                     <div class="chart-header">
                         <div>
-                            <div class="chart-title">Décomposition des Économies</div>
-                            <div class="chart-subtitle">Comportement vs Détection fuites (m³/ménage/an)</div>
+                            <div class="chart-title" data-i18n="chart.decomposition">Décomposition des Économies</div>
+                            <div class="chart-subtitle" data-i18n="chart.decomposition_sub">Comportement vs Détection fuites (m³/ménage/an)</div>
                         </div>
                     </div>
                     <div class="chart-wrapper">
@@ -1876,10 +2380,10 @@
                 <div class="chart-card">
                     <div class="chart-header">
                         <div>
-                            <div class="chart-title">Monte Carlo — Distribution VAN</div>
-                            <div class="chart-subtitle">Simulation stochastique (500 tirages)</div>
+                            <div class="chart-title" data-i18n="chart.monte_carlo">Monte Carlo — Distribution VAN</div>
+                            <div class="chart-subtitle" data-i18n="chart.monte_carlo_sub">Simulation stochastique (500 tirages)</div>
                         </div>
-                        <button class="btn-mc" id="btn-run-mc" onclick="runMonteCarlo()">▶ Lancer</button>
+                        <button class="btn-mc" id="btn-run-mc" onclick="runMonteCarlo()">▶ <span data-i18n="action.run_mc">Lancer</span></button>
                     </div>
                     <div class="chart-wrapper">
                         <canvas id="chart-monte-carlo"></canvas>
@@ -1889,8 +2393,8 @@
                 <div class="chart-card">
                     <div class="chart-header">
                         <div>
-                            <div class="chart-title">Monte Carlo — Drivers de Risque</div>
-                            <div class="chart-subtitle">Corrélations avec la VAN</div>
+                            <div class="chart-title" data-i18n="chart.drivers">Monte Carlo — Drivers de Risque</div>
+                            <div class="chart-subtitle" data-i18n="chart.drivers_sub">Corrélations avec la VAN</div>
                         </div>
                     </div>
                     <div class="chart-wrapper">
@@ -1984,20 +2488,25 @@
                     </table>
                 </div>
             </div>
-        </div>
+        </main>
     </div>
 
-    <div class="footer">
+    <!-- Toggle sidebar mobile -->
+    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Afficher/masquer les paramètres" onclick="toggleSidebar()">
+        ⚙️
+    </button>
+
+    <footer class="footer" role="contentinfo">
         <div>
-            Modèle développé par <strong>Enzo Simier</strong> — HEC Montréal<br>
-            Projet Mitacs / Réseau Environnement Québec • 2026
+            <span data-i18n="footer.developed_by">Modèle développé par</span> <strong>Enzo Simier</strong> — HEC Montréal<br>
+            <span data-i18n="footer.project">Projet Mitacs / Réseau Environnement Québec</span> • 2026
         </div>
         <div style="margin-top: 0.75rem;">
-            <a href="https://github.com/EnzoSim/compteurs.QC">Code source</a> •
-            <a href="#">Documentation</a> •
-            <a href="#">Méthodologie</a>
+            <a href="https://github.com/EnzoSim/compteurs.QC" data-i18n="footer.source">Code source</a> •
+            <a href="#" data-i18n="footer.docs">Documentation</a> •
+            <a href="#" data-i18n="footer.methodology">Méthodologie</a>
         </div>
-    </div>
+    </footer>
 
     <script>
         // Configuration
@@ -2023,11 +2532,24 @@
             '/api/validate_calibration',
         ]);
 
+        // === LANGUE / INTERNATIONALIZATION ===
+        function toggleLanguage() {
+            const newLang = currentLang === 'fr' ? 'en' : 'fr';
+            setLanguage(newLang);
+            document.getElementById('lang-toggle').textContent = newLang.toUpperCase();
+        }
+
         // Initialization
         document.addEventListener('DOMContentLoaded', async () => {
             const overlay = document.getElementById('loading-overlay');
             const overlayText = overlay.querySelector('.loading-text');
             const overlaySubtext = overlay.querySelector('.loading-subtext');
+
+            // Initialiser la langue
+            if (typeof initLanguage === 'function') {
+                initLanguage();
+                document.getElementById('lang-toggle').textContent = currentLang.toUpperCase();
+            }
 
             initCharts();
             updateLabels();
@@ -2075,14 +2597,18 @@
             try {
                 const response = await fetch(`${API_URL}/api/health`, { timeout: 10000 });
                 if (response.ok) {
-                    document.getElementById('api-status').textContent = 'API Connectée';
-                    document.getElementById('api-status').className = 'api-status connected';
+                    const statusEl = document.getElementById('api-status');
+                    statusEl.setAttribute('data-i18n', 'header.api_connected');
+                    statusEl.textContent = typeof t === 'function' ? t('header.api_connected') : 'API Connectée';
+                    statusEl.className = 'api-status connected';
                     return true;
                 }
                 return false;
             } catch (e) {
-                document.getElementById('api-status').textContent = 'API Déconnectée';
-                document.getElementById('api-status').className = 'api-status disconnected';
+                const statusEl = document.getElementById('api-status');
+                statusEl.setAttribute('data-i18n', 'header.api_disconnected');
+                statusEl.textContent = typeof t === 'function' ? t('header.api_disconnected') : 'API Déconnectée';
+                statusEl.className = 'api-status disconnected';
                 return false;
             }
         }
@@ -2155,6 +2681,32 @@
                 params.reseau_pondere_par_adoption = document.getElementById('reseau-pondere').checked;
             }
 
+            // Mode Expert: synchroniser OPEX détaillé si présent
+            if (document.getElementById('opex-cyber')) {
+                const opexTotal = parseFloat(document.getElementById('opex-cyber').value) +
+                                  parseFloat(document.getElementById('opex-licences').value) +
+                                  parseFloat(document.getElementById('opex-stockage').value) +
+                                  parseFloat(document.getElementById('opex-telecom').value);
+                // Mettre à jour le champ principal OPEX AMI
+                document.getElementById('opex-ami').value = opexTotal;
+                params.cout_opex_non_tech_ami = opexTotal;
+            }
+
+            // Mode Expert: paramètres avancés de persistance
+            if (document.getElementById('lambda-decay')) {
+                // Uniquement si mode réaliste (les autres presets n'utilisent pas ces params)
+                if (params.persistance === 'realiste') {
+                    params.expert_lambda_decay = parseFloat(document.getElementById('lambda-decay').value);
+                    params.expert_alpha_plateau = parseFloat(document.getElementById('alpha-plateau').value);
+                }
+            }
+
+            // Mode Expert: MCF (optionnel)
+            if (document.getElementById('appliquer-mcf')) {
+                params.appliquer_mcf = document.getElementById('appliquer-mcf').checked;
+                params.mcf = parseFloat(document.getElementById('mcf').value);
+            }
+
             return params;
         }
 
@@ -2218,6 +2770,14 @@
             onParamChange();
         }
 
+        // Toggle sidebar pour mobile
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            sidebar.classList.toggle('collapsed');
+            const btn = document.getElementById('sidebar-toggle');
+            btn.setAttribute('aria-expanded', !sidebar.classList.contains('collapsed'));
+        }
+
         function toggleAdvanced() {
             const content = document.getElementById('content-fuites');
             const chevron = document.getElementById('chevron-fuites');
@@ -2246,33 +2806,84 @@
             document.getElementById('hyp-projet').innerHTML = `
                 <div style="color: #6b7280; line-height: 1.6;">
                     • Ménages: <b>${params.nb_menages.toLocaleString('fr-CA')}</b><br>
+                    • Taille ménage: <b>${params.taille_menage} pers.</b><br>
                     • Horizon: <b>${params.horizon} ans</b><br>
-                    • Taux actualisation: <b>${params.taux_actualisation}%</b><br>
-                    • Compteur: <b>${params.type_compteur.toUpperCase()}</b> (${params.cout_compteur}$)
+                    • Taux actualisation: <b>${params.taux_actualisation}%</b>
                 </div>
             `;
 
-            // Fuites
+            // Coûts (NOUVEAU)
+            const opexAmi = params.cout_opex_non_tech_ami || 15;
+            const opexLevel = opexAmi <= 12 ? 'Bas' : opexAmi <= 20 ? 'Médian' : 'Haut';
+            const coutTotal = params.cout_compteur + (params.heures_installation * params.taux_horaire) + params.cout_reseau;
+            document.getElementById('hyp-couts').innerHTML = `
+                <div style="color: #6b7280; line-height: 1.6;">
+                    • Compteur: <b>${params.type_compteur.toUpperCase()}</b><br>
+                    • Coût unitaire: <b>${params.cout_compteur}$</b><br>
+                    • Install. + réseau: <b>${(params.heures_installation * params.taux_horaire + params.cout_reseau).toFixed(0)}$</b><br>
+                    • <span style="color: #0369a1;">OPEX non-tech: <b>${opexAmi}$/an</b> (${opexLevel})</span><br>
+                    • Coût/compteur total: <b>${result.cout_par_compteur?.toFixed(0) || coutTotal.toFixed(0)}$</b>
+                </div>
+            `;
+
+            // Déploiement/Adoption (NOUVEAU)
+            const adoptionLabels = {
+                'obligatoire': 'Obligatoire (100% an 1)',
+                'rapide': 'Rapide (3-4 ans)',
+                'progressive': 'Progressive (5-7 ans)',
+                'lent': 'Lent (10+ ans)',
+                'nouveaux': 'Nouveaux branchements',
+                'par_secteur': 'Par secteur',
+                'secteur': 'Par secteur',
+                'custom': 'Personnalisé'
+            };
+            const adoptionLabel = adoptionLabels[params.scenario_adoption] || params.scenario_adoption;
+            document.getElementById('hyp-deploiement').innerHTML = `
+                <div style="color: #6b7280; line-height: 1.6;">
+                    • Stratégie: <b>${adoptionLabel}</b><br>
+                    • Investissement: <b>${(result.investissement_initial/1e6).toFixed(1)} M$</b><br>
+                    ${params.scenario_adoption === 'custom' ? `
+                        • Mode: <b>${params.adoption_mode || 'logistique'}</b><br>
+                        • Taux max: <b>${params.adoption_max_pct || 100}%</b>
+                    ` : ''}
+                    ${params.activer_economies_echelle ? `• <span style="color: #059669;">Éco. d'échelle: <b>activées</b></span>` : ''}
+                </div>
+            `;
+
+            // Fuites (enrichi avec paramètres du modèle)
             const scenarioFuites = params.scenario_fuites;
-            const tarifNote = scenarioFuites.includes('sans_tarif') ? ' (sans signal-prix)' : '';
+            const hasTarif = !scenarioFuites.includes('sans_tarif');
+            const tarifNote = hasTarif ? ' <span style="color:#059669;">(avec signal-prix)</span>' : ' <span style="color:#dc2626;">(sans signal-prix)</span>';
+
+            // Paramètres fuites selon scénario (valeurs utilisées par le modèle)
+            const fuitesDefaults = {
+                'deux_stocks_sans_tarif': { taux_rep: 55, taux_det: 90, prev: '24+6%' },
+                'deux_stocks': { taux_rep: 70, taux_det: 90, prev: '24+6%' },
+                'quebec_sans_tarif': { taux_rep: 55, taux_det: 85, prev: '35%' },
+                'quebec': { taux_rep: 70, taux_det: 85, prev: '35%' },
+                'menage_sans_tarif': { taux_rep: 55, taux_det: 80, prev: '20%' },
+                'standard': { taux_rep: 70, taux_det: 80, prev: '20%' },
+            };
+            const fuitesParams = fuitesDefaults[scenarioFuites] || { taux_rep: '?', taux_det: '?', prev: '?' };
+
             document.getElementById('hyp-fuites').innerHTML = `
                 <div style="color: #6b7280; line-height: 1.6;">
                     • Scénario: <b>${scenarioFuites}</b>${tarifNote}<br>
-                    • Économie fuites: <b>${result.economie_fuite_menage.toFixed(1)} m³/an</b><br>
-                    ${params.scenario_fuites === 'custom' ? `
-                        • Prévalence: <b>${params.prevalence_petites_pct + params.prevalence_grosses_pct}%</b><br>
-                        • Réparation: <b>${params.taux_reparation_pct}%</b>
-                    ` : ''}
+                    • Prévalence: <b>${params.scenario_fuites === 'custom' ? (params.prevalence_petites_pct + params.prevalence_grosses_pct) + '%' : fuitesParams.prev}</b><br>
+                    • Taux détection: <b>${params.scenario_fuites === 'custom' ? params.taux_detection_pct : fuitesParams.taux_det}%</b><br>
+                    • Taux réparation: <b>${params.scenario_fuites === 'custom' ? params.taux_reparation_pct : fuitesParams.taux_rep}%</b><br>
+                    • Économie: <b>${result.economie_fuite_menage.toFixed(1)} m³/an</b>
                 </div>
             `;
 
             // Comportement
             document.getElementById('hyp-comportement').innerHTML = `
                 <div style="color: #6b7280; line-height: 1.6;">
+                    • LPCD: <b>${params.lpcd} L/pers/jour</b><br>
                     • Réduction initiale: <b>${params.reduction_comportement}%</b><br>
                     • Persistance: <b>${params.persistance}</b><br>
-                    • Économie comport.: <b>${result.economie_comportement_menage.toFixed(1)} m³/an</b><br>
-                    • LPCD: <b>${params.lpcd} L/pers/jour</b>
+                    • Économie: <b>${result.economie_comportement_menage.toFixed(1)} m³/an</b><br>
+                    • Usage base: <b>${result.usage_base_menage?.toFixed(0) || '-'} m³/an</b>
                 </div>
             `;
 
@@ -2426,6 +3037,25 @@
             document.getElementById('cout-reseau-group').style.display = isAMI ? 'block' : 'none';
             document.getElementById('cout-infra-fixe-group').style.display = isAMI ? 'block' : 'none';
             document.getElementById('opex-ami-group').style.display = isAMI ? 'block' : 'none';
+
+            // Labels Mode Expert
+            if (document.getElementById('val-mcf')) {
+                document.getElementById('val-mcf').textContent = parseFloat(document.getElementById('mcf').value).toFixed(2);
+                document.getElementById('val-lambda-decay').textContent = parseFloat(document.getElementById('lambda-decay').value).toFixed(2);
+                document.getElementById('val-alpha-plateau').textContent = parseFloat(document.getElementById('alpha-plateau').value).toFixed(1);
+                document.getElementById('val-externalites').textContent = parseFloat(document.getElementById('externalites').value).toFixed(2) + ' $/m³';
+
+                // OPEX détaillé
+                const cyber = parseFloat(document.getElementById('opex-cyber').value);
+                const licences = parseFloat(document.getElementById('opex-licences').value);
+                const stockage = parseFloat(document.getElementById('opex-stockage').value);
+                const telecom = parseFloat(document.getElementById('opex-telecom').value);
+                document.getElementById('val-opex-cyber').textContent = cyber.toFixed(2) + ' $/u/an';
+                document.getElementById('val-opex-licences').textContent = licences.toFixed(2) + ' $/u/an';
+                document.getElementById('val-opex-stockage').textContent = stockage.toFixed(2) + ' $/u/an';
+                document.getElementById('val-opex-telecom').textContent = telecom.toFixed(2) + ' $/u/an';
+                document.getElementById('val-opex-total').textContent = (cyber + licences + stockage + telecom).toFixed(2) + ' $/u/an';
+            }
         }
 
         async function updateModel() {
@@ -2720,6 +3350,107 @@
         function toggleMode() {
             setModeEconomique(!modeEconomique);
             updateModel();
+        }
+
+        // === OPTIMISATION ===
+        let optimizationOpen = false;
+
+        function toggleOptimization() {
+            optimizationOpen = !optimizationOpen;
+            document.getElementById('optimization-section').style.display = optimizationOpen ? 'block' : 'none';
+            document.getElementById('optim-toggle-icon').textContent = optimizationOpen ? '▼' : '▶';
+        }
+
+        function updateOptimLabels() {
+            const budget = parseFloat(document.getElementById('budget-max').value);
+            const capacite = parseInt(document.getElementById('capacite-max').value);
+            const horizon = parseInt(document.getElementById('horizon-deploy').value);
+
+            document.getElementById('val-budget-max').textContent = (budget / 1e6).toFixed(1) + ' M$';
+            document.getElementById('val-capacite-max').textContent = capacite.toLocaleString() + ' /an';
+            document.getElementById('val-horizon-deploy').textContent = horizon + ' ans';
+        }
+
+        async function runOptimization() {
+            try {
+                const params = collectParams();
+                const request = {
+                    params: params,
+                    budget_annuel_max: parseFloat(document.getElementById('budget-max').value),
+                    capacite_installation_max: parseInt(document.getElementById('capacite-max').value),
+                    objectif: document.getElementById('optim-objectif').value,
+                    horizon_deploiement: parseInt(document.getElementById('horizon-deploy').value)
+                };
+
+                const result = await apiCall('/api/optimize_deployment', request);
+
+                // Afficher les résultats
+                const optimal = result.optimal;
+                const resultDiv = document.getElementById('optim-results');
+                resultDiv.style.display = 'block';
+
+                document.getElementById('optim-result-text').innerHTML = `
+                    <strong>${result.recommandation}</strong><br>
+                    VAN: ${formatMoney(optimal.van)}<br>
+                    RBC: ${optimal.rbc.toFixed(2)}<br>
+                    Budget annuel: ${formatMoney(optimal.budget_annuel)}<br>
+                    Payback: ${optimal.payback ? optimal.payback.toFixed(1) + ' ans' : '>20 ans'}
+                `;
+
+            } catch (error) {
+                console.error('Erreur optimisation:', error);
+                alert('Erreur lors de l\'optimisation: ' + error.message);
+            }
+        }
+
+        // === MODE EXPERT ===
+        let expertModeOpen = false;
+
+        function toggleExpertMode() {
+            expertModeOpen = !expertModeOpen;
+            const section = document.getElementById('expert-section');
+            const icon = document.getElementById('expert-toggle-icon');
+            section.style.display = expertModeOpen ? 'block' : 'none';
+            icon.textContent = expertModeOpen ? '▼' : '▶';
+        }
+
+        function onExpertPresetChange() {
+            const preset = document.getElementById('expert-preset').value;
+
+            const presets = {
+                standard: {
+                    mcf: 0.20, appliquerMcf: false,
+                    lambdaDecay: 0.15, alphaPlateau: 2.5,
+                    externalites: 0.5,
+                    cyber: 3, licences: 5, stockage: 2, telecom: 5
+                },
+                conservateur: {
+                    mcf: 0.25, appliquerMcf: true,
+                    lambdaDecay: 0.20, alphaPlateau: 1.5,
+                    externalites: 0.3,
+                    cyber: 4, licences: 7, stockage: 3, telecom: 6
+                },
+                agressif: {
+                    mcf: 0.15, appliquerMcf: false,
+                    lambdaDecay: 0.10, alphaPlateau: 4.0,
+                    externalites: 1.0,
+                    cyber: 2, licences: 4, stockage: 1.5, telecom: 4
+                }
+            };
+
+            if (preset !== 'custom' && presets[preset]) {
+                const p = presets[preset];
+                document.getElementById('mcf').value = p.mcf;
+                document.getElementById('appliquer-mcf').checked = p.appliquerMcf;
+                document.getElementById('lambda-decay').value = p.lambdaDecay;
+                document.getElementById('alpha-plateau').value = p.alphaPlateau;
+                document.getElementById('externalites').value = p.externalites;
+                document.getElementById('opex-cyber').value = p.cyber;
+                document.getElementById('opex-licences').value = p.licences;
+                document.getElementById('opex-stockage').value = p.stockage;
+                document.getElementById('opex-telecom').value = p.telecom;
+                onParamChange();
+            }
         }
 
         function initCharts() {
@@ -3150,6 +3881,104 @@
         // Monte Carlo
         let mcRunning = false;
 
+        // === MONTE CARLO DISTRIBUTIONS ===
+        function toggleMCDistributions() {
+            const section = document.getElementById('mc-distributions-section');
+            const icon = document.getElementById('mc-distrib-toggle');
+            const isOpen = section.style.display !== 'none';
+            section.style.display = isOpen ? 'none' : 'block';
+            icon.textContent = isOpen ? '▶' : '▼';
+        }
+
+        function collectMCDistributions() {
+            return [
+                {
+                    nom: "alpha0",
+                    type_distribution: "triangular",
+                    min_val: parseFloat(document.getElementById('mc-alpha0-min').value) / 100,
+                    mode_val: parseFloat(document.getElementById('mc-alpha0-mode').value) / 100,
+                    max_val: parseFloat(document.getElementById('mc-alpha0-max').value) / 100,
+                },
+                {
+                    nom: "lpcd",
+                    type_distribution: "triangular",
+                    min_val: parseFloat(document.getElementById('mc-lpcd-min').value),
+                    mode_val: parseFloat(document.getElementById('mc-lpcd-mode').value),
+                    max_val: parseFloat(document.getElementById('mc-lpcd-max').value),
+                },
+                {
+                    nom: "cout_compteur",
+                    type_distribution: "triangular",
+                    min_val: parseFloat(document.getElementById('mc-cout-min').value),
+                    mode_val: parseFloat(document.getElementById('mc-cout-mode').value),
+                    max_val: parseFloat(document.getElementById('mc-cout-max').value),
+                },
+                {
+                    nom: "valeur_eau",
+                    type_distribution: "triangular",
+                    min_val: parseFloat(document.getElementById('mc-valeur-min').value),
+                    mode_val: parseFloat(document.getElementById('mc-valeur-mode').value),
+                    max_val: parseFloat(document.getElementById('mc-valeur-max').value),
+                },
+            ];
+        }
+
+        function exportMCConfig() {
+            const config = {
+                distributions: collectMCDistributions(),
+                n_simulations: parseInt(document.getElementById('montecarlo-sims').value),
+                seed: parseInt(document.getElementById('montecarlo-seed').value),
+            };
+            const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "monte-carlo-config.json";
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importMCConfig() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                const text = await file.text();
+                try {
+                    const config = JSON.parse(text);
+                    if (config.distributions) {
+                        config.distributions.forEach(d => {
+                            if (d.nom === 'alpha0') {
+                                document.getElementById('mc-alpha0-min').value = (d.min_val * 100).toFixed(1);
+                                document.getElementById('mc-alpha0-mode').value = (d.mode_val * 100).toFixed(1);
+                                document.getElementById('mc-alpha0-max').value = (d.max_val * 100).toFixed(1);
+                            } else if (d.nom === 'lpcd') {
+                                document.getElementById('mc-lpcd-min').value = d.min_val;
+                                document.getElementById('mc-lpcd-mode').value = d.mode_val;
+                                document.getElementById('mc-lpcd-max').value = d.max_val;
+                            } else if (d.nom === 'cout_compteur') {
+                                document.getElementById('mc-cout-min').value = d.min_val;
+                                document.getElementById('mc-cout-mode').value = d.mode_val;
+                                document.getElementById('mc-cout-max').value = d.max_val;
+                            } else if (d.nom === 'valeur_eau') {
+                                document.getElementById('mc-valeur-min').value = d.min_val;
+                                document.getElementById('mc-valeur-mode').value = d.mode_val;
+                                document.getElementById('mc-valeur-max').value = d.max_val;
+                            }
+                        });
+                    }
+                    if (config.n_simulations) document.getElementById('montecarlo-sims').value = config.n_simulations;
+                    if (config.seed) document.getElementById('montecarlo-seed').value = config.seed;
+                    document.getElementById('mc-use-custom').checked = true;
+                    alert('Configuration importée avec succès');
+                } catch (err) {
+                    alert('Erreur de format JSON');
+                }
+            };
+            input.click();
+        }
+
         async function runMonteCarlo() {
             if (mcRunning) return;
 
@@ -3163,7 +3992,22 @@
                 const params = collectParams();
                 const sims = parseInt(document.getElementById('montecarlo-sims').value || "500");
                 const seed = parseInt(document.getElementById('montecarlo-seed').value || "42");
-                const mcResult = await apiCall(`/api/monte_carlo?n_simulations=${sims}&seed=${seed}`, params);
+                const useCustom = document.getElementById('mc-use-custom')?.checked;
+
+                let mcResult;
+                if (useCustom) {
+                    // Utiliser l'endpoint avancé avec distributions personnalisées
+                    const request = {
+                        params: params,
+                        n_simulations: sims,
+                        seed: seed,
+                        distributions_custom: collectMCDistributions()
+                    };
+                    mcResult = await apiCall('/api/monte_carlo_advanced', request);
+                } else {
+                    // Endpoint standard
+                    mcResult = await apiCall(`/api/monte_carlo?n_simulations=${sims}&seed=${seed}`, params);
+                }
 
                 // Afficher les stats
                 document.getElementById('mc-stats').style.display = 'grid';
@@ -3204,15 +4048,58 @@
             }
         }
 
-        function exportJSON() {
-            const params = collectParams();
-            const blob = new Blob([JSON.stringify(params, null, 2)], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "scenario-compteurs.json";
-            a.click();
-            URL.revokeObjectURL(url);
+        async function exportJSON() {
+            try {
+                const params = collectParams();
+                const result = await apiCall('/api/calculate', params);
+                const health = await apiCall('/api/health', null, 'GET');
+
+                // Export complet: inputs + outputs + métadonnées
+                const exportData = {
+                    _meta: {
+                        export_timestamp: new Date().toISOString(),
+                        model_version: health.version || 'unknown',
+                        export_format_version: "2.0"
+                    },
+                    inputs: params,
+                    outputs: {
+                        van: result.van,
+                        rbc: result.rbc,
+                        payback: result.payback,
+                        lcsw: result.lcsw,
+                        investissement_initial: result.investissement_initial,
+                        va_benefices: result.va_benefices,
+                        va_couts_exploitation: result.va_couts_exploitation,
+                        va_couts_totaux: result.va_couts_totaux,
+                        va_benefices_eau: result.va_benefices_eau,
+                        va_benefices_report_infra: result.va_benefices_report_infra,
+                        va_benefices_cout_variable: result.va_benefices_cout_variable,
+                        economie_totale_menage: result.economie_totale_menage,
+                        economie_comportement_menage: result.economie_comportement_menage,
+                        economie_fuite_menage: result.economie_fuite_menage,
+                        usage_base_menage: result.usage_base_menage,
+                        cout_par_compteur: result.cout_par_compteur,
+                        viable: result.viable,
+                        recommandation: result.recommandation
+                    },
+                    series: {
+                        annees: result.annees,
+                        van_cumulative: result.van_cumulative,
+                        serie_alpha: result.serie_alpha
+                    }
+                };
+
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `scenario-compteurs-${new Date().toISOString().slice(0,10)}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error('Erreur export JSON:', error);
+                alert('Erreur lors de l\'export: ' + error.message);
+            }
         }
 
         async function exportCSV() {
@@ -3568,6 +4455,118 @@
             document.body.style.overflow = '';
         }
 
+        // ========================================
+        // Calibration Modal
+        // ========================================
+        let calibrationData = null;
+
+        function openCalibrationModal() {
+            document.getElementById('calibration-modal').classList.add('active');
+            document.body.style.overflow = 'hidden';
+            resetCalibration();
+        }
+
+        function closeCalibrationModal() {
+            document.getElementById('calibration-modal').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        function resetCalibration() {
+            calibrationData = null;
+            document.getElementById('calibration-upload').style.display = 'block';
+            document.getElementById('calibration-results').style.display = 'none';
+            document.getElementById('csv-file-input').value = '';
+        }
+
+        function handleFileDrop(event) {
+            event.preventDefault();
+            event.target.style.borderColor = '#cbd5e1';
+            const file = event.dataTransfer.files[0];
+            if (file) processCSVFile(file);
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) processCSVFile(file);
+        }
+
+        async function processCSVFile(file) {
+            try {
+                const text = await file.text();
+                const lines = text.trim().split('\n');
+                const data = [];
+
+                // Parser CSV simple
+                for (let i = 1; i < lines.length; i++) {
+                    const parts = lines[i].split(/[,;]/);
+                    if (parts.length >= 2) {
+                        data.push({
+                            mois: parts[0].trim(),
+                            consommation_m3: parseFloat(parts[1].trim())
+                        });
+                    }
+                }
+
+                if (data.length < 3) {
+                    alert('Le fichier doit contenir au moins 3 mois de données.');
+                    return;
+                }
+
+                // Appeler l'API de calibrage
+                const nbMenages = parseInt(document.getElementById('nb-menages').value);
+                const tailleMenage = parseFloat(document.getElementById('taille-menage').value);
+
+                const result = await apiCall('/api/calibrate_from_data', {
+                    data: data,
+                    nb_menages: nbMenages,
+                    taille_menage: tailleMenage
+                });
+
+                calibrationData = result;
+                displayCalibrationResults(result);
+
+            } catch (error) {
+                console.error('Erreur calibrage:', error);
+                alert('Erreur lors du traitement du fichier: ' + error.message);
+            }
+        }
+
+        function displayCalibrationResults(result) {
+            document.getElementById('calibration-upload').style.display = 'none';
+            document.getElementById('calibration-results').style.display = 'block';
+
+            // LPCD
+            document.getElementById('calib-lpcd').textContent = Math.round(result.lpcd.valeur);
+            document.getElementById('calib-lpcd-ic').textContent =
+                `IC 95%: [${Math.round(result.lpcd.intervalle_confiance[0])}, ${Math.round(result.lpcd.intervalle_confiance[1])}]`;
+
+            // Fuites
+            document.getElementById('calib-fuites').textContent = result.fuites_estimees.prevalence_pct.toFixed(0) + '%';
+            document.getElementById('calib-fuites-conf').textContent = 'Confiance: ' + result.fuites_estimees.confiance;
+
+            // Statistiques
+            document.getElementById('calib-mean').textContent = result.consommation_mensuelle.moyenne_m3.toLocaleString();
+            document.getElementById('calib-cv').textContent = result.consommation_mensuelle.coef_variation.toFixed(3);
+            document.getElementById('calib-variance').textContent = result.saisonnalite.variance_ratio.toFixed(2) + 'x';
+            document.getElementById('calib-anomalies').textContent = result.anomalies.nombre;
+        }
+
+        function applyCalibration() {
+            if (!calibrationData) return;
+
+            // Appliquer LPCD
+            const lpcdInput = document.getElementById('lpcd');
+            lpcdInput.value = Math.round(calibrationData.lpcd.valeur);
+
+            // Mettre à jour l'interface
+            updateLabels();
+            onParamChange();
+            closeCalibrationModal();
+
+            // Notification
+            alert(`Calibrage appliqué:\n- LPCD: ${Math.round(calibrationData.lpcd.valeur)} L/pers/jour\n- Qualité données: ${calibrationData.recommandations.qualite_donnees}`);
+        }
+
         // Listen for municipality selection from the map iframe
         window.addEventListener('message', async function(event) {
             // Verify origin for security (adjust if needed)
@@ -3634,16 +4633,79 @@
         <div class="map-modal">
             <div class="map-modal-header">
                 <div>
-                    <div class="map-modal-title">Sélectionner une municipalité</div>
-                    <div class="map-modal-subtitle">Cliquez sur une municipalité pour charger ses données</div>
+                    <div class="map-modal-title" data-i18n="map.title">Sélectionner une municipalité</div>
+                    <div class="map-modal-subtitle" data-i18n="map.subtitle">Cliquez sur une municipalité pour charger ses données</div>
                 </div>
                 <button class="map-modal-close" onclick="closeMapPicker()">✕</button>
             </div>
             <div class="map-modal-body">
                 <iframe src="map/index.html" id="map-iframe"></iframe>
             </div>
-            <div class="map-modal-footer">
+            <div class="map-modal-footer" data-i18n="map.data_source">
                 Données: BIL 2023 (MAMH) • Statistique Canada Recensement 2021
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Calibrage -->
+    <div class="map-modal-overlay" id="calibration-modal" onclick="if(event.target === this) closeCalibrationModal()">
+        <div class="map-modal" style="max-width: 600px;">
+            <div class="map-modal-header">
+                <div>
+                    <div class="map-modal-title">📈 <span data-i18n="calibration.title">Assistant de calibrage</span></div>
+                    <div class="map-modal-subtitle" data-i18n="calibration.subtitle">Importer des données de consommation pour calibrer les paramètres</div>
+                </div>
+                <button class="map-modal-close" onclick="closeCalibrationModal()">✕</button>
+            </div>
+            <div class="map-modal-body" style="padding: 20px; height: auto; max-height: 70vh; overflow-y: auto;">
+                <!-- Zone d'import -->
+                <div id="calibration-upload" style="margin-bottom: 20px;">
+                    <div style="border: 2px dashed #cbd5e1; border-radius: 12px; padding: 30px; text-align: center; cursor: pointer;"
+                         onclick="document.getElementById('csv-file-input').click()"
+                         ondragover="this.style.borderColor='#3b82f6'; event.preventDefault()"
+                         ondragleave="this.style.borderColor='#cbd5e1'"
+                         ondrop="handleFileDrop(event)">
+                        <div style="font-size: 48px; margin-bottom: 10px;">📁</div>
+                        <div style="font-weight: 600; color: #374151;" data-i18n="calibration.drop_file">Glisser un fichier CSV ici</div>
+                        <div style="color: #6b7280; font-size: 13px; margin-top: 5px;" data-i18n="calibration.or_click">ou cliquer pour sélectionner</div>
+                        <input type="file" id="csv-file-input" accept=".csv" style="display: none;" onchange="handleFileSelect(event)">
+                    </div>
+                    <div style="margin-top: 15px; padding: 12px; background: #f1f5f9; border-radius: 8px;">
+                        <div style="font-weight: 600; font-size: 12px; color: #475569; margin-bottom: 8px;" data-i18n="calibration.format">Format attendu (CSV):</div>
+                        <code style="font-size: 11px; color: #64748b;">mois,consommation_m3<br>2024-01,125000<br>2024-02,118000<br>...</code>
+                    </div>
+                </div>
+
+                <!-- Résultats calibrage -->
+                <div id="calibration-results" style="display: none;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div style="background: #f0fdf4; padding: 15px; border-radius: 10px;">
+                            <div style="font-size: 11px; color: #166534; font-weight: 600;" data-i18n="calibration.lpcd_suggested">LPCD suggéré</div>
+                            <div style="font-size: 28px; font-weight: 700; color: #15803d;" id="calib-lpcd">—</div>
+                            <div style="font-size: 10px; color: #22c55e;" id="calib-lpcd-ic">IC 95%: [—, —]</div>
+                        </div>
+                        <div style="background: #fef3c7; padding: 15px; border-radius: 10px;">
+                            <div style="font-size: 11px; color: #92400e; font-weight: 600;" data-i18n="calibration.leak_prevalence">Prévalence fuites</div>
+                            <div style="font-size: 28px; font-weight: 700; color: #d97706;" id="calib-fuites">—%</div>
+                            <div style="font-size: 10px; color: #f59e0b;" id="calib-fuites-conf"><span data-i18n="calibration.confidence">Confiance:</span> —</div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 15px; padding: 12px; background: #f8fafc; border-radius: 8px;">
+                        <div style="font-weight: 600; font-size: 12px; color: #334155; margin-bottom: 8px;" data-i18n="calibration.stats">Statistiques des données</div>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 11px;">
+                            <div><span data-i18n="calibration.mean">Consommation moyenne:</span> <strong id="calib-mean">—</strong> m³/mois</div>
+                            <div><span data-i18n="calibration.cv">Coefficient variation:</span> <strong id="calib-cv">—</strong></div>
+                            <div><span data-i18n="calibration.seasonality">Variance saisonnière:</span> <strong id="calib-variance">—</strong></div>
+                            <div><span data-i18n="calibration.anomalies">Anomalies détectées:</span> <strong id="calib-anomalies">—</strong></div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 15px; display: flex; gap: 10px;">
+                        <button class="btn" style="flex: 1;" onclick="applyCalibration()">✓ <span data-i18n="calibration.apply">Appliquer les valeurs</span></button>
+                        <button class="btn" style="flex: 1; background: #f1f5f9; color: #475569;" onclick="resetCalibration()" data-i18n="calibration.reset">Réinitialiser</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

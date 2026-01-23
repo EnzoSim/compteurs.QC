@@ -13,16 +13,122 @@ Usage production:
     uvicorn api:app --host 0.0.0.0 --port $PORT
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from dataclasses import replace
+from datetime import datetime, timezone
+from collections import defaultdict
 import numpy as np
 import math
 import os
+import time
+import logging
+import json
+
+# =============================================================================
+# OBSERVABILITÉ: LOGGING STRUCTURÉ & MÉTRIQUES
+# =============================================================================
+
+class StructuredLogger:
+    """Logger qui produit des logs JSON structurés."""
+
+    def __init__(self, name: str):
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(logging.INFO)
+        if not self.logger.handlers:
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter('%(message)s'))
+            self.logger.addHandler(handler)
+
+    def _log(self, level: str, message: str, **kwargs):
+        log_entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "level": level,
+            "message": message,
+            **kwargs
+        }
+        self.logger.log(getattr(logging, level.upper()), json.dumps(log_entry))
+
+    def info(self, message: str, **kwargs):
+        self._log("info", message, **kwargs)
+
+    def warning(self, message: str, **kwargs):
+        self._log("warning", message, **kwargs)
+
+    def error(self, message: str, **kwargs):
+        self._log("error", message, **kwargs)
+
+logger = StructuredLogger("api")
+
+class MetricsCollector:
+    """Collecteur de métriques pour monitoring."""
+
+    def __init__(self):
+        self.start_time = datetime.now(timezone.utc)
+        self.request_count: Dict[str, int] = defaultdict(int)
+        self.request_latency: Dict[str, List[float]] = defaultdict(list)
+        self.error_count: Dict[str, int] = defaultdict(int)
+        self.last_error: Optional[Dict[str, Any]] = None
+        self._max_latency_samples = 1000  # Limiter mémoire
+
+    def record_request(self, endpoint: str, latency_ms: float, status_code: int):
+        self.request_count[endpoint] += 1
+        latencies = self.request_latency[endpoint]
+        latencies.append(latency_ms)
+        if len(latencies) > self._max_latency_samples:
+            self.request_latency[endpoint] = latencies[-self._max_latency_samples:]
+
+        if status_code >= 400:
+            error_key = f"{endpoint}_{status_code}"
+            self.error_count[error_key] += 1
+
+    def record_error(self, endpoint: str, error_type: str, error_message: str):
+        self.last_error = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "endpoint": endpoint,
+            "error_type": error_type,
+            "error_message": error_message[:500]
+        }
+
+    def get_uptime_seconds(self) -> float:
+        return (datetime.now(timezone.utc) - self.start_time).total_seconds()
+
+    def get_metrics_prometheus(self) -> str:
+        """Exporter métriques au format Prometheus."""
+        lines = []
+        lines.append("# HELP api_requests_total Total number of API requests")
+        lines.append("# TYPE api_requests_total counter")
+        for endpoint, count in self.request_count.items():
+            safe_endpoint = endpoint.replace("/", "_").replace("-", "_")
+            lines.append(f'api_requests_total{{endpoint="{endpoint}"}} {count}')
+
+        lines.append("# HELP api_request_latency_ms Request latency in milliseconds")
+        lines.append("# TYPE api_request_latency_ms summary")
+        for endpoint, latencies in self.request_latency.items():
+            if latencies:
+                avg = sum(latencies) / len(latencies)
+                p50 = sorted(latencies)[len(latencies) // 2]
+                p95 = sorted(latencies)[int(len(latencies) * 0.95)] if len(latencies) >= 20 else max(latencies)
+                lines.append(f'api_request_latency_ms{{endpoint="{endpoint}",quantile="0.5"}} {p50:.2f}')
+                lines.append(f'api_request_latency_ms{{endpoint="{endpoint}",quantile="0.95"}} {p95:.2f}')
+                lines.append(f'api_request_latency_ms_avg{{endpoint="{endpoint}"}} {avg:.2f}')
+
+        lines.append("# HELP api_errors_total Total number of API errors")
+        lines.append("# TYPE api_errors_total counter")
+        for error_key, count in self.error_count.items():
+            lines.append(f'api_errors_total{{error="{error_key}"}} {count}')
+
+        lines.append("# HELP api_uptime_seconds API uptime in seconds")
+        lines.append("# TYPE api_uptime_seconds gauge")
+        lines.append(f"api_uptime_seconds {self.get_uptime_seconds():.0f}")
+
+        return "\n".join(lines)
+
+metrics = MetricsCollector()
 
 # Import du modèle
 from analyse_compteurs_eau import (
@@ -68,6 +174,7 @@ from analyse_compteurs_eau import (
     ResultatsMonteCarlo,
     simuler_monte_carlo,
     DISTRIBUTIONS_DEFAUT,
+    DistributionParametre,
 )
 
 # =============================================================================
@@ -96,10 +203,67 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Middleware pour collecter les métriques et ajouter headers
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    start_time = time.time()
+    response = None
+    try:
+        response = await call_next(request)
+        # Ajouter header version API
+        response.headers["X-API-Version"] = MODEL_VERSION
+        return response
+    except Exception as e:
+        metrics.record_error(request.url.path, type(e).__name__, str(e))
+        raise
+    finally:
+        latency_ms = (time.time() - start_time) * 1000
+        endpoint = request.url.path
+        status_code = response.status_code if response else 500
+        metrics.record_request(endpoint, latency_ms, status_code)
+        if status_code >= 400:
+            logger.warning(
+                "request_error",
+                endpoint=endpoint,
+                method=request.method,
+                status_code=status_code,
+                latency_ms=round(latency_ms, 2)
+            )
+        else:
+            logger.info(
+                "request_completed",
+                endpoint=endpoint,
+                method=request.method,
+                status_code=status_code,
+                latency_ms=round(latency_ms, 2)
+            )
+
 
 # =============================================================================
 # MODÈLES PYDANTIC (validation des entrées)
 # =============================================================================
+
+class DistributionConfig(BaseModel):
+    """Configuration d'une distribution pour Monte Carlo."""
+    nom: str = Field(..., description="Nom du paramètre (alpha0, lpcd, cout_compteur, etc.)")
+    type_distribution: str = Field("triangular", description="triangular, normal, uniform")
+    min_val: Optional[float] = Field(None, description="Valeur minimum (triangular/uniform)")
+    mode_val: Optional[float] = Field(None, description="Mode/valeur probable (triangular)")
+    max_val: Optional[float] = Field(None, description="Valeur maximum (triangular/uniform)")
+    moyenne: Optional[float] = Field(None, description="Moyenne (normal)")
+    ecart_type: Optional[float] = Field(None, description="Écart-type (normal)")
+
+
+class MonteCarloRequest(BaseModel):
+    """Paramètres pour Monte Carlo avancé."""
+    params: dict = Field(..., description="Paramètres de calcul (même format que CalculRequest)")
+    n_simulations: int = Field(500, ge=100, le=2000, description="Nombre de simulations")
+    seed: int = Field(42, ge=0, description="Seed pour reproductibilité")
+    distributions_custom: Optional[List[DistributionConfig]] = Field(
+        None,
+        description="Distributions personnalisées (remplacent les défauts)"
+    )
+
 
 class CalculRequest(BaseModel):
     """Paramètres pour le calcul principal."""
@@ -248,6 +412,35 @@ class CalculRequest(BaseModel):
     mc_seed: int = Field(default=42, ge=0)
     mc_n_simulations: int = Field(default=500, ge=100)
 
+    # -----------------------------
+    # Mode Expert (optionnel)
+    # -----------------------------
+    # Persistance comportementale avancée
+    expert_lambda_decay: Optional[float] = Field(
+        default=None,
+        ge=0.05,
+        le=0.40,
+        description="Vitesse de déclin vers le plateau (remplace valeur preset si fourni)"
+    )
+    expert_alpha_plateau: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=10.0,
+        description="Réduction résiduelle long terme en % (remplace valeur preset si fourni)"
+    )
+
+    # MCF - Coût Marginal des Fonds publics (optionnel, désactivé par défaut)
+    appliquer_mcf: bool = Field(
+        default=False,
+        description="Appliquer le MCF aux dépenses publiques (CAPEX)"
+    )
+    mcf: float = Field(
+        default=0.20,
+        ge=0.05,
+        le=0.50,
+        description="Coût marginal des fonds publics (Treasury Board: 0.20)"
+    )
+
 
 class CalculResponse(BaseModel):
     """Résultats du calcul."""
@@ -308,8 +501,20 @@ class PresetResponse(BaseModel):
 # FONCTIONS UTILITAIRES
 # =============================================================================
 
-def get_persistance(nom: str, alpha_initial: float) -> ParametresPersistance:
-    """Créer les paramètres de persistance selon le scénario."""
+def get_persistance(
+    nom: str,
+    alpha_initial: float,
+    expert_lambda_decay: Optional[float] = None,
+    expert_alpha_plateau: Optional[float] = None
+) -> ParametresPersistance:
+    """Créer les paramètres de persistance selon le scénario.
+
+    Args:
+        nom: Nom du scénario (optimiste, realiste, pessimiste, ultra)
+        alpha_initial: Réduction comportementale initiale (%)
+        expert_lambda_decay: Valeur custom pour lambda (remplace preset si fourni)
+        expert_alpha_plateau: Valeur custom pour alpha plateau en % (remplace preset si fourni)
+    """
 
     if nom == "optimiste":
         return ParametresPersistance(
@@ -319,11 +524,14 @@ def get_persistance(nom: str, alpha_initial: float) -> ParametresPersistance:
             nom="Optimiste",
         )
     elif nom == "realiste":
+        # Utiliser les valeurs expert si fournies, sinon les defaults
+        lambda_val = expert_lambda_decay if expert_lambda_decay is not None else 0.15
+        plateau_val = (expert_alpha_plateau / 100) if expert_alpha_plateau is not None else 0.025
         return ParametresPersistance(
             mode=ModePersistance.EXPONENTIEL_PLATEAU,
             alpha_initial=alpha_initial / 100,
-            alpha_plateau=0.025,
-            lambda_decay=0.15,
+            alpha_plateau=plateau_val,
+            lambda_decay=lambda_val,
             nom="Réaliste",
         )
     elif nom == "pessimiste":
@@ -434,10 +642,17 @@ def get_fuites(nom: str, req: CalculRequest = None) -> ParametresFuites:
 def get_valeur_eau(req: CalculRequest) -> ParametresValeurEau:
     preset = (req.valeur_eau_preset or "custom").strip().lower()
     if preset != "custom" and preset in PRESETS_VALEUR_EAU:
-        return PRESETS_VALEUR_EAU[preset]
+        base = PRESETS_VALEUR_EAU[preset]
+        appliquer_mcf = base.appliquer_mcf or req.appliquer_mcf
+        mcf_val = req.mcf if req.appliquer_mcf else base.mcf
+        if appliquer_mcf == base.appliquer_mcf and mcf_val == base.mcf:
+            return base
+        return replace(base, appliquer_mcf=appliquer_mcf, mcf=mcf_val)
     return ParametresValeurEau(
         valeur_sociale_m3=req.valeur_sociale,
         cout_variable_m3=req.cout_variable,
+        appliquer_mcf=req.appliquer_mcf,
+        mcf=req.mcf,
     )
 
 
@@ -565,8 +780,25 @@ async def root():
 
 @app.get("/api/health")
 async def health():
-    """Health check."""
-    return {"status": "ok", "version": MODEL_VERSION}
+    """Health check enrichi avec métriques de production."""
+    total_requests = sum(metrics.request_count.values())
+    total_errors = sum(metrics.error_count.values())
+
+    return {
+        "status": "ok",
+        "version": MODEL_VERSION,
+        "uptime_seconds": round(metrics.get_uptime_seconds()),
+        "started_at": metrics.start_time.isoformat(),
+        "total_requests": total_requests,
+        "total_errors": total_errors,
+        "last_error": metrics.last_error,
+    }
+
+
+@app.get("/api/metrics", response_class=PlainTextResponse)
+async def prometheus_metrics():
+    """Endpoint métriques au format Prometheus."""
+    return metrics.get_metrics_prometheus()
 
 
 @app.post("/api/calculate", response_model=CalculResponse)
@@ -593,7 +825,12 @@ async def calculate(req: CalculRequest):
 
         # Créer les autres paramètres
         compteur = get_compteur(req)
-        persistance = get_persistance(req.persistance, req.reduction_comportement)
+        persistance = get_persistance(
+            req.persistance,
+            req.reduction_comportement,
+            expert_lambda_decay=req.expert_lambda_decay,
+            expert_alpha_plateau=req.expert_alpha_plateau
+        )
         fuites = get_fuites(req.scenario_fuites, req)
 
         # Mode d'analyse
@@ -779,7 +1016,12 @@ async def validate_calibration(req: CalculRequest):
             benefice_report_infra_annuel=req.benefice_report_infra_annuel,
             benefice_report_infra_par_m3=req.benefice_report_infra_par_m3,
         )
-        persistance = get_persistance(req.persistance, req.reduction_comportement)
+        persistance = get_persistance(
+            req.persistance,
+            req.reduction_comportement,
+            expert_lambda_decay=req.expert_lambda_decay,
+            expert_alpha_plateau=req.expert_alpha_plateau
+        )
         fuites = get_fuites(req.scenario_fuites, req)
         valeur_eau = get_valeur_eau(req)
 
@@ -890,7 +1132,12 @@ async def detailed_series(req: CalculRequest):
             benefice_report_infra_par_m3=req.benefice_report_infra_par_m3,
         )
 
-        persistance = get_persistance(req.persistance, req.reduction_comportement)
+        persistance = get_persistance(
+            req.persistance,
+            req.reduction_comportement,
+            expert_lambda_decay=req.expert_lambda_decay,
+            expert_alpha_plateau=req.expert_alpha_plateau
+        )
         fuites = get_fuites(req.scenario_fuites, req)
 
         # Calculer la dynamique des fuites
@@ -1046,7 +1293,12 @@ async def monte_carlo(req: CalculRequest, n_simulations: int = 500, seed: int = 
         )
 
         compteur = get_compteur(req)
-        persistance = get_persistance(req.persistance, req.reduction_comportement)
+        persistance = get_persistance(
+            req.persistance,
+            req.reduction_comportement,
+            expert_lambda_decay=req.expert_lambda_decay,
+            expert_alpha_plateau=req.expert_alpha_plateau
+        )
         fuites = get_fuites(req.scenario_fuites, req)
 
         mode = ModeCompte.ECONOMIQUE if req.mode_economique else ModeCompte.FINANCIER
@@ -1113,6 +1365,149 @@ async def monte_carlo(req: CalculRequest, n_simulations: int = 500, seed: int = 
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/monte_carlo/distributions")
+async def get_distributions():
+    """
+    Retourner les distributions Monte Carlo par défaut.
+
+    Utile pour l'UI de configuration des distributions personnalisées.
+    """
+    result = {}
+    for nom, distrib in DISTRIBUTIONS_DEFAUT.items():
+        result[nom] = {
+            "nom": distrib.nom,
+            "type_distribution": distrib.type_distribution,
+            "min_val": distrib.min_val,
+            "mode_val": distrib.mode_val,
+            "max_val": distrib.max_val,
+            "moyenne": distrib.moyenne,
+            "ecart_type": distrib.ecart_type,
+            "description": distrib.description,
+        }
+    return result
+
+
+@app.post("/api/monte_carlo_advanced")
+async def monte_carlo_advanced(req: MonteCarloRequest):
+    """
+    Monte Carlo avec distributions personnalisées.
+
+    Permet de configurer les distributions pour chaque paramètre.
+    """
+    try:
+        # Convertir les params dict en CalculRequest
+        calc_req = CalculRequest(**req.params)
+
+        # Créer les paramètres de base
+        params = ParametresModele(
+            nb_menages=calc_req.nb_menages,
+            taille_menage=calc_req.taille_menage,
+            lpcd=calc_req.lpcd,
+            horizon_analyse=calc_req.horizon,
+            taux_actualisation_pct=calc_req.taux_actualisation,
+            reduction_comportement_pct=calc_req.reduction_comportement,
+            benefice_report_infra_annuel=calc_req.benefice_report_infra_annuel,
+            benefice_report_infra_par_m3=calc_req.benefice_report_infra_par_m3,
+        )
+
+        compteur = get_compteur(calc_req)
+        persistance = get_persistance(
+            calc_req.persistance,
+            calc_req.reduction_comportement,
+            expert_lambda_decay=calc_req.expert_lambda_decay,
+            expert_alpha_plateau=calc_req.expert_alpha_plateau
+        )
+        fuites = get_fuites(calc_req.scenario_fuites, calc_req)
+
+        mode = ModeCompte.ECONOMIQUE if calc_req.mode_economique else ModeCompte.FINANCIER
+        valeur_eau = get_valeur_eau(calc_req)
+
+        params_adoption = get_adoption(calc_req)
+        params_fuites_reseau = get_fuites_reseau(calc_req)
+
+        # Construire les distributions
+        distributions = DISTRIBUTIONS_DEFAUT.copy()
+
+        if req.distributions_custom:
+            for d in req.distributions_custom:
+                distributions[d.nom] = DistributionParametre(
+                    nom=d.nom,
+                    type_distribution=d.type_distribution,
+                    min_val=d.min_val,
+                    mode_val=d.mode_val,
+                    max_val=d.max_val,
+                    moyenne=d.moyenne,
+                    ecart_type=d.ecart_type,
+                )
+
+        # Configuration Monte Carlo
+        config_mc = ParametresMonteCarlo(
+            distributions=distributions,
+            n_simulations=min(req.n_simulations, 2000),
+            seed=req.seed,
+        )
+
+        # Exécuter Monte Carlo
+        resultats_mc = simuler_monte_carlo(
+            params_base=params,
+            compteur_base=compteur,
+            config_mc=config_mc,
+            mode_compte=mode,
+            valeur_eau=valeur_eau,
+            afficher_progression=False,
+            persistance=persistance,
+            params_fuites=fuites,
+            params_adoption=params_adoption,
+            params_fuites_reseau=params_fuites_reseau,
+        )
+
+        # Calculer l'histogramme
+        van_values = resultats_mc.van_simulations
+        hist, bin_edges = np.histogram(van_values, bins=30)
+        bin_centers = [(bin_edges[i] + bin_edges[i+1]) / 2 for i in range(len(hist))]
+
+        return {
+            "n_simulations": resultats_mc.n_simulations,
+            "van_moyenne": float(resultats_mc.van_moyenne),
+            "van_mediane": float(resultats_mc.van_mediane),
+            "van_std": float(resultats_mc.van_ecart_type),
+            "prob_van_positive": float(resultats_mc.prob_van_positive),
+            "percentiles": {
+                "p5": float(resultats_mc.percentile_5),
+                "p25": float(resultats_mc.percentile_25),
+                "p50": float(resultats_mc.van_mediane),
+                "p75": float(resultats_mc.percentile_75),
+                "p95": float(resultats_mc.percentile_95),
+            },
+            "histogram": {
+                "counts": hist.tolist(),
+                "bin_centers": [float(x) for x in bin_centers],
+                "bin_edges": [float(x) for x in bin_edges],
+            },
+            "correlations": [
+                {"param": k, "correlation": float(v)}
+                for k, v in sorted(
+                    resultats_mc.correlations.items(),
+                    key=lambda x: abs(x[1]),
+                    reverse=True
+                )[:8]
+            ] if resultats_mc.correlations else [],
+            "distributions_used": {
+                nom: {
+                    "type": d.type_distribution,
+                    "min": d.min_val,
+                    "mode": d.mode_val,
+                    "max": d.max_val,
+                }
+                for nom, d in distributions.items()
+            }
+        }
+
+    except Exception as e:
+        metrics.record_error("/api/monte_carlo_advanced", type(e).__name__, str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/perspectives")
 async def perspectives(req: CalculRequest):
     """
@@ -1133,7 +1528,12 @@ async def perspectives(req: CalculRequest):
         )
 
         compteur = get_compteur(req)
-        persistance = get_persistance(req.persistance, req.reduction_comportement)
+        persistance = get_persistance(
+            req.persistance,
+            req.reduction_comportement,
+            expert_lambda_decay=req.expert_lambda_decay,
+            expert_alpha_plateau=req.expert_alpha_plateau
+        )
         fuites = get_fuites(req.scenario_fuites, req)
         valeur_eau = get_valeur_eau(req)
         config_echelle = ConfigEconomiesEchelle(activer=req.activer_economies_echelle)
@@ -1198,6 +1598,221 @@ async def get_scenario_name(persistance: str = "realiste", fuites: str = "deux_s
         "persistance": p_nom,
         "fuites": f_nom,
     }
+
+
+class CalibrationData(BaseModel):
+    """Données de consommation pour calibrage automatique."""
+    data: List[dict] = Field(..., description="Liste de {mois/date, consommation_m3}")
+    nb_menages: int = Field(..., ge=1, description="Nombre de ménages dans les données")
+    taille_menage: float = Field(2.2, ge=1.0, le=5.0, description="Taille moyenne du ménage")
+
+
+class OptimizationRequest(BaseModel):
+    """Paramètres pour l'optimisation du déploiement."""
+    params: dict = Field(..., description="Paramètres de calcul de base")
+    budget_annuel_max: float = Field(..., ge=100000, description="Budget annuel maximum ($)")
+    capacite_installation_max: int = Field(..., ge=1000, description="Compteurs installables par an")
+    objectif: str = Field("van", description="Objectif: van (maximiser) ou payback (minimiser)")
+    horizon_deploiement: int = Field(10, ge=1, le=20, description="Horizon de déploiement (années)")
+
+
+@app.post("/api/calibrate_from_data")
+async def calibrate_from_data(req: CalibrationData):
+    """
+    Calibrer les paramètres à partir de données de consommation.
+
+    Analyse les données CSV importées et suggère des valeurs pour:
+    - LPCD moyen
+    - Variance saisonnière
+    - Détection d'anomalies (fuites probables)
+    - Estimation prévalence fuites
+    """
+    try:
+        data = req.data
+        if len(data) < 3:
+            raise HTTPException(status_code=422, detail="Au moins 3 mois de données requis")
+
+        # Extraire les consommations
+        consommations = []
+        for row in data:
+            val = row.get('consommation_m3') or row.get('valeur') or row.get('value')
+            if val is not None:
+                consommations.append(float(val))
+
+        if len(consommations) < 3:
+            raise HTTPException(status_code=422, detail="Données de consommation invalides")
+
+        consommations = np.array(consommations)
+
+        # Calculs statistiques
+        moyenne = float(np.mean(consommations))
+        mediane = float(np.median(consommations))
+        ecart_type = float(np.std(consommations))
+        coef_variation = ecart_type / moyenne if moyenne > 0 else 0
+
+        # LPCD: consommation / (nb_menages * taille_menage * jours_par_mois * 1000 L/m³)
+        jours_mois_moyen = 30.44
+        lpcd = (moyenne * 1000) / (req.nb_menages * req.taille_menage * jours_mois_moyen)
+
+        # Variance saisonnière (ratio max/min)
+        variance_saisonniere = float(np.max(consommations) / np.min(consommations)) if np.min(consommations) > 0 else 1.0
+
+        # Détection anomalies (valeurs > moyenne + 2*sigma)
+        seuil_anomalie = moyenne + 2 * ecart_type
+        anomalies = [i for i, v in enumerate(consommations) if v > seuil_anomalie]
+        nb_anomalies = len(anomalies)
+
+        # Estimation prévalence fuites basée sur la variance
+        # Hypothèse: haute variance = plus de fuites intermittentes
+        if coef_variation > 0.3:
+            prevalence_estimee = min(35, 20 + (coef_variation - 0.3) * 50)
+        elif coef_variation > 0.15:
+            prevalence_estimee = 15 + (coef_variation - 0.15) * 33
+        else:
+            prevalence_estimee = max(10, coef_variation * 100)
+
+        # Intervalles de confiance (95%)
+        n = len(consommations)
+        t_value = 1.96 if n > 30 else 2.0  # Approximation
+        margin = t_value * ecart_type / np.sqrt(n)
+
+        lpcd_low = (moyenne - margin) * 1000 / (req.nb_menages * req.taille_menage * jours_mois_moyen)
+        lpcd_high = (moyenne + margin) * 1000 / (req.nb_menages * req.taille_menage * jours_mois_moyen)
+
+        return {
+            "lpcd": {
+                "valeur": round(lpcd, 0),
+                "intervalle_confiance": [round(lpcd_low, 0), round(lpcd_high, 0)],
+                "description": "Litres par personne par jour"
+            },
+            "consommation_mensuelle": {
+                "moyenne_m3": round(moyenne, 0),
+                "mediane_m3": round(mediane, 0),
+                "ecart_type_m3": round(ecart_type, 0),
+                "coef_variation": round(coef_variation, 3)
+            },
+            "saisonnalite": {
+                "variance_ratio": round(variance_saisonniere, 2),
+                "description": "Ratio max/min mensuel"
+            },
+            "anomalies": {
+                "nombre": nb_anomalies,
+                "mois_suspects": anomalies,
+                "seuil_m3": round(seuil_anomalie, 0),
+                "description": "Mois avec consommation anormalement élevée (fuites probables)"
+            },
+            "fuites_estimees": {
+                "prevalence_pct": round(prevalence_estimee, 1),
+                "intervalle": [max(10, round(prevalence_estimee - 10, 0)), min(40, round(prevalence_estimee + 10, 0))],
+                "confiance": "moyenne" if 0.15 < coef_variation < 0.35 else "faible",
+                "description": "Estimation basée sur la variabilité des données"
+            },
+            "recommandations": {
+                "lpcd_suggere": round(lpcd, 0),
+                "prevalence_fuites_suggeree": round(prevalence_estimee, 0),
+                "qualite_donnees": "bonne" if n >= 12 else "limitée" if n >= 6 else "insuffisante"
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        metrics.record_error("/api/calibrate_from_data", type(e).__name__, str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/optimize_deployment")
+async def optimize_deployment(req: OptimizationRequest):
+    """
+    Trouver la trajectoire de déploiement optimale sous contraintes.
+
+    Optimise le rythme de déploiement pour maximiser la VAN
+    ou minimiser le payback sous contraintes de budget et capacité.
+    """
+    try:
+        calc_req = CalculRequest(**req.params)
+
+        # Coût par compteur
+        cout_unitaire = (
+            calc_req.cout_compteur +
+            calc_req.heures_installation * calc_req.taux_horaire +
+            calc_req.cout_reseau
+        )
+
+        # Calcul du nombre max de compteurs par an selon contraintes
+        compteurs_budget = int(req.budget_annuel_max / cout_unitaire)
+        compteurs_par_an = min(compteurs_budget, req.capacite_installation_max)
+
+        # Années nécessaires pour déployer tous les compteurs
+        annees_deploiement = math.ceil(calc_req.nb_menages / compteurs_par_an)
+
+        # Générer plusieurs scénarios de déploiement
+        scenarios = []
+
+        for vitesse in [0.5, 0.75, 1.0, 1.25, 1.5]:
+            compteurs_scenario = int(compteurs_par_an * vitesse)
+            if compteurs_scenario < 1000:
+                continue
+
+            annees = math.ceil(calc_req.nb_menages / compteurs_scenario)
+            if annees > req.horizon_deploiement:
+                continue
+
+            # Calculer avec ce scénario d'adoption
+            params_scenario = req.params.copy()
+            params_scenario['scenario_adoption'] = 'custom'
+            params_scenario['adoption_mode'] = 'secteur'
+            params_scenario['adoption_nb_secteurs'] = annees
+            params_scenario['adoption_annees_par_secteur'] = 1
+            params_scenario['adoption_max_pct'] = 100
+
+            try:
+                calc_req_scenario = CalculRequest(**params_scenario)
+                result = await calculate(calc_req_scenario)
+
+                scenarios.append({
+                    "compteurs_par_an": compteurs_scenario,
+                    "annees_deploiement": annees,
+                    "budget_annuel": compteurs_scenario * cout_unitaire,
+                    "van": result.van,
+                    "rbc": result.rbc,
+                    "payback": result.payback,
+                    "investissement_initial": result.investissement_initial,
+                })
+            except Exception:
+                continue
+
+        if not scenarios:
+            raise HTTPException(status_code=422, detail="Aucun scénario viable trouvé")
+
+        # Trouver l'optimal selon l'objectif
+        if req.objectif == "van":
+            optimal = max(scenarios, key=lambda s: s["van"])
+        else:  # payback
+            valides = [s for s in scenarios if s["payback"] is not None]
+            if valides:
+                optimal = min(valides, key=lambda s: s["payback"])
+            else:
+                optimal = scenarios[0]
+
+        return {
+            "optimal": optimal,
+            "scenarios": sorted(scenarios, key=lambda s: -s["van"]),
+            "contraintes": {
+                "budget_annuel_max": req.budget_annuel_max,
+                "capacite_installation_max": req.capacite_installation_max,
+                "cout_unitaire": cout_unitaire,
+                "compteurs_max_budget": compteurs_budget,
+                "compteurs_effectifs": compteurs_par_an,
+            },
+            "recommandation": f"Déployer {optimal['compteurs_par_an']:,} compteurs/an sur {optimal['annees_deploiement']} ans"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        metrics.record_error("/api/optimize_deployment", type(e).__name__, str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # =============================================================================

@@ -614,11 +614,28 @@ class QuebecMap {
         }
 
         // API: PostMessage for iframe integration (calculator modal)
+        // Security: Only send to same origin or explicitly allowed origins
         if (window.parent !== window) {
-            window.parent.postMessage({
-                type: 'municipalitySelected',
-                data: { ...feature.properties }
-            }, '*');
+            // Get the parent origin - default to same origin for security
+            const allowedOrigins = [
+                window.location.origin,  // Same origin (most common case)
+                'https://water-cba.onrender.com',  // Production domain
+                'http://localhost:8000',  // Local development
+                'http://127.0.0.1:8000',  // Local development alt
+            ];
+
+            // Use same origin by default, which is the most secure option
+            const targetOrigin = window.location.origin;
+
+            try {
+                window.parent.postMessage({
+                    type: 'municipalitySelected',
+                    data: { ...feature.properties }
+                }, targetOrigin);
+            } catch (e) {
+                // Fallback: if same-origin fails (cross-origin iframe), log warning
+                console.warn('PostMessage failed - cross-origin iframe detected. Municipality selection event not sent to parent.');
+            }
         }
     }
 
