@@ -842,6 +842,39 @@
             color: #047857;
         }
 
+        .actions-bar {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin: 0 0 1rem 0;
+        }
+
+        .btn {
+            padding: 0.5rem 0.9rem;
+            background: var(--card);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            border-color: var(--primary-light);
+            background: #f8fafc;
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+
+        .help-text {
+            color: #666;
+            font-size: 11px;
+            margin-top: 4px;
+            display: block;
+        }
+
         /* Monte Carlo Stats Grid */
         .mc-stats-grid {
             display: grid;
@@ -1186,6 +1219,12 @@
                     <label>Coût infra fixe (IT, intégration) <span class="value" id="val-cout-infra-fixe">0 $</span></label>
                     <input type="range" id="cout-infra-fixe" min="0" max="2000000" step="50000" value="0" oninput="onParamChange()">
                 </div>
+
+                <div class="input-group" id="opex-ami-group">
+                    <label>OPEX AMI non-tech <span class="value" id="val-opex-ami">15 $/an</span></label>
+                    <input type="range" id="opex-ami" min="0" max="50" step="1" value="15" oninput="onParamChange()">
+                    <small style="color: #666; font-size: 10px;">Cyber, logiciels, stockage, télécom (Bas=10, Médian=15, Haut=35)</small>
+                </div>
             </div>
 
             <!-- Behavior & Leaks -->
@@ -1216,9 +1255,36 @@
                 <div class="input-group">
                     <label>Scénario de fuites</label>
                     <select id="scenario-fuites" onchange="onScenarioFuitesChange()">
-                        <option value="deux_stocks_sans_tarif" selected>Réaliste (calibré Québec)</option>
-                        <option value="custom">Personnalisé...</option>
+                        <optgroup label="Avec signal-prix (réparation plus probable)">
+                            <option value="standard">Standard (20%)</option>
+                            <option value="quebec">Québec (35%)</option>
+                            <option value="deux_stocks">Québec différencié (2 stocks)</option>
+                            <option value="menage">Ménage (40%)</option>
+                            <option value="subvention_50">Subvention 50%</option>
+                            <option value="ville">Ville (meilleure détection)</option>
+                        </optgroup>
+
+                        <optgroup label="Sans signal-prix (sans tarification volumétrique)">
+                            <option value="menage_sans_tarif">Ménage (sans tarif)</option>
+                            <option value="quebec_sans_tarif">Québec (sans tarif)</option>
+                            <option value="deux_stocks_sans_tarif" selected>QC différencié (sans tarif)</option>
+                        </optgroup>
+
+                        <optgroup label="Avancé">
+                            <option value="custom">Personnalisé</option>
+                        </optgroup>
                     </select>
+
+                    <div class="input-group" style="margin-top:0.75rem;">
+                        <label style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
+                            <span>Tarification volumétrique en place</span>
+                            <input type="checkbox" id="tarification" onchange="onTarificationToggle()">
+                        </label>
+                        <small class="help-text">
+                            Note: le modèle ne simule pas une tarification (facturation). Ici, c’est juste un “signal-prix”
+                            qui influence la dynamique de réparation des fuites.
+                        </small>
+                    </div>
                 </div>
 
                 <!-- Paramètres avancés fuites (collapsible) -->
@@ -1319,6 +1385,97 @@
                 </div>
             </div>
 
+            <!-- Deployment / Adoption -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon blue">🚀</div>
+                    <div>
+                        <div class="card-title">Déploiement (adoption)</div>
+                        <div class="card-subtitle">Simule un déploiement progressif</div>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>Scénario d’adoption</label>
+                    <select id="scenario-adoption" onchange="onScenarioAdoptionChange()">
+                        <option value="obligatoire" selected>Obligatoire (100% dès l’année 1)</option>
+                        <option value="rapide">Rapide</option>
+                        <option value="progressive">Progressif</option>
+                        <option value="lent">Lent</option>
+                        <option value="nouveaux">Nouveaux ménages</option>
+                        <option value="par_secteur">Par secteur</option>
+                        <option value="custom">Personnalisé</option>
+                        <option value="none">Désactivé (test)</option>
+                    </select>
+                </div>
+
+                <div id="advanced-adoption" style="display:none;">
+                    <div class="input-group">
+                        <label>Adoption max (%) <span class="value" id="val-adoption-max">95</span></label>
+                        <input type="range" id="adoption-max" min="0" max="100" step="1" value="95" oninput="onParamChange()">
+                    </div>
+
+                    <div class="input-group">
+                        <label>Vitesse (k) <span class="value" id="val-adoption-k">0.50</span></label>
+                        <input type="range" id="adoption-k" min="0.1" max="2.0" step="0.05" value="0.5" oninput="onParamChange()">
+                    </div>
+
+                    <div class="input-group">
+                        <label>Point médian (t0) <span class="value" id="val-adoption-t0">5</span></label>
+                        <input type="range" id="adoption-t0" min="1" max="20" step="1" value="5" oninput="onParamChange()">
+                    </div>
+
+                    <div class="input-group" style="display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="adoption-etaler-capex" checked onchange="onParamChange()">
+                        <label for="adoption-etaler-capex" style="margin: 0;">Étaler le CAPEX</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fuites réseau -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon orange">🌐</div>
+                    <div>
+                        <div class="card-title">Fuites réseau</div>
+                        <div class="card-subtitle">Réduction des pertes réseau (optionnel)</div>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label><input type="checkbox" id="reseau-activer" onchange="onReseauToggle()"> Activer</label>
+                </div>
+
+                <div id="advanced-reseau" style="display:none;">
+                    <div class="input-group">
+                        <label>Pertes réseau (m³/an)</label>
+                        <input type="number" id="reseau-volume" value="0" min="0" step="1000" oninput="onParamChange()">
+                    </div>
+
+                    <div class="input-group">
+                        <label>Réduction max (%) <span class="value" id="val-reseau-reduc-max">0</span></label>
+                        <input type="range" id="reseau-reduc-max" min="0" max="100" step="1" value="0" oninput="onParamChange()">
+                    </div>
+
+                    <div class="input-group">
+                        <label>Mode</label>
+                        <select id="reseau-mode" onchange="onParamChange()">
+                            <option value="lineaire" selected>Linéaire</option>
+                            <option value="exponentiel">Exponentiel</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Années pour atteindre</label>
+                        <input type="number" id="reseau-annees" value="5" min="1" max="40" step="1" oninput="onParamChange()">
+                    </div>
+
+                    <div class="input-group">
+                        <label><input type="checkbox" id="reseau-pondere" checked onchange="onParamChange()"> Pondérer par adoption</label>
+                    </div>
+                </div>
+            </div>
+
             <!-- Economic Parameters -->
             <div class="card">
                 <div class="card-header">
@@ -1332,6 +1489,17 @@
                 <div class="toggle-container">
                     <div class="toggle" id="mode-toggle" onclick="toggleMode()"></div>
                     <span class="toggle-label" id="mode-label">Mode Économique (valeur sociale)</span>
+                </div>
+
+                <div class="input-group">
+                    <label>Valeur de l’eau (preset)</label>
+                    <select id="valeur-eau-preset" onchange="onValeurEauPresetChange()">
+                        <option value="custom" selected>Personnalisé</option>
+                        <option value="quebec">Québec</option>
+                        <option value="conservateur">Conservateur</option>
+                        <option value="rarete">Rareté</option>
+                        <option value="quebec_mcf">Québec + MCF</option>
+                    </select>
                 </div>
 
                 <div class="input-group">
@@ -1352,6 +1520,49 @@
                     <small style="color: #666; font-size: 11px; margin-top: 4px; display: block;">
                         Réduction 5-20% sur coûts matériel selon volume
                     </small>
+                </div>
+
+                <!-- Report d'infrastructure -->
+                <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
+                    <div style="font-weight: 600; color: #374151; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                        <span>🏗️</span> Report d'infrastructure (optionnel)
+                    </div>
+                    <small style="color: #666; font-size: 11px; display: block; margin-bottom: 12px;">
+                        Valorise les économies en eau par le report d'investissements en infrastructure (stations, réseaux).
+                    </small>
+
+                    <div class="input-group">
+                        <label>Bénéfice annuel fixe <span class="value" id="val-report-infra-annuel">0 $/an</span></label>
+                        <input type="range" id="report-infra-annuel" min="0" max="500000" step="10000" value="0" oninput="onParamChange()">
+                        <small style="color: #666; font-size: 10px;">Report capacité: usine, réservoirs ($/an)</small>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Bénéfice par m³ économisé <span class="value" id="val-report-infra-m3">0.00 $/m³</span></label>
+                        <input type="range" id="report-infra-m3" min="0" max="5" step="0.1" value="0" oninput="onParamChange()">
+                        <small style="color: #666; font-size: 10px;">Coût marginal infrastructure évité</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Monte Carlo Settings -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon purple">🎲</div>
+                    <div>
+                        <div class="card-title">Monte Carlo</div>
+                        <div class="card-subtitle">Paramètres de simulation</div>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>Monte Carlo – Simulations</label>
+                    <input type="number" id="montecarlo-sims" value="500" min="100" step="50">
+                </div>
+
+                <div class="input-group">
+                    <label>Monte Carlo – Seed</label>
+                    <input type="number" id="montecarlo-seed" value="42" min="0" step="1">
                 </div>
             </div>
         </div>
@@ -1391,6 +1602,42 @@
                 </div>
             </div>
 
+            <div class="actions-bar">
+                <button class="btn" onclick="exportJSON()">Exporter JSON</button>
+                <button class="btn" onclick="exportCSV()">Exporter CSV</button>
+                <button class="btn" onclick="exportPDF()">Exporter PDF</button>
+                <button class="btn" onclick="copyPermalink()">Copier lien</button>
+                <button class="btn" onclick="saveScenario()" style="background: #059669;">Sauvegarder</button>
+                <button class="btn" onclick="toggleComparator()" style="background: #7c3aed;">Comparateur</button>
+            </div>
+
+            <!-- Comparateur de scénarios -->
+            <div id="comparator-panel" style="display: none; margin-top: 1rem;">
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <div style="font-weight: 600; color: #374151;">
+                            <span style="font-size: 1.2em;">📊</span> Scénarios sauvegardés
+                        </div>
+                        <button class="btn" onclick="clearSavedScenarios()" style="background: #dc2626; font-size: 11px; padding: 5px 10px;">Tout effacer</button>
+                    </div>
+                    <div id="saved-scenarios-list" style="font-size: 12px;"></div>
+                    <div id="comparison-table" style="margin-top: 15px; display: none;">
+                        <table class="breakdown-table" style="font-size: 11px;">
+                            <thead>
+                                <tr>
+                                    <th>Scénario</th>
+                                    <th>VAN</th>
+                                    <th>RBC</th>
+                                    <th>Payback</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="comparison-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- Scenario Badge -->
             <div class="scenario-badge" id="scenario-badge">
                 <div class="scenario-icon">📊</div>
@@ -1402,6 +1649,79 @@
                     <span class="tag tag-persistance">Réaliste</span>
                     <span class="tag tag-fuites">Réaliste</span>
                     <span class="tag tag-mode">Économique</span>
+                </div>
+            </div>
+
+            <div id="calibration-warnings" style="display:none;margin-top:1rem;"></div>
+
+            <!-- Hypothèses effectives (collapsible) -->
+            <div class="card" style="margin-top: 1rem; cursor: pointer;" onclick="toggleHypotheses()">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.2em;">📋</span>
+                        <span style="font-weight: 600; color: #374151;">Hypothèses effectives</span>
+                        <span style="font-size: 11px; color: #6b7280;">(cliquer pour développer)</span>
+                    </div>
+                    <span id="chevron-hypotheses" style="transition: transform 0.2s;">▼</span>
+                </div>
+                <div id="hypotheses-content" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; font-size: 12px;">
+                        <div>
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">🏠 Projet</div>
+                            <div id="hyp-projet"></div>
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">💧 Fuites</div>
+                            <div id="hyp-fuites"></div>
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">📈 Comportement</div>
+                            <div id="hyp-comportement"></div>
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">💰 Valorisation</div>
+                            <div id="hyp-valorisation"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Méthodologie (collapsible) -->
+            <div class="card" style="margin-top: 1rem; cursor: pointer;" onclick="toggleMethodo()">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.2em;">📐</span>
+                        <span style="font-weight: 600; color: #374151;">Méthodologie</span>
+                        <span style="font-size: 11px; color: #6b7280;">(formules et conventions)</span>
+                    </div>
+                    <span id="chevron-methodo" style="transition: transform 0.2s;">▼</span>
+                </div>
+                <div id="methodo-content" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #4b5563; line-height: 1.7;">
+                    <div style="margin-bottom: 12px;">
+                        <strong>Valeur Actualisée Nette (VAN)</strong><br>
+                        <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-size: 11px;">
+                            VAN = Σ (Bénéfices_t - Coûts_t) / (1+r)^t - Investissement_0
+                        </code>
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <strong>Conventions de signes</strong><br>
+                        • <span style="color: #10b981;">Bénéfices (+)</span>: économies d'eau valorisées, report d'infrastructure<br>
+                        • <span style="color: #ef4444;">Coûts (−)</span>: investissement initial (CAPEX), exploitation (OPEX)
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <strong>Perspectives d'analyse</strong><br>
+                        • <b>Économique</b>: valorise l'eau au coût social complet (inclut externalités)<br>
+                        • <b>Financier</b>: valorise l'eau au coût variable évité uniquement
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <strong>Indicateurs clés</strong><br>
+                        • <b>RBC</b> (Ratio Bénéfices/Coûts): viable si > 1<br>
+                        • <b>LCSW</b>: coût pour économiser 1 m³ d'eau<br>
+                        • <b>Payback</b>: années pour récupérer l'investissement
+                    </div>
+                    <div style="font-size: 11px; color: #9ca3af;">
+                        Sources: MAMH (2019-2025), méthodologie CBA standard du Conseil du Trésor.
+                    </div>
                 </div>
             </div>
 
@@ -1460,6 +1780,18 @@
                 <div class="chart-card">
                     <div class="chart-header">
                         <div>
+                            <div class="chart-title">Contribution à la VAN (Waterfall)</div>
+                            <div class="chart-subtitle">Décomposition des bénéfices et coûts</div>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-waterfall"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
                             <div class="chart-title">Comparaison des Technologies</div>
                             <div class="chart-subtitle">VAN selon le type de compteur</div>
                         </div>
@@ -1496,8 +1828,8 @@
                 <div class="chart-card">
                     <div class="chart-header">
                         <div>
-                            <div class="chart-title">Économique vs Financier</div>
-                            <div class="chart-subtitle">Comparaison des perspectives d'analyse</div>
+                            <div class="chart-title">Perspectives par Acteur</div>
+                            <div class="chart-subtitle">VAN: Société / Ville / Ménages</div>
                         </div>
                     </div>
                     <div class="chart-wrapper">
@@ -1676,6 +2008,20 @@
         let modeEconomique = true;
         let debounceTimer = null;
         let charts = {};
+        let suppressParamChange = false;
+        let currentAbortController = null;  // Pour annuler les requêtes en cours
+        let permalinkApplied = false;
+        const apiCache = new Map();
+        const API_CACHE_LIMIT = 50;
+        const CACHEABLE_ENDPOINTS = new Set([
+            '/api/calculate',
+            '/api/sensitivity',
+            '/api/compare_meters',
+            '/api/compare_persistence',
+            '/api/detailed_series',
+            '/api/compare_fuites',
+            '/api/validate_calibration',
+        ]);
 
         // Initialization
         document.addEventListener('DOMContentLoaded', async () => {
@@ -1710,7 +2056,10 @@
                 // Étape 2: Chargement du modèle
                 overlayText.textContent = 'Chargement du modèle...';
                 overlaySubtext.textContent = 'Calcul des scénarios';
-                await updateModel();
+                const appliedPermalink = await loadFromPermalink();
+                if (!appliedPermalink) {
+                    await updateModel();
+                }
 
                 // Masquer l'overlay
                 overlay.classList.add('hidden');
@@ -1751,13 +2100,20 @@
                 taux_horaire: parseFloat(document.getElementById('taux-horaire').value),
                 cout_reseau: parseFloat(document.getElementById('cout-reseau').value),
                 cout_infra_fixe: parseFloat(document.getElementById('cout-infra-fixe').value),
+                cout_opex_non_tech_ami: parseFloat(document.getElementById('opex-ami').value),
                 reduction_comportement: parseFloat(document.getElementById('reduction-comportement').value),
                 persistance: document.getElementById('persistance').value,
                 scenario_fuites: document.getElementById('scenario-fuites').value,
+                scenario_adoption: document.getElementById('scenario-adoption').value,
                 mode_economique: modeEconomique,
                 valeur_sociale: parseFloat(document.getElementById('valeur-sociale').value),
                 cout_variable: parseFloat(document.getElementById('cout-variable').value),
+                valeur_eau_preset: document.getElementById('valeur-eau-preset').value,
                 activer_economies_echelle: document.getElementById('economies-echelle').checked,
+                benefice_report_infra_annuel: parseFloat(document.getElementById('report-infra-annuel').value),
+                benefice_report_infra_par_m3: parseFloat(document.getElementById('report-infra-m3').value),
+                mc_seed: parseInt(document.getElementById('montecarlo-seed').value || "42"),
+                mc_n_simulations: parseInt(document.getElementById('montecarlo-sims').value || "500"),
             };
 
             // Ajouter les paramètres avancés si mode custom
@@ -1783,7 +2139,31 @@
                 params.inclure_cout_reparation = document.getElementById('inclure-couts').checked;
             }
 
+            if (params.scenario_adoption === 'custom') {
+                params.adoption_max_pct = parseFloat(document.getElementById('adoption-max').value);
+                params.adoption_k_vitesse = parseFloat(document.getElementById('adoption-k').value);
+                params.adoption_t0_point_median = parseFloat(document.getElementById('adoption-t0').value);
+                params.adoption_etaler_capex = document.getElementById('adoption-etaler-capex').checked;
+            }
+
+            params.reseau_activer = document.getElementById('reseau-activer').checked;
+            if (params.reseau_activer) {
+                params.reseau_volume_pertes_m3_an = parseFloat(document.getElementById('reseau-volume').value || "0");
+                params.reseau_reduction_max_pct = parseFloat(document.getElementById('reseau-reduc-max').value);
+                params.reseau_mode_reduction = document.getElementById('reseau-mode').value;
+                params.reseau_annees_atteinte = parseInt(document.getElementById('reseau-annees').value);
+                params.reseau_pondere_par_adoption = document.getElementById('reseau-pondere').checked;
+            }
+
             return params;
+        }
+
+        function isSansTarifScenario(key) {
+            return (key || "").endsWith("_sans_tarif");
+        }
+
+        function hasOption(selectEl, value) {
+            return Array.from(selectEl.options).some(o => o.value === value);
         }
 
         function onScenarioFuitesChange() {
@@ -1798,6 +2178,43 @@
                 advancedSection.style.display = 'none';
             }
 
+            document.getElementById('tarification').checked = !isSansTarifScenario(scenario);
+
+            updateScenarioBadge();
+            onParamChange();
+        }
+
+        function onTarificationToggle() {
+            const checked = document.getElementById('tarification').checked;
+            const sel = document.getElementById('scenario-fuites');
+            const key = sel.value;
+
+            if (checked && isSansTarifScenario(key)) {
+                const base = key.replace("_sans_tarif", "");
+                if (hasOption(sel, base)) sel.value = base;
+            }
+
+            if (!checked && !isSansTarifScenario(key)) {
+                const sans = key + "_sans_tarif";
+                if (hasOption(sel, sans)) sel.value = sans;
+            }
+
+            onScenarioFuitesChange();
+        }
+
+        function onScenarioAdoptionChange() {
+            const scenario = document.getElementById('scenario-adoption').value;
+            document.getElementById('advanced-adoption').style.display = (scenario === "custom") ? "block" : "none";
+            onParamChange();
+        }
+
+        function onReseauToggle() {
+            const on = document.getElementById('reseau-activer').checked;
+            document.getElementById('advanced-reseau').style.display = on ? 'block' : 'none';
+            onParamChange();
+        }
+
+        function onValeurEauPresetChange() {
             onParamChange();
         }
 
@@ -1808,9 +2225,103 @@
             chevron.classList.toggle('open');
         }
 
-        async function apiCall(endpoint, data = null) {
+        function toggleHypotheses() {
+            const content = document.getElementById('hypotheses-content');
+            const chevron = document.getElementById('chevron-hypotheses');
+            const isOpen = content.style.display !== 'none';
+            content.style.display = isOpen ? 'none' : 'block';
+            chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+        }
+
+        function toggleMethodo() {
+            const content = document.getElementById('methodo-content');
+            const chevron = document.getElementById('chevron-methodo');
+            const isOpen = content.style.display !== 'none';
+            content.style.display = isOpen ? 'none' : 'block';
+            chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+        }
+
+        function updateHypotheses(params, result) {
+            // Projet
+            document.getElementById('hyp-projet').innerHTML = `
+                <div style="color: #6b7280; line-height: 1.6;">
+                    • Ménages: <b>${params.nb_menages.toLocaleString('fr-CA')}</b><br>
+                    • Horizon: <b>${params.horizon} ans</b><br>
+                    • Taux actualisation: <b>${params.taux_actualisation}%</b><br>
+                    • Compteur: <b>${params.type_compteur.toUpperCase()}</b> (${params.cout_compteur}$)
+                </div>
+            `;
+
+            // Fuites
+            const scenarioFuites = params.scenario_fuites;
+            const tarifNote = scenarioFuites.includes('sans_tarif') ? ' (sans signal-prix)' : '';
+            document.getElementById('hyp-fuites').innerHTML = `
+                <div style="color: #6b7280; line-height: 1.6;">
+                    • Scénario: <b>${scenarioFuites}</b>${tarifNote}<br>
+                    • Économie fuites: <b>${result.economie_fuite_menage.toFixed(1)} m³/an</b><br>
+                    ${params.scenario_fuites === 'custom' ? `
+                        • Prévalence: <b>${params.prevalence_petites_pct + params.prevalence_grosses_pct}%</b><br>
+                        • Réparation: <b>${params.taux_reparation_pct}%</b>
+                    ` : ''}
+                </div>
+            `;
+
+            // Comportement
+            document.getElementById('hyp-comportement').innerHTML = `
+                <div style="color: #6b7280; line-height: 1.6;">
+                    • Réduction initiale: <b>${params.reduction_comportement}%</b><br>
+                    • Persistance: <b>${params.persistance}</b><br>
+                    • Économie comport.: <b>${result.economie_comportement_menage.toFixed(1)} m³/an</b><br>
+                    • LPCD: <b>${params.lpcd} L/pers/jour</b>
+                </div>
+            `;
+
+            // Valorisation
+            const reportInfraAnnuel = params.benefice_report_infra_annuel || 0;
+            const reportInfraM3 = params.benefice_report_infra_par_m3 || 0;
+            document.getElementById('hyp-valorisation').innerHTML = `
+                <div style="color: #6b7280; line-height: 1.6;">
+                    • Mode: <b>${params.mode_economique ? 'Économique' : 'Financier'}</b><br>
+                    • Valeur eau: <b>${params.valeur_sociale} $/m³</b><br>
+                    • Coût variable: <b>${params.cout_variable} $/m³</b><br>
+                    ${reportInfraAnnuel > 0 || reportInfraM3 > 0 ? `• Report infra: <b>${reportInfraAnnuel > 0 ? (reportInfraAnnuel/1000).toFixed(0)+'k$/an' : ''} ${reportInfraM3 > 0 ? reportInfraM3.toFixed(2)+'$/m³' : ''}</b>` : '• Report infra: <b>non activé</b>'}
+                </div>
+            `;
+        }
+
+        function stableStringify(obj) {
+            if (obj === null || typeof obj !== 'object') {
+                return JSON.stringify(obj);
+            }
+            if (Array.isArray(obj)) {
+                return '[' + obj.map(stableStringify).join(',') + ']';
+            }
+            return '{' + Object.keys(obj).sort().map(key => {
+                return JSON.stringify(key) + ':' + stableStringify(obj[key]);
+            }).join(',') + '}';
+        }
+
+        function cacheSet(key, value) {
+            if (apiCache.size >= API_CACHE_LIMIT) {
+                const firstKey = apiCache.keys().next().value;
+                apiCache.delete(firstKey);
+            }
+            apiCache.set(key, value);
+        }
+
+        async function apiCall(endpoint, data = null, useAbort = false) {
             const loading = document.getElementById('loading');
             loading.classList.add('active');
+
+            // Si useAbort, annuler les requêtes précédentes et créer un nouveau contrôleur
+            let abortController = null;
+            if (useAbort) {
+                if (currentAbortController) {
+                    currentAbortController.abort();
+                }
+                abortController = new AbortController();
+                currentAbortController = abortController;
+            }
 
             try {
                 const options = {
@@ -1818,11 +2329,29 @@
                     headers: { 'Content-Type': 'application/json' },
                 };
                 if (data) options.body = JSON.stringify(data);
+                if (abortController) options.signal = abortController.signal;
+
+                const baseEndpoint = endpoint.split('?')[0];
+                if (data && CACHEABLE_ENDPOINTS.has(baseEndpoint)) {
+                    const cacheKey = `${baseEndpoint}|${stableStringify(data)}`;
+                    if (apiCache.has(cacheKey)) {
+                        return apiCache.get(cacheKey);
+                    }
+                    const response = await fetch(`${API_URL}${endpoint}`, options);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const result = await response.json();
+                    cacheSet(cacheKey, result);
+                    return result;
+                }
 
                 const response = await fetch(`${API_URL}${endpoint}`, options);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 return await response.json();
             } catch (e) {
+                if (e.name === 'AbortError') {
+                    // Requête annulée, c'est normal
+                    return null;
+                }
                 console.error('API Error:', e);
                 throw e;
             } finally {
@@ -1831,9 +2360,10 @@
         }
 
         function onParamChange() {
+            updateLabels();
+            if (suppressParamChange) return;
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(updateModel, 200);
-            updateLabels();
         }
 
         function updateLabels() {
@@ -1850,9 +2380,17 @@
             document.getElementById('val-cout-infra-fixe').textContent = coutInfraFixe >= 1000000
                 ? (coutInfraFixe / 1000000).toFixed(1) + ' M$'
                 : (coutInfraFixe / 1000).toFixed(0) + ' k$';
+            document.getElementById('val-opex-ami').textContent = document.getElementById('opex-ami').value + ' $/an';
             document.getElementById('val-reduction').textContent = parseFloat(document.getElementById('reduction-comportement').value).toFixed(1) + ' %';
             document.getElementById('val-valeur-sociale').textContent = parseFloat(document.getElementById('valeur-sociale').value).toFixed(2) + ' $/m³';
             document.getElementById('val-cout-variable').textContent = parseFloat(document.getElementById('cout-variable').value).toFixed(2) + ' $/m³';
+
+            // Labels report d'infrastructure
+            const reportAnnuel = parseFloat(document.getElementById('report-infra-annuel').value);
+            document.getElementById('val-report-infra-annuel').textContent = reportAnnuel >= 1000
+                ? (reportAnnuel / 1000).toFixed(0) + ' k$/an'
+                : reportAnnuel.toFixed(0) + ' $/an';
+            document.getElementById('val-report-infra-m3').textContent = parseFloat(document.getElementById('report-infra-m3').value).toFixed(2) + ' $/m³';
 
             // Labels paramètres avancés fuites
             const prevPetites = parseFloat(document.getElementById('prevalence-petites').value);
@@ -1874,17 +2412,53 @@
             document.getElementById('val-cout-grosse').textContent = document.getElementById('cout-grosse').value + ' $';
             document.getElementById('val-part-ville').textContent = document.getElementById('part-ville').value + ' %';
 
+            if (document.getElementById('val-adoption-max')) {
+                document.getElementById('val-adoption-max').textContent = document.getElementById('adoption-max').value + ' %';
+                document.getElementById('val-adoption-k').textContent = parseFloat(document.getElementById('adoption-k').value).toFixed(2);
+                document.getElementById('val-adoption-t0').textContent = document.getElementById('adoption-t0').value;
+            }
+
+            if (document.getElementById('val-reseau-reduc-max')) {
+                document.getElementById('val-reseau-reduc-max').textContent = document.getElementById('reseau-reduc-max').value + ' %';
+            }
+
             const isAMI = document.getElementById('type-compteur').value === 'ami';
             document.getElementById('cout-reseau-group').style.display = isAMI ? 'block' : 'none';
             document.getElementById('cout-infra-fixe-group').style.display = isAMI ? 'block' : 'none';
+            document.getElementById('opex-ami-group').style.display = isAMI ? 'block' : 'none';
         }
 
         async function updateModel() {
             try {
                 const params = collectParams();
-                const result = await apiCall('/api/calculate', params);
+                const result = await apiCall('/api/calculate', params, true);  // useAbort=true
+                if (!result) return;  // Requête annulée
                 updateDisplay(result);
+                updateHypotheses(params, result);
                 updateScenarioBadge();
+
+                try {
+                    const warnings = await apiCall('/api/validate_calibration', collectParams());
+                    const box = document.getElementById('calibration-warnings');
+                    const bad = (warnings.warnings || []).filter(w => !w.ok);
+
+                    if (bad.length === 0) {
+                        box.style.display = 'none';
+                    } else {
+                        box.style.display = 'block';
+                        box.innerHTML = `
+                            <div class="recommendation warning">
+                                <div class="recommendation-icon">!</div>
+                                <div class="recommendation-text">
+                                    <b>Paramètres hors calibration</b><br>
+                                    ${bad.map(w => `• <b>${w.param}</b>: ${w.message}`).join('<br>')}
+                                </div>
+                            </div>
+                        `;
+                    }
+                } catch (e) {
+                    console.warn("Validation calibration indisponible:", e);
+                }
 
                 const [sensitivity, meters, persistence] = await Promise.all([
                     apiCall('/api/sensitivity', params),
@@ -1975,6 +2549,22 @@
             charts.van.data.labels = result.annees;
             charts.van.data.datasets[0].data = result.van_cumulative.map(v => v / 1e6);
             charts.van.update('none');
+
+            // Mise à jour du graphique waterfall
+            const waterfallData = [
+                -result.investissement_initial / 1e6,
+                -result.va_couts_exploitation / 1e6,
+                (result.va_benefices_eau || result.va_benefices) / 1e6,
+                (result.va_benefices_report_infra || 0) / 1e6,
+                result.van / 1e6
+            ];
+            charts.waterfall.data.datasets[0].data = waterfallData;
+            // Ajuster les couleurs selon le signe
+            charts.waterfall.data.datasets[0].backgroundColor = waterfallData.map((v, i) => {
+                if (i === 4) return v >= 0 ? chartColors.success : chartColors.danger;  // VAN
+                return v >= 0 ? chartColors.success : chartColors.danger;
+            });
+            charts.waterfall.update('none');
 
             charts.alpha.data.labels = result.annees;
             charts.alpha.data.datasets[0].data = result.serie_alpha;
@@ -2075,14 +2665,25 @@
         }
 
         async function updatePerspectivesChart(params) {
-            const [resEco, resFin] = await Promise.all([
-                apiCall('/api/calculate', { ...params, mode_economique: true }),
-                apiCall('/api/calculate', { ...params, mode_economique: false }),
-            ]);
+            try {
+                const persp = await apiCall('/api/perspectives', params);
+                if (!persp) return;
 
-            charts.perspectives.data.datasets[0].data = [resEco.va_benefices / 1e6, resEco.va_couts_totaux / 1e6, resEco.van / 1e6];
-            charts.perspectives.data.datasets[1].data = [resFin.va_benefices / 1e6, resFin.va_couts_totaux / 1e6, resFin.van / 1e6];
-            charts.perspectives.update('none');
+                const data = [
+                    persp.van_economique / 1e6,
+                    persp.van_ville / 1e6,
+                    persp.van_menages / 1e6
+                ];
+
+                charts.perspectives.data.datasets[0].data = data;
+                // Colorer selon positif/négatif
+                charts.perspectives.data.datasets[0].backgroundColor = data.map(v =>
+                    v >= 0 ? chartColors.success : chartColors.danger
+                );
+                charts.perspectives.update('none');
+            } catch (e) {
+                console.warn('Perspectives chart update failed:', e);
+            }
         }
 
         async function loadPreset(ville) {
@@ -2108,12 +2709,16 @@
             await updateModel();
         }
 
-        function toggleMode() {
-            modeEconomique = !modeEconomique;
+        function setModeEconomique(value) {
+            modeEconomique = !!value;
             document.getElementById('mode-toggle').classList.toggle('active', !modeEconomique);
             document.getElementById('mode-label').textContent = modeEconomique
                 ? 'Mode Économique (valeur sociale)'
                 : 'Mode Financier (coût variable)';
+        }
+
+        function toggleMode() {
+            setModeEconomique(!modeEconomique);
             updateModel();
         }
 
@@ -2208,6 +2813,46 @@
                 }
             });
 
+            // Waterfall chart - Contribution VAN
+            charts.waterfall = new Chart(document.getElementById('chart-waterfall').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['Investissement', 'OPEX', 'Bénéfices eau', 'Report infra', 'VAN'],
+                    datasets: [{
+                        label: 'Contribution (M$)',
+                        data: [0, 0, 0, 0, 0],
+                        backgroundColor: [
+                            chartColors.danger,      // Investissement (négatif)
+                            chartColors.warning,     // OPEX (négatif)
+                            chartColors.success,     // Bénéfices eau (positif)
+                            chartColors.info,        // Report infra (positif)
+                            chartColors.primary      // VAN (résultat)
+                        ],
+                        borderRadius: 4,
+                        barPercentage: 0.7
+                    }]
+                },
+                options: {
+                    ...defaultOptions,
+                    plugins: {
+                        ...defaultOptions.plugins,
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${ctx.raw >= 0 ? '+' : ''}${ctx.raw.toFixed(2)} M$`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { ...defaultOptions.scales.x },
+                        y: {
+                            ...defaultOptions.scales.y,
+                            title: { display: true, text: 'M$', font: { family: 'Inter', weight: 600 } }
+                        }
+                    }
+                }
+            });
+
             charts.types = new Chart(document.getElementById('chart-types').getContext('2d'), {
                 type: 'bar',
                 data: {
@@ -2278,17 +2923,35 @@
             charts.perspectives = new Chart(document.getElementById('chart-perspectives').getContext('2d'), {
                 type: 'bar',
                 data: {
-                    labels: ['Bénéfices', 'Coûts', 'VAN'],
-                    datasets: [
-                        { label: 'Économique', data: [], backgroundColor: chartColors.primary, borderRadius: 6 },
-                        { label: 'Financier', data: [], backgroundColor: chartColors.secondary, borderRadius: 6 }
-                    ]
+                    labels: ['Économique', 'Ville', 'Ménages'],
+                    datasets: [{
+                        label: 'VAN (M$)',
+                        data: [],
+                        backgroundColor: [chartColors.primary, chartColors.info, chartColors.success],
+                        borderRadius: 6
+                    }]
                 },
                 options: {
                     ...defaultOptions,
+                    plugins: {
+                        ...defaultOptions.plugins,
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => {
+                                    const labels = {
+                                        0: 'Bien-être social (externalités incluses)',
+                                        1: 'Budget municipal',
+                                        2: 'Perspective citoyens'
+                                    };
+                                    return `${ctx.raw >= 0 ? '+' : ''}${ctx.raw.toFixed(2)} M$ - ${labels[ctx.dataIndex]}`;
+                                }
+                            }
+                        }
+                    },
                     scales: {
                         ...defaultOptions.scales,
-                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'M$', font: { family: 'Inter', weight: 600 } } }
+                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'VAN (M$)', font: { family: 'Inter', weight: 600 } } }
                     }
                 }
             });
@@ -2443,7 +3106,15 @@
             };
 
             const fuitesNoms = {
-                'deux_stocks_sans_tarif': 'Réaliste',
+                'standard': 'Standard (20%)',
+                'quebec': 'Québec (35%)',
+                'deux_stocks': 'QC différencié',
+                'menage': 'Ménage (40%)',
+                'subvention_50': 'Subvention 50%',
+                'ville': 'Ville (détection ↑)',
+                'menage_sans_tarif': 'Ménage sans tarif',
+                'quebec_sans_tarif': 'Québec sans tarif',
+                'deux_stocks_sans_tarif': 'QC différencié sans tarif',
                 'custom': 'Personnalisé'
             };
 
@@ -2464,6 +3135,9 @@
                 const fuitesData = await apiCall('/api/compare_fuites', params);
 
                 charts.fuitesScenarios.data.labels = currentResult.annees;
+                charts.fuitesScenarios.data.datasets[0].label = fuitesData.standard.nom;
+                charts.fuitesScenarios.data.datasets[1].label = fuitesData.quebec.nom;
+                charts.fuitesScenarios.data.datasets[2].label = fuitesData.deux_stocks.nom;
                 charts.fuitesScenarios.data.datasets[0].data = fuitesData.standard.van_cumulative.map(v => v / 1e6);
                 charts.fuitesScenarios.data.datasets[1].data = fuitesData.quebec.van_cumulative.map(v => v / 1e6);
                 charts.fuitesScenarios.data.datasets[2].data = fuitesData.deux_stocks.van_cumulative.map(v => v / 1e6);
@@ -2482,12 +3156,14 @@
             const btn = document.getElementById('btn-run-mc');
             btn.disabled = true;
             btn.classList.add('loading');
-            btn.textContent = '⏳ Simulation...';
+            btn.textContent = 'Simulation...';
             mcRunning = true;
 
             try {
                 const params = collectParams();
-                const mcResult = await apiCall('/api/monte_carlo', params);
+                const sims = parseInt(document.getElementById('montecarlo-sims').value || "500");
+                const seed = parseInt(document.getElementById('montecarlo-seed').value || "42");
+                const mcResult = await apiCall(`/api/monte_carlo?n_simulations=${sims}&seed=${seed}`, params);
 
                 // Afficher les stats
                 document.getElementById('mc-stats').style.display = 'grid';
@@ -2525,6 +3201,356 @@
                 btn.classList.remove('loading');
                 btn.textContent = '▶ Lancer';
                 mcRunning = false;
+            }
+        }
+
+        function exportJSON() {
+            const params = collectParams();
+            const blob = new Blob([JSON.stringify(params, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "scenario-compteurs.json";
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        async function exportCSV() {
+            try {
+                const params = collectParams();
+                const result = await apiCall('/api/calculate', params);
+                const series = await apiCall('/api/detailed_series', params);
+
+                // Créer le CSV
+                let csv = "Analyse CBA Compteurs d'Eau - Export\n\n";
+
+                // Section Paramètres
+                csv += "PARAMETRES\n";
+                csv += `Ménages;${params.nb_menages}\n`;
+                csv += `Horizon (ans);${params.horizon}\n`;
+                csv += `Taux actualisation (%);${params.taux_actualisation}\n`;
+                csv += `Type compteur;${params.type_compteur}\n`;
+                csv += `Scénario fuites;${params.scenario_fuites}\n`;
+                csv += `Scénario adoption;${params.scenario_adoption}\n`;
+                csv += `Persistance;${params.persistance}\n`;
+                csv += "\n";
+
+                // Section Résultats
+                csv += "RESULTATS\n";
+                csv += `VAN ($);${result.van.toFixed(0)}\n`;
+                csv += `RBC;${result.rbc.toFixed(2)}\n`;
+                csv += `Payback (ans);${result.payback ? result.payback.toFixed(1) : '>20'}\n`;
+                csv += `LCSW ($/m3);${result.lcsw.toFixed(2)}\n`;
+                csv += `Investissement ($);${result.investissement_initial.toFixed(0)}\n`;
+                csv += `Économie totale (m3/ménage/an);${result.economie_totale_menage.toFixed(2)}\n`;
+                csv += "\n";
+
+                // Section Séries temporelles
+                csv += "SERIES TEMPORELLES\n";
+                csv += "Année;VAN Cumulative ($);Alpha (%);Économie comportement (m3);Économie fuites (m3)\n";
+                for (let i = 0; i < result.annees.length; i++) {
+                    csv += `${result.annees[i]};${result.van_cumulative[i].toFixed(0)};${result.serie_alpha[i].toFixed(1)};${(series.economies_comportement_m3[i] || 0).toFixed(2)};${(series.economies_fuites_m3[i] || 0).toFixed(2)}\n`;
+                }
+
+                // Télécharger
+                const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "analyse-compteurs.csv";
+                a.click();
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                alert("Erreur lors de l'export CSV: " + e.message);
+            }
+        }
+
+        function exportPDF() {
+            // Créer une fenêtre d'impression avec le résumé
+            const params = collectParams();
+            const van = document.getElementById('metric-van').textContent;
+            const rbc = document.getElementById('metric-rbc').textContent;
+            const payback = document.getElementById('metric-payback').textContent;
+            const invest = document.getElementById('metric-invest').textContent;
+            const economies = document.getElementById('metric-economies').textContent;
+            const recommandation = document.getElementById('recommendation').innerText;
+
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Analyse CBA Compteurs d'Eau</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; }
+                        h1 { color: #1e40af; border-bottom: 2px solid #1e40af; padding-bottom: 10px; }
+                        h2 { color: #374151; margin-top: 30px; }
+                        .metric { display: inline-block; width: 30%; margin: 10px 0; padding: 15px; background: #f3f4f6; border-radius: 8px; text-align: center; }
+                        .metric-value { font-size: 24px; font-weight: bold; color: #1e40af; }
+                        .metric-label { font-size: 12px; color: #6b7280; }
+                        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                        th, td { border: 1px solid #e5e7eb; padding: 10px; text-align: left; }
+                        th { background: #f3f4f6; }
+                        .recommandation { padding: 15px; background: ${van.includes('-') ? '#fef2f2' : '#f0fdf4'}; border-radius: 8px; margin: 20px 0; }
+                        .footer { margin-top: 40px; font-size: 11px; color: #9ca3af; text-align: center; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Analyse Coûts-Bénéfices Compteurs d'Eau</h1>
+                    <p><em>Généré le ${new Date().toLocaleDateString('fr-CA')}</em></p>
+
+                    <h2>Résultats clés</h2>
+                    <div>
+                        <div class="metric"><div class="metric-label">VAN</div><div class="metric-value">${van}</div></div>
+                        <div class="metric"><div class="metric-label">RBC</div><div class="metric-value">${rbc}</div></div>
+                        <div class="metric"><div class="metric-label">Payback</div><div class="metric-value">${payback} ans</div></div>
+                    </div>
+                    <div>
+                        <div class="metric"><div class="metric-label">Investissement</div><div class="metric-value">${invest}</div></div>
+                        <div class="metric"><div class="metric-label">Économies</div><div class="metric-value">${economies} m³/an</div></div>
+                    </div>
+
+                    <div class="recommandation">${recommandation}</div>
+
+                    <h2>Hypothèses</h2>
+                    <table>
+                        <tr><th>Paramètre</th><th>Valeur</th></tr>
+                        <tr><td>Ménages</td><td>${params.nb_menages.toLocaleString('fr-CA')}</td></tr>
+                        <tr><td>Horizon</td><td>${params.horizon} ans</td></tr>
+                        <tr><td>Taux d'actualisation</td><td>${params.taux_actualisation}%</td></tr>
+                        <tr><td>Type de compteur</td><td>${params.type_compteur.toUpperCase()}</td></tr>
+                        <tr><td>Coût compteur</td><td>${params.cout_compteur} $</td></tr>
+                        <tr><td>Scénario fuites</td><td>${params.scenario_fuites}</td></tr>
+                        <tr><td>Scénario adoption</td><td>${params.scenario_adoption}</td></tr>
+                        <tr><td>Persistance</td><td>${params.persistance}</td></tr>
+                        <tr><td>Mode analyse</td><td>${params.mode_economique ? 'Économique' : 'Financier'}</td></tr>
+                        <tr><td>Valeur eau</td><td>${params.valeur_sociale} $/m³</td></tr>
+                    </table>
+
+                    <div class="footer">
+                        Calculateur CBA Compteurs d'Eau - Modèle basé sur la méthodologie MAMH/SCT<br>
+                        Les résultats sont indicatifs et dépendent des hypothèses utilisées.
+                    </div>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.print();
+        }
+
+        function copyPermalink() {
+            const params = collectParams();
+            const encoded = encodeURIComponent(btoa(JSON.stringify(params)));
+            const link = `${location.origin}${location.pathname}?p=${encoded}`;
+            navigator.clipboard.writeText(link);
+            alert("Lien copié !");
+        }
+
+        // === Comparateur de scénarios ===
+        function getSavedScenarios() {
+            try {
+                return JSON.parse(localStorage.getItem('savedScenarios') || '[]');
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveScenariosToStorage(scenarios) {
+            localStorage.setItem('savedScenarios', JSON.stringify(scenarios));
+        }
+
+        async function saveScenario() {
+            const name = prompt("Nom du scénario:", `Scénario ${new Date().toLocaleTimeString('fr-CA')}`);
+            if (!name) return;
+
+            const params = collectParams();
+            const result = await apiCall('/api/calculate', params);
+
+            const scenario = {
+                id: Date.now(),
+                name: name,
+                params: params,
+                results: {
+                    van: result.van,
+                    rbc: result.rbc,
+                    payback: result.payback,
+                    investissement: result.investissement_initial
+                },
+                savedAt: new Date().toISOString()
+            };
+
+            const scenarios = getSavedScenarios();
+            scenarios.push(scenario);
+            saveScenariosToStorage(scenarios);
+
+            updateComparatorUI();
+            alert(`Scénario "${name}" sauvegardé !`);
+        }
+
+        function toggleComparator() {
+            const panel = document.getElementById('comparator-panel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+            if (panel.style.display === 'block') {
+                updateComparatorUI();
+            }
+        }
+
+        function updateComparatorUI() {
+            const scenarios = getSavedScenarios();
+            const listEl = document.getElementById('saved-scenarios-list');
+            const tableEl = document.getElementById('comparison-table');
+            const bodyEl = document.getElementById('comparison-body');
+
+            if (scenarios.length === 0) {
+                listEl.innerHTML = '<p style="color: #9ca3af;">Aucun scénario sauvegardé. Cliquez sur "Sauvegarder" pour ajouter le scénario actuel.</p>';
+                tableEl.style.display = 'none';
+                return;
+            }
+
+            listEl.innerHTML = `<p style="color: #6b7280;">${scenarios.length} scénario(s) sauvegardé(s)</p>`;
+            tableEl.style.display = 'block';
+
+            bodyEl.innerHTML = scenarios.map(s => `
+                <tr>
+                    <td><strong>${s.name}</strong><br><span style="font-size: 10px; color: #9ca3af;">${new Date(s.savedAt).toLocaleString('fr-CA')}</span></td>
+                    <td style="color: ${s.results.van >= 0 ? '#10b981' : '#ef4444'}; font-weight: 600;">${formatMoney(s.results.van)}</td>
+                    <td>${s.results.rbc.toFixed(2)}</td>
+                    <td>${s.results.payback ? s.results.payback.toFixed(1) + ' ans' : '>20'}</td>
+                    <td>
+                        <button onclick="loadScenario(${s.id})" style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;">Charger</button>
+                        <button onclick="deleteScenario(${s.id})" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 10px; margin-left: 4px;">X</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function loadScenario(id) {
+            const scenarios = getSavedScenarios();
+            const scenario = scenarios.find(s => s.id === id);
+            if (scenario) {
+                applyParamsToForm(scenario.params);
+                alert(`Scénario "${scenario.name}" chargé !`);
+            }
+        }
+
+        function deleteScenario(id) {
+            if (!confirm("Supprimer ce scénario ?")) return;
+            const scenarios = getSavedScenarios().filter(s => s.id !== id);
+            saveScenariosToStorage(scenarios);
+            updateComparatorUI();
+        }
+
+        function clearSavedScenarios() {
+            if (!confirm("Effacer tous les scénarios sauvegardés ?")) return;
+            localStorage.removeItem('savedScenarios');
+            updateComparatorUI();
+        }
+
+        function applyParamsToForm(params) {
+            suppressParamChange = true;
+
+            if (params.nb_menages != null) document.getElementById('nb-menages').value = params.nb_menages;
+            if (params.taille_menage != null) document.getElementById('taille-menage').value = params.taille_menage;
+            if (params.lpcd != null) document.getElementById('lpcd').value = params.lpcd;
+            if (params.horizon != null) document.getElementById('horizon').value = params.horizon;
+            if (params.taux_actualisation != null) document.getElementById('taux-actualisation').value = params.taux_actualisation;
+            if (params.type_compteur) document.getElementById('type-compteur').value = params.type_compteur;
+            if (params.cout_compteur != null) document.getElementById('cout-compteur').value = params.cout_compteur;
+            if (params.heures_installation != null) document.getElementById('heures-install').value = params.heures_installation;
+            if (params.taux_horaire != null) document.getElementById('taux-horaire').value = params.taux_horaire;
+            if (params.cout_reseau != null) document.getElementById('cout-reseau').value = params.cout_reseau;
+            if (params.cout_infra_fixe != null) document.getElementById('cout-infra-fixe').value = params.cout_infra_fixe;
+
+            if (params.reduction_comportement != null) document.getElementById('reduction-comportement').value = params.reduction_comportement;
+            if (params.persistance) document.getElementById('persistance').value = params.persistance;
+            if (params.scenario_fuites) {
+                const fuitesMap = {
+                    "sans_cout": "standard",
+                    "quebec_deux_stocks": "deux_stocks",
+                    "quebec_deux_stocks_sans_tarif": "deux_stocks_sans_tarif",
+                };
+                const fuitesValue = fuitesMap[params.scenario_fuites] || params.scenario_fuites;
+                document.getElementById('scenario-fuites').value = fuitesValue;
+            }
+
+            if (params.scenario_adoption) {
+                const adoptionMap = { "progressif": "progressive", "secteur": "par_secteur" };
+                const adoptionValue = adoptionMap[params.scenario_adoption] || params.scenario_adoption;
+                document.getElementById('scenario-adoption').value = adoptionValue;
+            }
+            if (params.valeur_sociale != null) document.getElementById('valeur-sociale').value = params.valeur_sociale;
+            if (params.cout_variable != null) document.getElementById('cout-variable').value = params.cout_variable;
+            if (params.valeur_eau_preset) document.getElementById('valeur-eau-preset').value = params.valeur_eau_preset;
+            if (params.activer_economies_echelle != null) document.getElementById('economies-echelle').checked = params.activer_economies_echelle;
+
+            if (params.mode_economique != null) setModeEconomique(params.mode_economique);
+
+            if (params.prevalence_petites_pct != null) document.getElementById('prevalence-petites').value = params.prevalence_petites_pct;
+            if (params.debit_petites_m3 != null) document.getElementById('debit-petites').value = params.debit_petites_m3;
+            if (params.prevalence_grosses_pct != null) document.getElementById('prevalence-grosses').value = params.prevalence_grosses_pct;
+            if (params.debit_grosses_m3 != null) document.getElementById('debit-grosses').value = params.debit_grosses_m3;
+            if (params.taux_detection_pct != null) document.getElementById('taux-detection').value = params.taux_detection_pct;
+            if (params.taux_reparation_pct != null) document.getElementById('taux-reparation').value = params.taux_reparation_pct;
+            if (params.facteur_detection_sig != null) document.getElementById('facteur-detection-sig').value = params.facteur_detection_sig;
+            if (params.facteur_reparation_sig != null) document.getElementById('facteur-reparation-sig').value = params.facteur_reparation_sig;
+            if (params.taux_nouvelles_fuites_pct != null) document.getElementById('nouvelles-fuites').value = params.taux_nouvelles_fuites_pct;
+            if (params.part_persistantes_pct != null) document.getElementById('persistantes').value = params.part_persistantes_pct;
+            if (params.facteur_duree_longue_traine != null) document.getElementById('longue-traine').value = params.facteur_duree_longue_traine;
+            if (params.cout_reparation_petite != null) document.getElementById('cout-petite').value = params.cout_reparation_petite;
+            if (params.cout_reparation_grosse != null) document.getElementById('cout-grosse').value = params.cout_reparation_grosse;
+            if (params.part_ville_pct != null) document.getElementById('part-ville').value = params.part_ville_pct;
+            if (params.inclure_cout_reparation != null) document.getElementById('inclure-couts').checked = params.inclure_cout_reparation;
+
+            if (params.adoption_max_pct != null) document.getElementById('adoption-max').value = params.adoption_max_pct;
+            if (params.adoption_k_vitesse != null) document.getElementById('adoption-k').value = params.adoption_k_vitesse;
+            if (params.adoption_t0_point_median != null) document.getElementById('adoption-t0').value = params.adoption_t0_point_median;
+            if (params.adoption_etaler_capex != null) document.getElementById('adoption-etaler-capex').checked = params.adoption_etaler_capex;
+
+            if (params.reseau_activer != null) document.getElementById('reseau-activer').checked = params.reseau_activer;
+            if (params.reseau_volume_pertes_m3_an != null) document.getElementById('reseau-volume').value = params.reseau_volume_pertes_m3_an;
+            if (params.reseau_reduction_max_pct != null) document.getElementById('reseau-reduc-max').value = params.reseau_reduction_max_pct;
+            if (params.reseau_mode_reduction) document.getElementById('reseau-mode').value = params.reseau_mode_reduction;
+            if (params.reseau_annees_atteinte != null) document.getElementById('reseau-annees').value = params.reseau_annees_atteinte;
+            if (params.reseau_pondere_par_adoption != null) document.getElementById('reseau-pondere').checked = params.reseau_pondere_par_adoption;
+
+            if (params.mc_seed != null) document.getElementById('montecarlo-seed').value = params.mc_seed;
+            if (params.mc_n_simulations != null) document.getElementById('montecarlo-sims').value = params.mc_n_simulations;
+
+            const scenario = document.getElementById('scenario-fuites').value;
+            const advancedFuites = document.getElementById('advanced-fuites');
+            if (scenario === 'custom') {
+                advancedFuites.style.display = 'block';
+                document.getElementById('content-fuites').classList.add('open');
+                document.getElementById('chevron-fuites').classList.add('open');
+            } else {
+                advancedFuites.style.display = 'none';
+            }
+            document.getElementById('tarification').checked = !isSansTarifScenario(scenario);
+
+            const adoptionScenario = document.getElementById('scenario-adoption').value;
+            document.getElementById('advanced-adoption').style.display = (adoptionScenario === "custom") ? "block" : "none";
+
+            const reseauOn = document.getElementById('reseau-activer').checked;
+            document.getElementById('advanced-reseau').style.display = reseauOn ? 'block' : 'none';
+
+            suppressParamChange = false;
+            updateLabels();
+        }
+
+        async function loadFromPermalink() {
+            if (permalinkApplied) return false;
+            const sp = new URLSearchParams(location.search);
+            const p = sp.get("p");
+            if (!p) return false;
+            try {
+                const params = JSON.parse(atob(decodeURIComponent(p)));
+                permalinkApplied = true;
+                applyParamsToForm(params);
+                await updateModel();
+                return true;
+            } catch (e) {
+                console.warn("Permalink invalide", e);
+                return false;
             }
         }
 
@@ -2597,6 +3623,10 @@
             updateLabels();
             await updateModel();
         }
+
+        window.addEventListener("load", () => {
+            loadFromPermalink();
+        });
     </script>
 
     <!-- Map Modal -->

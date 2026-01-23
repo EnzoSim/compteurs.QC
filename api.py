@@ -19,8 +19,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from typing import Optional, List
+from dataclasses import replace
 import numpy as np
 import math
+import os
 
 # Import du modèle
 from analyse_compteurs_eau import (
@@ -35,16 +37,28 @@ from analyse_compteurs_eau import (
     ParametresFuites,
     ModeRepartitionCouts,
     ConfigEconomiesEchelle,
+    ParametresAdoption,
+    STRATEGIES_ADOPTION,
+    ADOPTION_OBLIGATOIRE,
+    ModeAdoption,
+    ParametresFuitesReseau,
+    ModeReductionReseau,
+    PRESETS_VALEUR_EAU,
+    valider_parametres_vs_calibration,
     executer_modele,
     calculer_alpha_comportement,
     calculer_dynamique_fuites,
     calculer_economies_fuites_menage,
+    decomposer_par_payeur,
     PERSISTANCE_OPTIMISTE,
     PERSISTANCE_REALISTE,
     PERSISTANCE_PESSIMISTE,
     FUITES_SANS_COUT,
     FUITES_QUEBEC_DEUX_STOCKS,
     FUITES_CONTEXTE_QUEBEC,
+    FUITES_MENAGE_SEUL,
+    FUITES_SUBVENTION_50,
+    FUITES_VILLE_SEULE,
     FUITES_MENAGE_SANS_TARIF,
     FUITES_QUEBEC_SANS_TARIF,
     FUITES_QUEBEC_DEUX_STOCKS_SANS_TARIF,
@@ -67,9 +81,16 @@ app = FastAPI(
 )
 
 # CORS pour permettre les appels depuis le frontend
+# En production, définir CORS_ORIGINS="https://monsite.com,https://autre.com"
+CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*")
+if CORS_ORIGINS == "*":
+    allowed_origins = ["*"]
+else:
+    allowed_origins = [origin.strip() for origin in CORS_ORIGINS.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # En production, restreindre aux domaines autorisés
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -99,6 +120,14 @@ class CalculRequest(BaseModel):
     taux_horaire: float = Field(125.0, ge=50, le=250, description="Taux horaire installation ($/h)")
     cout_reseau: float = Field(50.0, ge=0, le=300, description="Coût réseau par compteur ($)")
     cout_infra_fixe: float = Field(0.0, ge=0, le=5_000_000, description="Coût infrastructure fixe ($)")
+
+    # OPEX AMI non-technique (cyber, logiciels, stockage, télécom)
+    cout_opex_non_tech_ami: float = Field(
+        15.0,
+        ge=0,
+        le=50,
+        description="OPEX AMI non-technique ($/compteur/an). Bas=10, Médian=15, Haut=35"
+    )
 
     # Paramètres comportementaux
     reduction_comportement: float = Field(8.0, ge=0, le=20, description="Réduction comportementale (%)")
@@ -150,6 +179,75 @@ class CalculRequest(BaseModel):
     # Économies d'échelle (grands déploiements >10k compteurs)
     activer_economies_echelle: bool = Field(False, description="Activer économies d'échelle")
 
+    # -----------------------------
+    # Valeur de l'eau (preset)
+    # -----------------------------
+    valeur_eau_preset: str = Field(
+        default="custom",
+        description="custom | quebec | conservateur | rarete | quebec_mcf"
+    )
+
+    # -----------------------------
+    # Déploiement / adoption
+    # -----------------------------
+    scenario_adoption: str = Field(
+        default="obligatoire",
+        description="obligatoire | rapide | progressive | lent | nouveaux | par_secteur | custom | none"
+    )
+    adoption_mode: Optional[str] = Field(
+        default=None,
+        description="logistique | nouveaux | secteur (utilisé si scenario_adoption=custom)"
+    )
+    adoption_max_pct: Optional[float] = Field(default=None, ge=0, le=100)
+    adoption_k_vitesse: Optional[float] = Field(default=None, ge=0.0)
+    adoption_t0_point_median: Optional[float] = Field(default=None, ge=0.0)
+    adoption_etaler_capex: Optional[bool] = Field(default=None)
+    adoption_fraction_premiere_annee: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    adoption_cout_incitatif_par_menage: Optional[float] = Field(default=None, ge=0.0)
+    adoption_duree_incitatif_ans: Optional[int] = Field(default=None, ge=0)
+    adoption_taux_nouveaux_pct: Optional[float] = Field(default=None, ge=0.0, le=100.0)
+    adoption_nb_secteurs: Optional[int] = Field(default=None, ge=1)
+    adoption_annees_par_secteur: Optional[int] = Field(default=None, ge=1)
+    adoption_annee_demarrage: Optional[int] = Field(default=None, ge=1)
+
+    # -----------------------------
+    # Fuites réseau
+    # -----------------------------
+    reseau_activer: bool = Field(default=False)
+    reseau_volume_pertes_m3_an: float = Field(default=0.0, ge=0.0)
+    reseau_reduction_max_pct: float = Field(default=0.0, ge=0.0, le=100.0)
+    reseau_mode_reduction: str = Field(default="lineaire", description="lineaire | exponentiel")
+    reseau_annees_atteinte: int = Field(default=5, ge=1)
+    reseau_lambda_reduction: float = Field(default=0.5, ge=0.0)
+    reseau_annee_demarrage: int = Field(default=1, ge=1)
+    reseau_cout_programme_annuel: float = Field(default=0.0, ge=0.0)
+    reseau_cout_reparation_m3: float = Field(default=0.0, ge=0.0)
+    reseau_cout_capex_initial: float = Field(default=0.0, ge=0.0)
+    reseau_annee_capex: int = Field(default=1, ge=1)
+    reseau_pondere_par_adoption: bool = Field(default=True)
+
+    # -----------------------------
+    # Report d'infrastructure (optionnel)
+    # -----------------------------
+    benefice_report_infra_annuel: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=10_000_000,
+        description="Bénéfice annuel fixe du report d'infrastructure ($/an)"
+    )
+    benefice_report_infra_par_m3: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=10.0,
+        description="Bénéfice par m³ économisé lié au report d'infrastructure ($/m³)"
+    )
+
+    # -----------------------------
+    # Monte Carlo (optionnel)
+    # -----------------------------
+    mc_seed: int = Field(default=42, ge=0)
+    mc_n_simulations: int = Field(default=500, ge=100)
+
 
 class CalculResponse(BaseModel):
     """Résultats du calcul."""
@@ -165,6 +263,11 @@ class CalculResponse(BaseModel):
     va_benefices: float
     va_couts_exploitation: float
     va_couts_totaux: float
+
+    # Décomposition des bénéfices (pour waterfall)
+    va_benefices_eau: float = 0.0
+    va_benefices_report_infra: float = 0.0
+    va_benefices_cout_variable: float = 0.0
 
     # Économies par ménage
     economie_totale_menage: float
@@ -259,12 +362,18 @@ def get_fuites(nom: str, req: CalculRequest = None) -> ParametresFuites:
     scenarios_map = {
         # Avec tarification
         "standard": FUITES_SANS_COUT,
+        "sans_cout": FUITES_SANS_COUT,
         "quebec": FUITES_CONTEXTE_QUEBEC,
         "deux_stocks": FUITES_QUEBEC_DEUX_STOCKS,
+        "quebec_deux_stocks": FUITES_QUEBEC_DEUX_STOCKS,
+        "menage": FUITES_MENAGE_SEUL,
+        "subvention_50": FUITES_SUBVENTION_50,
+        "ville": FUITES_VILLE_SEULE,
         # Sans tarification (taux réparation réduit, persistance augmentée)
         "menage_sans_tarif": FUITES_MENAGE_SANS_TARIF,
         "quebec_sans_tarif": FUITES_QUEBEC_SANS_TARIF,
         "deux_stocks_sans_tarif": FUITES_QUEBEC_DEUX_STOCKS_SANS_TARIF,
+        "quebec_deux_stocks_sans_tarif": FUITES_QUEBEC_DEUX_STOCKS_SANS_TARIF,
     }
 
     if nom in scenarios_map:
@@ -322,6 +431,93 @@ def get_fuites(nom: str, req: CalculRequest = None) -> ParametresFuites:
         )
 
 
+def get_valeur_eau(req: CalculRequest) -> ParametresValeurEau:
+    preset = (req.valeur_eau_preset or "custom").strip().lower()
+    if preset != "custom" and preset in PRESETS_VALEUR_EAU:
+        return PRESETS_VALEUR_EAU[preset]
+    return ParametresValeurEau(
+        valeur_sociale_m3=req.valeur_sociale,
+        cout_variable_m3=req.cout_variable,
+    )
+
+
+def get_adoption(req: CalculRequest) -> Optional[ParametresAdoption]:
+    key = (req.scenario_adoption or "obligatoire").strip().lower()
+    if key in ("none", "aucune", "off", "0"):
+        return None
+
+    alias = {
+        "progressive": "progressif",
+        "par_secteur": "secteur",
+        "par-secteur": "secteur",
+    }
+    key = alias.get(key, key)
+
+    if key != "custom":
+        base = STRATEGIES_ADOPTION.get(key, ADOPTION_OBLIGATOIRE)
+    else:
+        mode_str = (req.adoption_mode or "logistique").strip().lower()
+        if mode_str.startswith("nou"):
+            mode = ModeAdoption.NOUVEAUX_BRANCHEMENTS
+        elif mode_str.startswith("sec"):
+            mode = ModeAdoption.PAR_SECTEUR
+        else:
+            mode = ModeAdoption.VOLONTAIRE_INCITATIF
+        base = ParametresAdoption(mode=mode, nom="Personnalisé", description="")
+
+    overrides = {}
+    if req.adoption_max_pct is not None:
+        overrides["adoption_max_pct"] = req.adoption_max_pct
+    if req.adoption_k_vitesse is not None:
+        overrides["k_vitesse"] = req.adoption_k_vitesse
+    if req.adoption_t0_point_median is not None:
+        overrides["t0_point_median"] = req.adoption_t0_point_median
+    if req.adoption_etaler_capex is not None:
+        overrides["etaler_capex"] = req.adoption_etaler_capex
+    if req.adoption_fraction_premiere_annee is not None:
+        overrides["fraction_premiere_annee"] = req.adoption_fraction_premiere_annee
+    if req.adoption_cout_incitatif_par_menage is not None:
+        overrides["cout_incitatif_par_menage"] = req.adoption_cout_incitatif_par_menage
+    if req.adoption_duree_incitatif_ans is not None:
+        overrides["duree_incitatif_ans"] = req.adoption_duree_incitatif_ans
+    if req.adoption_taux_nouveaux_pct is not None:
+        overrides["taux_nouveaux_pct"] = req.adoption_taux_nouveaux_pct
+    if req.adoption_nb_secteurs is not None:
+        overrides["nb_secteurs"] = req.adoption_nb_secteurs
+    if req.adoption_annees_par_secteur is not None:
+        overrides["annees_par_secteur"] = req.adoption_annees_par_secteur
+    if req.adoption_annee_demarrage is not None:
+        overrides["annee_demarrage"] = req.adoption_annee_demarrage
+
+    if overrides:
+        base = replace(base, **overrides)
+
+    return base
+
+
+def get_fuites_reseau(req: CalculRequest) -> Optional[ParametresFuitesReseau]:
+    if not req.reseau_activer:
+        return None
+
+    mode_str = (req.reseau_mode_reduction or "lineaire").strip().lower()
+    mode = ModeReductionReseau.EXPONENTIEL if mode_str.startswith("exp") else ModeReductionReseau.LINEAIRE
+
+    return ParametresFuitesReseau(
+        activer=True,
+        volume_pertes_m3_an=req.reseau_volume_pertes_m3_an,
+        reduction_max_pct=req.reseau_reduction_max_pct,
+        mode_reduction=mode,
+        annees_atteinte=req.reseau_annees_atteinte,
+        lambda_reduction=req.reseau_lambda_reduction,
+        annee_demarrage=req.reseau_annee_demarrage,
+        cout_programme_annuel=req.reseau_cout_programme_annuel,
+        cout_reparation_m3=req.reseau_cout_reparation_m3,
+        cout_capex_initial=req.reseau_cout_capex_initial,
+        annee_capex=req.reseau_annee_capex,
+        pondere_par_adoption=req.reseau_pondere_par_adoption,
+    )
+
+
 def get_compteur(req: CalculRequest) -> ParametresCompteur:
     """Créer les paramètres du compteur."""
 
@@ -338,6 +534,7 @@ def get_compteur(req: CalculRequest) -> ParametresCompteur:
         taux_horaire_installation=req.taux_horaire,
         cout_reseau_par_compteur=req.cout_reseau if req.type_compteur == "ami" else 0,
         cout_infra_fixe=req.cout_infra_fixe if req.type_compteur == "ami" else 0,
+        cout_opex_non_tech_ami=req.cout_opex_non_tech_ami if req.type_compteur == "ami" else 0,
     )
 
 
@@ -390,6 +587,8 @@ async def calculate(req: CalculRequest):
             horizon_analyse=req.horizon,
             taux_actualisation_pct=req.taux_actualisation,
             reduction_comportement_pct=req.reduction_comportement,
+            benefice_report_infra_annuel=req.benefice_report_infra_annuel,
+            benefice_report_infra_par_m3=req.benefice_report_infra_par_m3,
         )
 
         # Créer les autres paramètres
@@ -399,23 +598,25 @@ async def calculate(req: CalculRequest):
 
         # Mode d'analyse
         mode = ModeCompte.ECONOMIQUE if req.mode_economique else ModeCompte.FINANCIER
-        valeur_eau = ParametresValeurEau(
-            valeur_sociale_m3=req.valeur_sociale,
-            cout_variable_m3=req.cout_variable,
-        )
+        valeur_eau = get_valeur_eau(req)
 
         # Économies d'échelle
         config_echelle = ConfigEconomiesEchelle(activer=req.activer_economies_echelle)
+
+        params_adoption = get_adoption(req)
+        params_fuites_reseau = get_fuites_reseau(req)
 
         # Exécuter le modèle
         result = executer_modele(
             params=params,
             compteur=compteur,
+            mode_compte=mode,
+            valeur_eau=valeur_eau,
             config_echelle=config_echelle,
             persistance=persistance,
             params_fuites=fuites,
-            mode_compte=mode,
-            valeur_eau=valeur_eau,
+            params_adoption=params_adoption,
+            params_fuites_reseau=params_fuites_reseau,
         )
 
         # Générer la série alpha
@@ -443,6 +644,9 @@ async def calculate(req: CalculRequest):
             va_benefices=float(result.va_benefices),
             va_couts_exploitation=float(result.va_couts_exploitation),
             va_couts_totaux=float(result.va_couts_totaux),
+            va_benefices_eau=float(result.va_benefices_eau),
+            va_benefices_report_infra=float(result.va_benefices_report_infra),
+            va_benefices_cout_variable=float(result.va_benefices_cout_variable),
             economie_totale_menage=float(result.economie_totale_menage),
             economie_comportement_menage=float(result.economie_comportement_menage),
             economie_fuite_menage=float(result.economie_fuite_menage),
@@ -547,6 +751,73 @@ async def get_presets():
     }
 
 
+@app.get("/api/valeur_eau_presets")
+def valeur_eau_presets():
+    return {
+        k: {
+            "nom": v.nom,
+            "description": v.description,
+            "valeur_sociale_m3": v.valeur_sociale_m3,
+            "cout_variable_m3": v.cout_variable_m3,
+            "appliquer_mcf": getattr(v, "appliquer_mcf", False),
+            "mcf": getattr(v, "mcf", 1.0),
+        }
+        for k, v in PRESETS_VALEUR_EAU.items()
+    }
+
+
+@app.post("/api/validate_calibration")
+async def validate_calibration(req: CalculRequest):
+    try:
+        params = ParametresModele(
+            nb_menages=req.nb_menages,
+            taille_menage=req.taille_menage,
+            lpcd=req.lpcd,
+            horizon_analyse=req.horizon,
+            taux_actualisation_pct=req.taux_actualisation,
+            reduction_comportement_pct=req.reduction_comportement,
+            benefice_report_infra_annuel=req.benefice_report_infra_annuel,
+            benefice_report_infra_par_m3=req.benefice_report_infra_par_m3,
+        )
+        persistance = get_persistance(req.persistance, req.reduction_comportement)
+        fuites = get_fuites(req.scenario_fuites, req)
+        valeur_eau = get_valeur_eau(req)
+
+        if fuites.utiliser_prevalence_differenciee:
+            petites = fuites.part_menages_fuite_any_pct
+            grosses = fuites.part_menages_fuite_significative_pct
+            total = petites + grosses
+            if total > 0:
+                debit_m3 = (
+                    (petites * fuites.debit_fuite_any_m3_an) +
+                    (grosses * fuites.debit_fuite_significative_m3_an)
+                ) / total
+            else:
+                debit_m3 = fuites.debit_fuite_any_m3_an
+            prevalence = total
+        else:
+            prevalence = fuites.part_menages_fuite_pct
+            debit_m3 = fuites.debit_fuite_m3_an
+
+        params = replace(
+            params,
+            part_menages_fuite_pct=prevalence,
+            debit_fuite_m3_an=debit_m3,
+            valeur_eau_m3=valeur_eau.valeur_sociale_m3,
+        )
+
+        checks = valider_parametres_vs_calibration(params, persistance, fuites)
+
+        return {
+            "warnings": [
+                {"param": nom, "ok": ok, "message": msg}
+                for (nom, ok, msg) in checks
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/compare_meters")
 async def compare_meters(req: CalculRequest):
     """Comparer les trois types de compteurs."""
@@ -615,6 +886,8 @@ async def detailed_series(req: CalculRequest):
             horizon_analyse=req.horizon,
             taux_actualisation_pct=req.taux_actualisation,
             reduction_comportement_pct=req.reduction_comportement,
+            benefice_report_infra_annuel=req.benefice_report_infra_annuel,
+            benefice_report_infra_par_m3=req.benefice_report_infra_par_m3,
         )
 
         persistance = get_persistance(req.persistance, req.reduction_comportement)
@@ -720,17 +993,27 @@ async def compare_fuites(req: CalculRequest):
     """
     results = {}
 
-    scenarios = [
-        ("standard", "Standard sans coûts (20%)"),
-        ("quebec", "Québec (35%)"),
-        ("deux_stocks", "Différencié QC"),
-    ]
+    sans_tarif = (req.scenario_fuites or "").endswith("_sans_tarif")
 
-    for scenario_key, scenario_nom in scenarios:
+    if sans_tarif:
+        scenarios = [
+            ("menage_sans_tarif", "Ménage (sans tarif)"),
+            ("quebec_sans_tarif", "Québec (sans tarif)"),
+            ("deux_stocks_sans_tarif", "QC différencié (sans tarif)"),
+        ]
+    else:
+        scenarios = [
+            ("standard", "Standard sans coûts (20%)"),
+            ("quebec", "Québec (35%)"),
+            ("deux_stocks", "Différencié QC"),
+        ]
+
+    out_keys = ["standard", "quebec", "deux_stocks"]
+    for out_key, (scenario_key, scenario_nom) in zip(out_keys, scenarios):
         req_copy = req.model_copy()
         req_copy.scenario_fuites = scenario_key
         result = await calculate(req_copy)
-        results[scenario_key] = {
+        results[out_key] = {
             "nom": scenario_nom,
             "van": result.van,
             "rbc": result.rbc,
@@ -743,7 +1026,7 @@ async def compare_fuites(req: CalculRequest):
 
 
 @app.post("/api/monte_carlo")
-async def monte_carlo(req: CalculRequest, n_simulations: int = 500):
+async def monte_carlo(req: CalculRequest, n_simulations: int = 500, seed: int = 42):
     """
     Exécuter une simulation Monte Carlo.
 
@@ -758,6 +1041,8 @@ async def monte_carlo(req: CalculRequest, n_simulations: int = 500):
             horizon_analyse=req.horizon,
             taux_actualisation_pct=req.taux_actualisation,
             reduction_comportement_pct=req.reduction_comportement,
+            benefice_report_infra_annuel=req.benefice_report_infra_annuel,
+            benefice_report_infra_par_m3=req.benefice_report_infra_par_m3,
         )
 
         compteur = get_compteur(req)
@@ -765,16 +1050,16 @@ async def monte_carlo(req: CalculRequest, n_simulations: int = 500):
         fuites = get_fuites(req.scenario_fuites, req)
 
         mode = ModeCompte.ECONOMIQUE if req.mode_economique else ModeCompte.FINANCIER
-        valeur_eau = ParametresValeurEau(
-            valeur_sociale_m3=req.valeur_sociale,
-            cout_variable_m3=req.cout_variable,
-        )
+        valeur_eau = get_valeur_eau(req)
+
+        params_adoption = get_adoption(req)
+        params_fuites_reseau = get_fuites_reseau(req)
 
         # Configuration Monte Carlo
         config_mc = ParametresMonteCarlo(
             distributions=DISTRIBUTIONS_DEFAUT,
             n_simulations=min(n_simulations, 1000),  # Limiter pour performance
-            seed=42,
+            seed=seed,
         )
 
         # Exécuter Monte Carlo
@@ -787,6 +1072,8 @@ async def monte_carlo(req: CalculRequest, n_simulations: int = 500):
             afficher_progression=False,
             persistance=persistance,
             params_fuites=fuites,
+            params_adoption=params_adoption,
+            params_fuites_reseau=params_fuites_reseau,
         )
 
         # Calculer l'histogramme pour le frontend
@@ -820,6 +1107,62 @@ async def monte_carlo(req: CalculRequest, n_simulations: int = 500):
                     reverse=True
                 )[:8]  # Top 8 paramètres
             ] if resultats_mc.correlations else [],
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/perspectives")
+async def perspectives(req: CalculRequest):
+    """
+    Retourner la décomposition de la VAN par payeur: économique, ville, ménages.
+
+    Permet l'analyse distributive: qui paie, qui gagne.
+    """
+    try:
+        params = ParametresModele(
+            nb_menages=req.nb_menages,
+            taille_menage=req.taille_menage,
+            lpcd=req.lpcd,
+            horizon_analyse=req.horizon,
+            taux_actualisation_pct=req.taux_actualisation,
+            reduction_comportement_pct=req.reduction_comportement,
+            benefice_report_infra_annuel=req.benefice_report_infra_annuel,
+            benefice_report_infra_par_m3=req.benefice_report_infra_par_m3,
+        )
+
+        compteur = get_compteur(req)
+        persistance = get_persistance(req.persistance, req.reduction_comportement)
+        fuites = get_fuites(req.scenario_fuites, req)
+        valeur_eau = get_valeur_eau(req)
+        config_echelle = ConfigEconomiesEchelle(activer=req.activer_economies_echelle)
+        params_adoption = get_adoption(req)
+
+        # Décomposition par payeur
+        result = decomposer_par_payeur(
+            params=params,
+            compteur=compteur,
+            config_echelle=config_echelle,
+            persistance=persistance,
+            params_fuites=fuites,
+            valeur_eau=valeur_eau,
+            params_adoption=params_adoption,
+        )
+
+        return {
+            "van_economique": float(result.van_economique),
+            "van_ville": float(result.van_ville),
+            "van_menages": float(result.van_menages),
+            "va_couts_ville": float(result.va_couts_ville),
+            "va_benefices_ville": float(result.va_benefices_ville),
+            "va_externalites": float(result.va_externalites),
+            "va_benefices_report_infra": float(result.va_benefices_report_infra),
+            "description": {
+                "economique": "Bien-être social total (externalités incluses)",
+                "ville": "Budget municipal (CAPEX, OPEX, économies coût variable)",
+                "menages": "Perspective citoyens (coûts réparations, économies si tarif)",
+            }
         }
 
     except Exception as e:
@@ -862,7 +1205,6 @@ async def get_scenario_name(persistance: str = "realiste", fuites: str = "deux_s
 # =============================================================================
 
 # Si index.html existe dans le même dossier, le servir
-import os
 if os.path.exists("index.html"):
     @app.get("/{path:path}")
     async def serve_static(path: str):
