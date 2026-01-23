@@ -1841,7 +1841,7 @@
             <!-- Fuites réseau -->
             <div class="card">
                 <div class="card-header">
-                    <div class="card-icon orange">🌐</div>
+                    <div class="card-icon orange"><i data-lucide="network"></i></div>
                     <div>
                         <div class="card-title" data-i18n="section.network">Fuites réseau</div>
                         <div class="card-subtitle" data-i18n="section.network_sub">Réduction des pertes réseau (optionnel)</div>
@@ -1931,7 +1931,7 @@
                 <!-- Report d'infrastructure -->
                 <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
                     <div style="font-weight: 600; color: #374151; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
-                        <span>🏗️</span> <span data-i18n="economic.infra_deferral">Report d'infrastructure (optionnel)</span>
+                        <i data-lucide="building-2" style="width: 16px; height: 16px;"></i> <span data-i18n="economic.infra_deferral">Report d'infrastructure (optionnel)</span>
                     </div>
                     <small style="color: #666; font-size: 11px; display: block; margin-bottom: 12px;" data-i18n="economic.infra_deferral_help">
                         Valorise les économies en eau par le report d'investissements en infrastructure (stations, réseaux).
@@ -2331,36 +2331,35 @@
             <div class="card" style="margin-top: 1rem; cursor: pointer;" onclick="toggleHypotheses()">
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 1.2em;">📋</span>
-                        <span style="font-weight: 600; color: #374151;" data-i18n="hypotheses.title">Hypothèses effectives</span>
-                        <span style="font-size: 11px; color: #6b7280;" data-i18n="hypotheses.expand">(cliquer pour développer)</span>
+                        <i data-lucide="clipboard-list" style="width: 18px; height: 18px; color: var(--primary);"></i>
+                        <span style="font-weight: 600; color: #374151;" data-i18n="hypotheses.title">Hypothèses</span>
                     </div>
                     <span id="chevron-hypotheses" class="toggle-chevron open"><i data-lucide="chevron-down"></i></span>
                 </div>
                 <div id="hypotheses-content" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; font-size: 12px;">
                         <div>
-                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;"><i data-lucide="home" class="lucide-sm"></i> <span data-i18n="hypotheses.project">Projet</span></div>
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;" data-i18n="hypotheses.project">Projet</div>
                             <div id="hyp-projet"></div>
                         </div>
                         <div>
-                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">💵 <span data-i18n="hypotheses.costs">Coûts</span></div>
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;" data-i18n="hypotheses.costs">Coûts</div>
                             <div id="hyp-couts"></div>
                         </div>
                         <div>
-                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;">🚀 <span data-i18n="hypotheses.deployment">Déploiement</span></div>
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;" data-i18n="hypotheses.deployment">Déploiement</div>
                             <div id="hyp-deploiement"></div>
                         </div>
                         <div>
-                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;"><i data-lucide="droplet" class="lucide-sm"></i> <span data-i18n="hypotheses.leaks">Fuites</span></div>
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;" data-i18n="hypotheses.leaks">Fuites</div>
                             <div id="hyp-fuites"></div>
                         </div>
                         <div>
-                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;"><i data-lucide="trending-up" class="lucide-sm"></i> <span data-i18n="hypotheses.behavior">Comportement</span></div>
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;" data-i18n="hypotheses.behavior">Comportement</div>
                             <div id="hyp-comportement"></div>
                         </div>
                         <div>
-                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;"><i data-lucide="badge-dollar-sign" class="lucide-sm"></i> <span data-i18n="hypotheses.valuation">Valorisation</span></div>
+                            <div style="font-weight: 600; color: #374151; margin-bottom: 8px;" data-i18n="hypotheses.valuation">Valorisation</div>
                             <div id="hyp-valorisation"></div>
                         </div>
                     </div>
@@ -2371,37 +2370,24 @@
             <div class="card" style="margin-top: 1rem; cursor: pointer;" onclick="toggleMethodo()">
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 1.2em;">📐</span>
+                        <i data-lucide="book-open" style="width: 18px; height: 18px; color: var(--primary);"></i>
                         <span style="font-weight: 600; color: #374151;" data-i18n="methodology.title">Méthodologie</span>
-                        <span style="font-size: 11px; color: #6b7280;" data-i18n="methodology.expand">(formules et conventions)</span>
                     </div>
                     <span id="chevron-methodo" class="toggle-chevron open"><i data-lucide="chevron-down"></i></span>
                 </div>
                 <div id="methodo-content" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #4b5563; line-height: 1.7;">
                     <div style="margin-bottom: 12px;">
-                        <strong data-i18n="methodology.van_formula">Valeur Actualisée Nette (VAN)</strong><br>
-                        <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-size: 11px;">
-                            VAN = Σ (Bénéfices_t - Coûts_t) / (1+r)^t - Investissement_0
+                        <strong data-i18n="methodology.van_formula">VAN</strong><br>
+                        <code style="background: #f3f4f6; padding: 4px 8px; border-radius: 4px; font-size: 11px; display: inline-block; margin-top: 4px;">
+                            Σ (Bénéfices - Coûts) / (1+r)^t - I₀
                         </code>
                     </div>
                     <div style="margin-bottom: 12px;">
-                        <strong data-i18n="methodology.sign_conventions">Conventions de signes</strong><br>
-                        • <span style="color: #10b981;" data-i18n="methodology.benefits">Bénéfices (+)</span>: <span data-i18n="methodology.benefits_desc">économies d'eau valorisées, report d'infrastructure</span><br>
-                        • <span style="color: #ef4444;" data-i18n="methodology.costs">Coûts (−)</span>: <span data-i18n="methodology.costs_desc">investissement initial (CAPEX), exploitation (OPEX)</span>
-                    </div>
-                    <div style="margin-bottom: 12px;">
-                        <strong data-i18n="methodology.perspectives">Perspectives d'analyse</strong><br>
-                        • <b>Économique</b>: <span data-i18n="methodology.economic_desc">valorise l'eau au coût social complet (inclut externalités)</span><br>
-                        • <b>Financier</b>: <span data-i18n="methodology.financial_desc">valorise l'eau au coût variable évité uniquement</span>
-                    </div>
-                    <div style="margin-bottom: 12px;">
-                        <strong data-i18n="methodology.indicators">Indicateurs clés</strong><br>
-                        • <b>RBC</b>: <span data-i18n="methodology.rbc_desc">viable si > 1</span><br>
-                        • <b>LCSW</b>: <span data-i18n="methodology.lcsw_desc">coût pour économiser 1 m³ d'eau</span><br>
-                        • <b>Payback</b>: <span data-i18n="methodology.payback_desc">années pour récupérer l'investissement</span>
+                        <strong data-i18n="methodology.indicators">Indicateurs</strong><br>
+                        <span style="color: #6b7280;">RBC > 1 = viable | LCSW = coût/m³ économisé | Payback = années récupération</span>
                     </div>
                     <div style="font-size: 11px; color: #9ca3af;" data-i18n="methodology.sources">
-                        Sources: MAMH (2019-2025), méthodologie CBA standard du Conseil du Trésor.
+                        Sources: MAMH (2019-2025), Conseil du Trésor.
                     </div>
                 </div>
             </div>
