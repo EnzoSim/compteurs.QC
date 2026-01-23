@@ -3267,28 +3267,8 @@
                 updateHypotheses(params, result);
                 updateScenarioBadge();
 
-                try {
-                    const warnings = await apiCall('/api/validate_calibration', collectParams());
-                    const box = document.getElementById('calibration-warnings');
-                    const bad = (warnings.warnings || []).filter(w => !w.ok);
-
-                    if (bad.length === 0) {
-                        box.style.display = 'none';
-                    } else {
-                        box.style.display = 'block';
-                        box.innerHTML = `
-                            <div class="recommendation warning">
-                                <div class="recommendation-icon">!</div>
-                                <div class="recommendation-text">
-                                    <b>Paramètres hors calibration</b><br>
-                                    ${bad.map(w => `• <b>${w.param}</b>: ${w.message}`).join('<br>')}
-                                </div>
-                            </div>
-                        `;
-                    }
-                } catch (e) {
-                    console.warn("Validation calibration indisponible:", e);
-                }
+                // Calibration warnings disabled (too noisy)
+                document.getElementById('calibration-warnings').style.display = 'none';
 
                 const [sensitivity, meters, persistence] = await Promise.all([
                     apiCall('/api/sensitivity', params),
