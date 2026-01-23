@@ -83,8 +83,8 @@ const TRANSLATIONS = {
         "param.behavior_reduction": "Réduction comportementale",
         "param.persistence": "Scénario de persistance",
         "param.leak_scenario": "Scénario de fuites",
-        "param.pricing": "Tarification volumétrique en place",
-        "param.pricing_help": "Note: le modèle ne simule pas une tarification (facturation). Ici, c'est juste un \"signal-prix\" qui influence la dynamique de réparation des fuites.",
+        "param.pricing": "Signal-prix actif",
+        "param.pricing_help": "<b>Signal-prix</b> = tarification au m³ (le ménage paie selon sa consommation).<br><span style='color:#059669;'>● Avec:</span> facture ↑ si fuite → forte motivation à réparer (<b>85%</b>)<br><span style='color:#dc2626;'>● Sans (Québec):</span> eau incluse dans taxes → motivation réduite (<b>55%</b>)",
 
         // Persistence scenarios
         "persistence.optimistic": "Optimiste — Effet constant (α = 8%)",
@@ -462,8 +462,8 @@ const TRANSLATIONS = {
         "param.behavior_reduction": "Behavioral reduction",
         "param.persistence": "Persistence scenario",
         "param.leak_scenario": "Leak scenario",
-        "param.pricing": "Volumetric pricing in place",
-        "param.pricing_help": "Note: the model doesn't simulate billing. This is just a \"price signal\" that influences leak repair dynamics.",
+        "param.pricing": "Price signal active",
+        "param.pricing_help": "<b>Price signal</b> = volumetric pricing (household pays per m³ consumed).<br><span style='color:#059669;'>● With:</span> bill ↑ if leak → strong motivation to repair (<b>85%</b>)<br><span style='color:#dc2626;'>● Without (Quebec):</span> water included in taxes → reduced motivation (<b>55%</b>)",
 
         // Persistence scenarios
         "persistence.optimistic": "Optimistic — Constant effect (α = 8%)",

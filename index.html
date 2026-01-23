@@ -1001,6 +1001,45 @@
             display: block;
         }
 
+        /* Signal-prix indicator box */
+        .signal-prix-box {
+            margin-top: 0.5rem;
+            padding: 0.75rem;
+            background: linear-gradient(135deg, #fef3c7 0%, #fef9c3 100%);
+            border: 1px solid #fcd34d;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+        }
+
+        .signal-prix-box.active {
+            background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%);
+            border-color: #6ee7b7;
+        }
+
+        .signal-prix-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 600;
+            color: #92400e;
+            margin-bottom: 0.5rem;
+        }
+
+        .signal-prix-box.active .signal-prix-indicator {
+            color: #047857;
+        }
+
+        .signal-prix-rate {
+            margin-left: auto;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .signal-prix-box .help-text {
+            margin-top: 0.5rem;
+            line-height: 1.5;
+        }
+
         /* Monte Carlo Stats Grid */
         .mc-stats-grid {
             display: grid;
@@ -1631,13 +1670,21 @@
 
                     <div class="input-group" style="margin-top:0.75rem;">
                         <label style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
-                            <span data-i18n="param.pricing">Tarification volumétrique en place</span>
+                            <span data-i18n="param.pricing">Signal-prix actif</span>
                             <input type="checkbox" id="tarification" onchange="onTarificationToggle()">
                         </label>
-                        <small class="help-text" data-i18n="param.pricing_help">
-                            Note: le modèle ne simule pas une tarification (facturation). Ici, c'est juste un "signal-prix"
-                            qui influence la dynamique de réparation des fuites.
-                        </small>
+                        <div class="signal-prix-box" id="signal-prix-box">
+                            <div class="signal-prix-indicator">
+                                <i data-lucide="info" class="lucide-sm"></i>
+                                <span id="signal-prix-status">Sans signal-prix</span>
+                                <span class="signal-prix-rate" id="signal-prix-rate">→ Taux réparation: <b>55%</b></span>
+                            </div>
+                            <small class="help-text">
+                                <b>Signal-prix</b> = tarification au m³ (le ménage paie selon sa consommation).<br>
+                                <span style="color:#059669;">● Avec:</span> facture ↑ si fuite → forte motivation à réparer (<b>85%</b>)<br>
+                                <span style="color:#dc2626;">● Sans (Québec):</span> eau incluse dans taxes → motivation réduite (<b>55%</b>)
+                            </small>
+                        </div>
                     </div>
                 </div>
 
@@ -2864,7 +2911,9 @@
                 advancedSection.style.display = 'none';
             }
 
-            document.getElementById('tarification').checked = !isSansTarifScenario(scenario);
+            const hasSignalPrix = !isSansTarifScenario(scenario);
+            document.getElementById('tarification').checked = hasSignalPrix;
+            updateSignalPrixIndicator(hasSignalPrix);
 
             updateScenarioBadge();
             onParamChange();
@@ -2885,7 +2934,24 @@
                 if (hasOption(sel, sans)) sel.value = sans;
             }
 
+            updateSignalPrixIndicator(checked);
             onScenarioFuitesChange();
+        }
+
+        function updateSignalPrixIndicator(hasSignalPrix) {
+            const box = document.getElementById('signal-prix-box');
+            const status = document.getElementById('signal-prix-status');
+            const rate = document.getElementById('signal-prix-rate');
+
+            if (hasSignalPrix) {
+                box.classList.add('active');
+                status.textContent = 'Avec signal-prix';
+                rate.innerHTML = '→ Taux réparation: <b>85%</b>';
+            } else {
+                box.classList.remove('active');
+                status.textContent = 'Sans signal-prix';
+                rate.innerHTML = '→ Taux réparation: <b>55%</b>';
+            }
         }
 
         function onScenarioAdoptionChange() {
