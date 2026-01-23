@@ -1757,7 +1757,7 @@
             <!-- Deployment / Adoption -->
             <div class="card">
                 <div class="card-header">
-                    <div class="card-icon blue">🚀</div>
+                    <div class="card-icon blue"><i data-lucide="calendar-clock"></i></div>
                     <div>
                         <div class="card-title" data-i18n="section.deployment">Déploiement (adoption)</div>
                         <div class="card-subtitle" data-i18n="section.deployment_sub">Simule un déploiement progressif</div>
@@ -1767,11 +1767,11 @@
                 <div class="input-group">
                     <label data-i18n="param.adoption_scenario">Scénario d'adoption</label>
                     <select id="scenario-adoption" onchange="onScenarioAdoptionChange()">
-                        <option value="obligatoire" selected data-i18n="adoption.mandatory">Obligatoire (100% dès l'année 1)</option>
-                        <option value="rapide" data-i18n="adoption.fast">Rapide</option>
-                        <option value="progressive" data-i18n="adoption.progressive">Progressif</option>
-                        <option value="lent" data-i18n="adoption.slow">Lent</option>
-                        <option value="nouveaux" data-i18n="adoption.new_households">Nouveaux ménages</option>
+                        <option value="obligatoire" selected data-i18n="adoption.mandatory">Obligatoire — 100% an 1</option>
+                        <option value="rapide" data-i18n="adoption.fast">Rapide — 80% an 3, 95% an 5</option>
+                        <option value="progressive" data-i18n="adoption.progressive">Progressif — 50% an 5, 85% an 10</option>
+                        <option value="lent" data-i18n="adoption.slow">Lent — 35% an 10, 70% an 20</option>
+                        <option value="nouveaux" data-i18n="adoption.new_households">Nouveaux logements seulement</option>
                         <option value="par_secteur" data-i18n="adoption.by_sector">Par secteur</option>
                         <option value="custom" data-i18n="adoption.custom">Personnalisé</option>
                         <option value="none" data-i18n="adoption.disabled">Désactivé (test)</option>
@@ -2961,10 +2961,10 @@
             // Déploiement/Adoption (NOUVEAU)
             const adoptionLabels = {
                 'obligatoire': 'Obligatoire (100% an 1)',
-                'rapide': 'Rapide (3-4 ans)',
-                'progressive': 'Progressive (5-7 ans)',
-                'lent': 'Lent (10+ ans)',
-                'nouveaux': 'Nouveaux branchements',
+                'rapide': 'Rapide (95% an 5)',
+                'progressive': 'Progressif (85% an 10)',
+                'lent': 'Lent (70% an 20)',
+                'nouveaux': 'Nouveaux logements',
                 'par_secteur': 'Par secteur',
                 'secteur': 'Par secteur',
                 'custom': 'Personnalisé'
