@@ -22,12 +22,16 @@ from typing import Optional, List, Dict, Any
 from dataclasses import replace
 from datetime import datetime, timezone
 from collections import defaultdict
+from pathlib import Path
 import numpy as np
 import math
 import os
 import time
 import logging
 import json
+
+# Base directory for static file serving (security: prevent path traversal)
+BASE_DIR = Path(__file__).resolve().parent
 
 # =============================================================================
 # OBSERVABILITÉ: LOGGING STRUCTURÉ & MÉTRIQUES
@@ -1814,19 +1818,39 @@ async def optimize_deployment(req: OptimizationRequest):
 
 
 # =============================================================================
-# SERVIR LES FICHIERS STATIQUES
+# SERVIR LES FICHIERS STATIQUES (avec protection contre path traversal)
 # =============================================================================
 
 # Si index.html existe dans le même dossier, le servir
 if os.path.exists("index.html"):
     @app.get("/{path:path}")
     async def serve_static(path: str):
+        # Cas spécial: racine ou index.html
         if path == "" or path == "index.html":
-            return FileResponse("index.html")
-        elif os.path.exists(path):
-            return FileResponse(path)
-        else:
-            return FileResponse("index.html")
+            return FileResponse(str(BASE_DIR / "index.html"))
+
+        # Éviter les chemins commençant par api/ (gérés par les routes API)
+        if path.startswith("api/"):
+            raise HTTPException(404, detail="Not found")
+
+        # Résoudre le chemin demandé et vérifier qu'il reste dans BASE_DIR
+        requested = (BASE_DIR / path).resolve()
+
+        # Protection contre path traversal: le chemin résolu doit être dans BASE_DIR
+        if not str(requested).startswith(str(BASE_DIR)):
+            raise HTTPException(404, detail="Not found")
+
+        # Si le fichier existe, le servir
+        if requested.is_file():
+            return FileResponse(str(requested))
+
+        # Si c'est un asset (contient un point) qui n'existe pas, retourner 404
+        # plutôt que de servir index.html (évite la confusion)
+        if "." in path:
+            raise HTTPException(404, detail="Asset not found")
+
+        # Sinon, comportement SPA: servir index.html
+        return FileResponse(str(BASE_DIR / "index.html"))
 
 
 # =============================================================================

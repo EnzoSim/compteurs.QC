@@ -551,6 +551,55 @@
             color: var(--text-muted);
         }
 
+        /* Secondary VAN display (Financial VAN below Economic VAN) */
+        .metric-secondary {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+            padding-top: 0.5rem;
+            border-top: 1px dashed var(--border);
+        }
+        .metric-secondary .label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            color: var(--text-muted);
+        }
+
+        /* Highlighted Payback card - key speed indicator */
+        .metric-card.highlight-speed::before {
+            background: linear-gradient(90deg, var(--warning) 0%, #f59e0b 100%);
+            height: 5px;
+        }
+        .metric-card.highlight-speed {
+            border: 2px solid var(--warning);
+            box-shadow: var(--shadow), 0 0 0 3px rgba(255, 209, 102, 0.15);
+        }
+        .metric-card.highlight-speed:hover {
+            box-shadow: var(--shadow-lg), 0 0 20px rgba(255, 209, 102, 0.25);
+        }
+        .metric-card.highlight-speed .metric-value {
+            color: #d97706;
+            font-size: 2.25rem;
+        }
+        .metric-card.highlight-speed .metric-label {
+            color: #92400e;
+        }
+        .speed-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--warning) 0%, #f59e0b 100%);
+            color: #78350f;
+            font-size: 0.6rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+
         /* Recommendation Banner */
         .recommendation {
             padding: 1.25rem 1.5rem;
@@ -2243,8 +2292,11 @@
             <!-- Metrics -->
             <div class="metrics-grid" role="region" aria-label="Indicateurs clés">
                 <div class="metric-card primary">
-                    <div class="metric-label">Valeur Actualisée Nette</div>
+                    <div class="metric-label">VAN Économique</div>
                     <div class="metric-value" id="metric-van">—</div>
+                    <div class="metric-secondary">
+                        <span class="label">VAN Financière:</span> <span id="metric-van-financier">—</span>
+                    </div>
                     <div class="metric-change">sur 20 ans</div>
                 </div>
                 <div class="metric-card" id="rbc-card">
@@ -2252,8 +2304,8 @@
                     <div class="metric-value" id="metric-rbc">—</div>
                     <div class="metric-change">seuil: 1.00</div>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-label">Période de récupération</div>
+                <div class="metric-card highlight-speed" id="payback-card">
+                    <div class="metric-label">Période de récupération<span class="speed-badge">Vitesse</span></div>
                     <div class="metric-value" id="metric-payback">—</div>
                     <div class="metric-change">années</div>
                 </div>
@@ -2667,9 +2719,13 @@
 
     <script>
         // Configuration
-        const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-            ? `http://${window.location.hostname}:8000`
-            : 'https://compteurs-qc.onrender.com';
+        // API_URL: use current origin by default (same domain), with optional override
+        const isLocal = ['localhost','127.0.0.1'].includes(window.location.hostname);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const apiOverride = urlParams.get('api') || localStorage.getItem('api_url');
+
+        const API_URL = apiOverride || (isLocal ? 'http://localhost:8000' : window.location.origin);
 
         let modeEconomique = true;
         let debounceTimer = null;
@@ -2686,8 +2742,10 @@
         };
         let suppressParamChange = false;
         let currentAbortController = null;  // Pour annuler les requêtes en cours
+        let globalRequestId = 0;  // For request race condition prevention
         let permalinkApplied = false;
         const apiCache = new Map();
+        let VALEUR_EAU_PRESETS = null;  // Cache for water value presets
         const API_CACHE_LIMIT = 50;
         const CACHEABLE_ENDPOINTS = new Set([
             '/api/calculate',
@@ -2762,8 +2820,13 @@
         });
 
         async function checkApiHealth() {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+
             try {
-                const response = await fetch(`${API_URL}/api/health`, { timeout: 10000 });
+                const response = await fetch(`${API_URL}/api/health`, { signal: controller.signal });
+                clearTimeout(timeoutId);
+
                 if (response.ok) {
                     const statusEl = document.getElementById('api-status');
                     statusEl.setAttribute('data-i18n', 'header.api_connected');
@@ -2773,6 +2836,7 @@
                 }
                 return false;
             } catch (e) {
+                clearTimeout(timeoutId);
                 const statusEl = document.getElementById('api-status');
                 statusEl.setAttribute('data-i18n', 'header.api_disconnected');
                 statusEl.textContent = typeof t === 'function' ? t('header.api_disconnected') : 'API Déconnectée';
@@ -2935,7 +2999,34 @@
             onParamChange();
         }
 
-        function onValeurEauPresetChange() {
+        async function getValeurEauPresets() {
+            if (VALEUR_EAU_PRESETS) return VALEUR_EAU_PRESETS;
+            VALEUR_EAU_PRESETS = await apiCall('/api/valeur_eau_presets');
+            return VALEUR_EAU_PRESETS;
+        }
+
+        async function onValeurEauPresetChange() {
+            const key = document.getElementById('valeur-eau-preset').value;
+            const vs = document.getElementById('valeur-sociale');
+            const cv = document.getElementById('cout-variable');
+
+            if (key === 'custom') {
+                vs.disabled = false;
+                cv.disabled = false;
+                onParamChange();
+                return;
+            }
+
+            const presets = await getValeurEauPresets();
+            const p = presets[key];
+            if (!p) return;
+
+            vs.value = p.valeur_sociale_m3;
+            cv.value = p.cout_variable_m3;
+            vs.disabled = true;
+            cv.disabled = true;
+
+            updateLabels();
             onParamChange();
         }
 
@@ -3039,32 +3130,32 @@
                 </div>
             `;
 
-            // Fuites
+            // Fuites - uses API response (params_fuites) as single source of truth
+            // The actual values are displayed by updateParamsTables() which receives data from /api/detailed_series
             const scenarioFuites = params.scenario_fuites;
             const fuitesLabels = {
+                // Avec tarification (signal-prix)
                 'standard': 'Standard (20%)',
                 'quebec': 'Québec (35%)',
-                'deux_stocks_sans_tarif': 'Québec différencié (30%)',
+                'deux_stocks': 'QC différencié (30%)',
+                // Sans tarification
+                'menage_sans_tarif': 'Ménage (sans tarif)',
+                'quebec_sans_tarif': 'Québec (sans tarif)',
+                'deux_stocks_sans_tarif': 'QC différencié (sans tarif)',
                 'custom': 'Personnalisé'
             };
-            const fuitesDefaults = {
-                'deux_stocks_sans_tarif': { taux_rep: 55, taux_det: 90, prev: '24+6%' },
-                'quebec': { taux_rep: 55, taux_det: 85, prev: '35%' },
-                'standard': { taux_rep: 55, taux_det: 80, prev: '20%' },
+            // Store context for updateParamsTables() which will update hyp-fuites with real API data
+            window.__lastFuitesContext = {
+                scenarioFuites,
+                fuitesLabels,
+                economieFuiteMenage: result.economie_fuite_menage
             };
-            const fuitesParams = fuitesDefaults[scenarioFuites] || { taux_rep: '?', taux_det: '?', prev: '?' };
 
-            // Calcul explicite des fuites
-            const prevPetites = params.scenario_fuites === 'custom' ? params.prevalence_petites_pct : (scenarioFuites === 'deux_stocks_sans_tarif' ? 24 : (scenarioFuites === 'quebec' ? 35 : 20));
-            const prevGrosses = params.scenario_fuites === 'custom' ? params.prevalence_grosses_pct : (scenarioFuites === 'deux_stocks_sans_tarif' ? 6 : 0);
-            const prevTotal = prevPetites + prevGrosses;
-
+            // Show loading placeholder - will be updated with real API data from params_fuites
             document.getElementById('hyp-fuites').innerHTML = `
                 <div style="color: #6b7280; line-height: 1.6;">
                     • Scénario: <b>${fuitesLabels[scenarioFuites] || scenarioFuites}</b><br>
-                    • Prévalence: <b>${prevTotal}%</b> <span style="font-size: 10px;">(${prevPetites}% pet. + ${prevGrosses}% gros.)</span><br>
-                    • Détection: <b>${params.scenario_fuites === 'custom' ? params.taux_detection_pct : fuitesParams.taux_det}%</b> • Réparation: <b>${params.scenario_fuites === 'custom' ? params.taux_reparation_pct : fuitesParams.taux_rep}%</b><br>
-                    • <span style="color: #059669;">Économie/ménage: <b>${result.economie_fuite_menage.toFixed(1)} m³/an</b></span>
+                    • <span style="color: #9ca3af;">Chargement des paramètres...</span>
                 </div>
             `;
 
@@ -3160,6 +3251,16 @@
             } finally {
                 loading.classList.remove('active');
             }
+        }
+
+        // Helper to prevent race conditions for non-abortable requests
+        async function fetchWithRequestId(url, data) {
+            const requestId = ++globalRequestId;
+            const result = await apiCall(url, data);
+            if (requestId !== globalRequestId) {
+                throw new Error('Request superseded');
+            }
+            return result;
         }
 
         function onParamChange() {
@@ -3282,9 +3383,9 @@
                 // Ne pas masquer ici pour laisser les warnings visibles
 
                 const [sensitivity, meters, persistence] = await Promise.all([
-                    apiCall('/api/sensitivity', params),
-                    apiCall('/api/compare_meters', params),
-                    apiCall('/api/compare_persistence', params),
+                    fetchWithRequestId('/api/sensitivity', params),
+                    fetchWithRequestId('/api/compare_meters', params),
+                    fetchWithRequestId('/api/compare_persistence', params),
                 ]);
 
                 updateSensitivityChart(sensitivity);
@@ -3293,10 +3394,11 @@
 
                 // Fetch detailed series and fuites comparison
                 try {
-                    const detailed = await apiCall('/api/detailed_series', params);
+                    const detailed = await fetchWithRequestId('/api/detailed_series', params);
                     updateDetailedCharts(detailed);
                     updateParamsTables(detailed);
                 } catch (e) {
+                    if (e.message === 'Request superseded') throw e;
                     console.warn('detailed_series endpoint not available yet:', e);
                 }
 
@@ -3306,6 +3408,10 @@
                 await updatePerspectivesChart(params);
 
             } catch (e) {
+                if (e.message === 'Request superseded') {
+                    // Stale request, silently ignore
+                    return;
+                }
                 console.error('Model update error:', e);
                 const recEl = document.getElementById('recommendation');
                 recEl.className = 'recommendation negative';
@@ -3476,6 +3582,19 @@
             `;
             document.getElementById('fuites-params-body').innerHTML = fuitesHtml;
 
+            // Update hyp-fuites with real API data (single source of truth from Python model)
+            const ctx = window.__lastFuitesContext || {};
+            const scenarioLabel = ctx.fuitesLabels?.[ctx.scenarioFuites] || ctx.scenarioFuites || 'N/A';
+            const economieFuite = ctx.economieFuiteMenage?.toFixed(1) || '-';
+            document.getElementById('hyp-fuites').innerHTML = `
+                <div style="color: #6b7280; line-height: 1.6;">
+                    • Scénario: <b>${scenarioLabel}</b><br>
+                    • Prévalence: <b>${totalPrev.toFixed(0)}%</b> <span style="font-size: 10px;">(${petitesPrev.toFixed(0)}% pet. + ${grossesPrev.toFixed(0)}% gros.)</span><br>
+                    • Détection: <b>${pf.taux_detection_pct.toFixed(0)}%</b> • Réparation: <b>${pf.taux_reparation_pct.toFixed(0)}%</b><br>
+                    • <span style="color: #059669;">Économie/ménage: <b>${economieFuite} m³/an</b></span>
+                </div>
+            `;
+
             // Table paramètres persistance
             const modeNames = {
                 'CONSTANT': 'Constant (optimiste)',
@@ -3510,6 +3629,11 @@
                     v >= 0 ? chartColors.success : chartColors.danger
                 );
                 charts.perspectives.update('none');
+
+                // Update the dual VAN display: Economic VAN (primary) and Financial VAN (secondary)
+                // van_economique = full social value, van_ville = financial perspective (city)
+                document.getElementById('metric-van').textContent = formatMoney(persp.van_economique);
+                document.getElementById('metric-van-financier').textContent = formatMoney(persp.van_ville);
             } catch (e) {
                 console.warn('Perspectives chart update failed:', e);
             }
@@ -4278,7 +4402,7 @@
             try {
                 const params = collectParams();
                 const result = await apiCall('/api/calculate', params);
-                const health = await apiCall('/api/health', null, 'GET');
+                const health = await apiCall('/api/health');
 
                 // Export complet: inputs + outputs + métadonnées
                 const exportData = {
