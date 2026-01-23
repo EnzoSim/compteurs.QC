@@ -451,6 +451,19 @@
         .metric-card.warning::before { background: var(--warning); }
         .metric-card.danger::before { background: var(--danger); }
 
+        /* Subtle glow for positive/negative indicators */
+        .metric-card.success:hover {
+            box-shadow: var(--shadow-lg), 0 0 20px rgba(6, 214, 160, 0.15);
+        }
+
+        .metric-card.danger:hover {
+            box-shadow: var(--shadow-lg), 0 0 20px rgba(239, 71, 111, 0.15);
+        }
+
+        .metric-card.primary:hover {
+            box-shadow: var(--shadow-lg), 0 0 20px rgba(15, 76, 117, 0.15);
+        }
+
         .metric-label {
             font-size: 0.75rem;
             font-weight: 600;
@@ -467,6 +480,12 @@
             line-height: 1.1;
             letter-spacing: -1px;
             font-variant-numeric: tabular-nums;
+            transition: transform var(--transition-fast), opacity var(--transition-fast);
+        }
+
+        .metric-value.updating {
+            transform: scale(1.05);
+            opacity: 0.7;
         }
 
         .metric-card.primary .metric-value { color: var(--primary); }
@@ -554,6 +573,12 @@
             padding: 1.5rem;
             box-shadow: var(--shadow);
             border: 1px solid var(--border);
+            transition: box-shadow var(--transition), border-color var(--transition);
+        }
+
+        .chart-card:hover {
+            box-shadow: var(--shadow-lg);
+            border-color: var(--primary-light);
         }
 
         .chart-card.full-width {
@@ -582,6 +607,42 @@
         .chart-wrapper {
             position: relative;
             height: 300px;
+        }
+
+        /* Chart skeleton loading */
+        .chart-skeleton {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, var(--bg) 25%, var(--bg-dark) 50%, var(--bg) 75%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.5s infinite;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chart-skeleton::after {
+            content: '';
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes skeleton-shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .chart-wrapper canvas {
+            transition: opacity var(--transition);
+        }
+
+        .chart-wrapper.loading canvas {
+            opacity: 0.3;
         }
 
         /* Detail Table */
@@ -640,6 +701,19 @@
 
         .breakdown-table tr:last-child td:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
         .breakdown-table tr:last-child td:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+
+        /* Row hover highlighting */
+        .breakdown-table tbody tr {
+            transition: background-color var(--transition-fast);
+        }
+
+        .breakdown-table tbody tr:not(:last-child):hover {
+            background-color: var(--bg);
+        }
+
+        .breakdown-table tbody tr:not(:last-child):hover td {
+            color: var(--primary-dark);
+        }
 
         /* Loading Bar */
         .loading {
@@ -1951,7 +2025,7 @@
             <!-- Optimisation déploiement -->
             <div class="card">
                 <div class="card-header" style="cursor: pointer;" onclick="toggleOptimization()">
-                    <div class="card-icon blue">🎯</div>
+                    <div class="card-icon blue"><i data-lucide="target"></i></div>
                     <div>
                         <div class="card-title" data-i18n="section.optimization">Optimisation</div>
                         <div class="card-subtitle" data-i18n="section.optimization_sub">Déploiement sous contraintes</div>
@@ -1984,7 +2058,7 @@
                     </div>
 
                     <button class="btn" style="width: 100%; margin-top: 10px;" onclick="runOptimization()">
-                        🎯 <span data-i18n="optim.run">Optimiser le déploiement</span>
+                        <i data-lucide="target" class="lucide-sm"></i> <span data-i18n="optim.run">Optimiser le déploiement</span>
                     </button>
 
                     <div id="optim-results" style="display: none; margin-top: 15px; padding: 12px; background: #f0fdf4; border-radius: 8px;">
@@ -1997,7 +2071,7 @@
             <!-- Mode Expert -->
             <div class="card">
                 <div class="card-header" style="cursor: pointer;" onclick="toggleExpertMode()">
-                    <div class="card-icon orange">⚙️</div>
+                    <div class="card-icon orange"><i data-lucide="settings"></i></div>
                     <div>
                         <div class="card-title" data-i18n="section.expert">Mode Expert</div>
                         <div class="card-subtitle" data-i18n="section.expert_sub">Paramètres avancés</div>
@@ -3527,6 +3601,21 @@
             const defaultOptions = {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: {
+                    duration: 400,
+                    easing: 'easeOutQuart'
+                },
+                transitions: {
+                    active: {
+                        animation: {
+                            duration: 200
+                        }
+                    }
+                },
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
                 plugins: {
                     legend: {
                         display: true,
@@ -3536,6 +3625,21 @@
                             usePointStyle: true,
                             padding: 20
                         }
+                    },
+                    tooltip: {
+                        enabled: true,
+                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        titleFont: { family: 'Inter', size: 13, weight: '600' },
+                        bodyFont: { family: 'Inter', size: 12 },
+                        footerFont: { family: 'Inter', size: 11 },
+                        padding: 12,
+                        cornerRadius: 8,
+                        displayColors: true,
+                        boxPadding: 6,
+                        caretSize: 6,
+                        caretPadding: 8,
+                        borderColor: 'rgba(255, 255, 255, 0.1)',
+                        borderWidth: 1
                     }
                 },
                 scales: {
