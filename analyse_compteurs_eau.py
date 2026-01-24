@@ -1818,7 +1818,7 @@ class ParametresFuites:
 
     # === RÉPARATION ===
     # Une fois détectée, la fuite doit être réparée par le ménage
-    taux_reparation_pct: float = 55.0         # % des fuites détectées qui sont réparées
+    taux_reparation_pct: float = 85.0         # % des fuites détectées qui sont réparées
     cout_reparation_moyen: float = 200.0      # Coût moyen par réparation ($)
 
     # === PARTAGE DES COÛTS ===
