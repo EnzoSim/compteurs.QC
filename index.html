@@ -2719,13 +2719,15 @@
 
     <script>
         // Configuration
-        // API_URL: use current origin by default (same domain), with optional override
+        // API_URL: URLs relatives par défaut (même origine), avec override possible
+        // Same-origin: fetch('/api/...') fonctionne directement
+        // Split-origin: passer ?api=https://ton-api.tld ou localStorage.setItem('api_url', '...')
         const isLocal = ['localhost','127.0.0.1'].includes(window.location.hostname);
 
         const urlParams = new URLSearchParams(window.location.search);
         const apiOverride = urlParams.get('api') || localStorage.getItem('api_url');
 
-        const API_URL = apiOverride || (isLocal ? 'http://localhost:8000' : window.location.origin);
+        const API_URL = apiOverride || (isLocal ? 'http://localhost:8000' : '');
 
         let modeEconomique = true;
         let debounceTimer = null;
@@ -3220,9 +3222,12 @@
             try {
                 const options = {
                     method: data ? 'POST' : 'GET',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {},
                 };
-                if (data) options.body = JSON.stringify(data);
+                if (data) {
+                    options.headers['Content-Type'] = 'application/json';
+                    options.body = JSON.stringify(data);
+                }
                 if (abortController) options.signal = abortController.signal;
 
                 const baseEndpoint = endpoint.split('?')[0];
@@ -3233,14 +3238,20 @@
                     }
                     const response = await fetch(`${API_URL}${endpoint}`, options);
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    const result = await response.json();
+                    const contentType = response.headers.get('content-type') || '';
+                    const result = contentType.includes('application/json')
+                        ? await response.json()
+                        : await response.text();
                     cacheSet(cacheKey, result);
                     return result;
                 }
 
                 const response = await fetch(`${API_URL}${endpoint}`, options);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                return await response.json();
+                const contentType = response.headers.get('content-type') || '';
+                return contentType.includes('application/json')
+                    ? await response.json()
+                    : await response.text();
             } catch (e) {
                 if (e.name === 'AbortError') {
                     // Requête annulée, c'est normal
