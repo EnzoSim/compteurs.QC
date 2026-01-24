@@ -3005,7 +3005,7 @@
             return VALEUR_EAU_PRESETS;
         }
 
-        async function onValeurEauPresetChange() {
+        async function onValeurEauPresetChange(skipUpdate = false) {
             const key = document.getElementById('valeur-eau-preset').value;
             const vs = document.getElementById('valeur-sociale');
             const cv = document.getElementById('cout-variable');
@@ -3013,7 +3013,7 @@
             if (key === 'custom') {
                 vs.disabled = false;
                 cv.disabled = false;
-                onParamChange();
+                if (!skipUpdate) onParamChange();
                 return;
             }
 
@@ -3027,7 +3027,7 @@
             cv.disabled = true;
 
             updateLabels();
-            onParamChange();
+            if (!skipUpdate) onParamChange();
         }
 
         // Toggle sidebar pour mobile
@@ -3254,8 +3254,7 @@
         }
 
         // Helper to prevent race conditions for non-abortable requests
-        async function fetchWithRequestId(url, data) {
-            const requestId = ++globalRequestId;
+        async function fetchWithRequestId(url, data, requestId) {
             const result = await apiCall(url, data);
             if (requestId !== globalRequestId) {
                 throw new Error('Request superseded');
@@ -3373,6 +3372,7 @@
         async function updateModel() {
             try {
                 const params = collectParams();
+                const requestId = ++globalRequestId;
                 const result = await apiCall('/api/calculate', params, true);  // useAbort=true
                 if (!result) return;  // Requête annulée
                 updateDisplay(result);
@@ -3383,9 +3383,9 @@
                 // Ne pas masquer ici pour laisser les warnings visibles
 
                 const [sensitivity, meters, persistence] = await Promise.all([
-                    fetchWithRequestId('/api/sensitivity', params),
-                    fetchWithRequestId('/api/compare_meters', params),
-                    fetchWithRequestId('/api/compare_persistence', params),
+                    fetchWithRequestId('/api/sensitivity', params, requestId),
+                    fetchWithRequestId('/api/compare_meters', params, requestId),
+                    fetchWithRequestId('/api/compare_persistence', params, requestId),
                 ]);
 
                 updateSensitivityChart(sensitivity);
@@ -3394,7 +3394,7 @@
 
                 // Fetch detailed series and fuites comparison
                 try {
-                    const detailed = await fetchWithRequestId('/api/detailed_series', params);
+                    const detailed = await fetchWithRequestId('/api/detailed_series', params, requestId);
                     updateDetailedCharts(detailed);
                     updateParamsTables(detailed);
                 } catch (e) {
@@ -3403,9 +3403,9 @@
                 }
 
                 // Comparaison scénarios fuites
-                await updateFuitesComparison(params, result);
+                await updateFuitesComparison(params, result, requestId);
 
-                await updatePerspectivesChart(params);
+                await updatePerspectivesChart(params, requestId);
 
             } catch (e) {
                 if (e.message === 'Request superseded') {
@@ -3612,9 +3612,9 @@
             `;
         }
 
-        async function updatePerspectivesChart(params) {
+        async function updatePerspectivesChart(params, requestId) {
             try {
-                const persp = await apiCall('/api/perspectives', params);
+                const persp = await fetchWithRequestId('/api/perspectives', params, requestId);
                 if (!persp) return;
 
                 const data = [
@@ -3635,6 +3635,7 @@
                 document.getElementById('metric-van').textContent = formatMoney(persp.van_economique);
                 document.getElementById('metric-van-financier').textContent = formatMoney(persp.van_ville);
             } catch (e) {
+                if (e.message === 'Request superseded') return;
                 console.warn('Perspectives chart update failed:', e);
             }
         }
@@ -4210,9 +4211,9 @@
         }
 
         // Comparaison des scénarios de fuites
-        async function updateFuitesComparison(params, currentResult) {
+        async function updateFuitesComparison(params, currentResult, requestId) {
             try {
-                const fuitesData = await apiCall('/api/compare_fuites', params);
+                const fuitesData = await fetchWithRequestId('/api/compare_fuites', params, requestId);
 
                 charts.fuitesScenarios.data.labels = currentResult.annees;
                 charts.fuitesScenarios.data.datasets[0].label = fuitesData.standard.nom;
@@ -4223,6 +4224,7 @@
                 charts.fuitesScenarios.data.datasets[2].data = fuitesData.deux_stocks.van_cumulative.map(v => v / 1e6);
                 charts.fuitesScenarios.update('none');
             } catch (e) {
+                if (e.message === 'Request superseded') return;
                 console.warn('Erreur compare_fuites:', e);
             }
         }
@@ -4712,7 +4714,10 @@
             }
             if (params.valeur_sociale != null) document.getElementById('valeur-sociale').value = params.valeur_sociale;
             if (params.cout_variable != null) document.getElementById('cout-variable').value = params.cout_variable;
-            if (params.valeur_eau_preset) document.getElementById('valeur-eau-preset').value = params.valeur_eau_preset;
+            if (params.valeur_eau_preset) {
+                document.getElementById('valeur-eau-preset').value = params.valeur_eau_preset;
+                onValeurEauPresetChange(true);
+            }
             if (params.activer_economies_echelle != null) document.getElementById('economies-echelle').checked = params.activer_economies_echelle;
 
             if (params.mode_economique != null) setModeEconomique(params.mode_economique);
