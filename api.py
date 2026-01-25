@@ -196,13 +196,15 @@ app = FastAPI(
 CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*")
 if CORS_ORIGINS == "*":
     allowed_origins = ["*"]
+    allow_credentials = False  # Wildcard + credentials = interdit par la spec CORS
 else:
     allowed_origins = [origin.strip() for origin in CORS_ORIGINS.split(",") if origin.strip()]
+    allow_credentials = True
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -773,10 +775,10 @@ def numpy_to_python(obj):
 # ENDPOINTS
 # =============================================================================
 
-@app.get("/")
+@app.get("/", include_in_schema=False)
 async def root():
     """Servir le frontend."""
-    return FileResponse("index.html")
+    return FileResponse(str(BASE_DIR / "index.html"))
 
 
 @app.get("/api/health")
@@ -1821,9 +1823,9 @@ async def optimize_deployment(req: OptimizationRequest):
 # SERVIR LES FICHIERS STATIQUES (avec protection contre path traversal)
 # =============================================================================
 
-# Si index.html existe dans le même dossier, le servir
-if os.path.exists("index.html"):
-    @app.get("/{path:path}")
+# Si index.html existe dans BASE_DIR, enregistrer la route statique/SPA
+if (BASE_DIR / "index.html").exists():
+    @app.get("/{path:path}", include_in_schema=False)
     async def serve_static(path: str):
         # Cas spécial: racine ou index.html
         if path == "" or path == "index.html":
