@@ -8,32 +8,34 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="translations.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #0f4c75;
-            --primary-light: #3282b8;
-            --primary-dark: #0b3d5e;
-            --secondary: #00b4d8;
-            --accent: #48cae4;
-            --success: #06d6a0;
-            --warning: #ffd166;
-            --danger: #ef476f;
-            --bg: #f0f4f8;
-            --bg-dark: #e2e8f0;
+            --primary: #0b3d5b;
+            --primary-light: #1f6f8b;
+            --primary-dark: #072a3d;
+            --secondary: #2a9d8f;
+            --accent: #a8dadc;
+            --success: #16a34a;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #eef5f6;
+            --bg-dark: #e2eef1;
             --card: #ffffff;
-            --text: #1a202c;
-            --text-secondary: #4a5568;
-            --text-muted: #718096;
-            --border: #e2e8f0;
-            --shadow: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.04);
-            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04);
-            --radius: 16px;
-            --radius-sm: 8px;
-            --transition: 200ms ease;
-            --transition-fast: 150ms ease;
-            --hover-scale: 1.02;
+            --text: #0f172a;
+            --text-secondary: #334155;
+            --text-muted: #64748b;
+            --border: #d7e3e8;
+            --shadow: 0 8px 24px -16px rgba(15, 23, 42, 0.35), 0 4px 10px -8px rgba(15, 23, 42, 0.2);
+            --shadow-lg: 0 24px 50px -28px rgba(15, 23, 42, 0.45), 0 10px 20px -16px rgba(15, 23, 42, 0.25);
+            --radius: 18px;
+            --radius-sm: 10px;
+            --transition: 180ms ease;
+            --transition-fast: 120ms ease;
+            --hover-scale: 1.015;
             --hover-lift: translateY(-2px);
+            --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            --font-display: "Space Grotesk", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -71,9 +73,32 @@
         }
         .animate-spin { animation: spin 1s linear infinite; }
 
+        @keyframes rise {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (prefers-reduced-motion: no-preference) {
+            .metric-card,
+            .chart-card,
+            .card {
+                animation: rise 420ms ease both;
+            }
+
+            .metrics-grid .metric-card:nth-child(1) { animation-delay: 30ms; }
+            .metrics-grid .metric-card:nth-child(2) { animation-delay: 60ms; }
+            .metrics-grid .metric-card:nth-child(3) { animation-delay: 90ms; }
+            .metrics-grid .metric-card:nth-child(4) { animation-delay: 120ms; }
+            .metrics-grid .metric-card:nth-child(5) { animation-delay: 150ms; }
+            .metrics-grid .metric-card:nth-child(6) { animation-delay: 180ms; }
+        }
+
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg);
+            font-family: var(--font-sans);
+            background:
+                radial-gradient(1200px 800px at 5% -10%, rgba(42, 157, 143, 0.12), transparent 60%),
+                radial-gradient(1200px 900px at 95% 0%, rgba(31, 111, 139, 0.12), transparent 55%),
+                linear-gradient(180deg, #f8fbfc 0%, var(--bg) 35%, #edf4f6 100%);
             color: var(--text);
             line-height: 1.6;
             min-height: 100vh;
@@ -98,7 +123,7 @@
             right: 0;
             bottom: 0;
             background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-            opacity: 0.5;
+            opacity: 0.4;
         }
 
         .header-content {
@@ -112,9 +137,10 @@
         }
 
         .header h1 {
-            font-size: 1.75rem;
+            font-family: var(--font-display);
+            font-size: 1.9rem;
             font-weight: 700;
-            letter-spacing: -0.5px;
+            letter-spacing: -0.6px;
             text-wrap: balance;
         }
 
@@ -122,7 +148,17 @@
             opacity: 0.9;
             font-size: 0.95rem;
             margin-top: 0.25rem;
-            font-weight: 400;
+            font-weight: 500;
+        }
+
+        h1, h2, h3,
+        .card-title,
+        .section-title,
+        .chart-title,
+        .map-modal-title,
+        .scenario-name {
+            font-family: var(--font-display);
+            letter-spacing: -0.3px;
         }
 
         .header-badge {
@@ -150,18 +186,18 @@
         }
 
         .api-status.connected {
-            background: rgba(6, 214, 160, 0.2);
-            color: #06d6a0;
+            background: rgba(22, 163, 74, 0.2);
+            color: #16a34a;
         }
 
-        .api-status.connected::before { background: #06d6a0; }
+        .api-status.connected::before { background: #16a34a; }
 
         .api-status.disconnected {
-            background: rgba(239, 71, 111, 0.2);
-            color: #ef476f;
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
         }
 
-        .api-status.disconnected::before { background: #ef476f; }
+        .api-status.disconnected::before { background: #ef4444; }
 
         @keyframes pulse {
             0%, 100% { opacity: 1; }
@@ -193,15 +229,19 @@
 
         /* Cards */
         .card {
-            background: var(--card);
+            background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
             border-radius: var(--radius);
             padding: 1.5rem;
             box-shadow: var(--shadow);
             border: 1px solid var(--border);
-            transition: box-shadow var(--transition);
+            transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
         }
 
-        .card:hover { box-shadow: var(--shadow-lg); }
+        .card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-1px);
+            border-color: rgba(15, 23, 42, 0.12);
+        }
 
         .card-header {
             display: flex;
@@ -223,9 +263,9 @@
         }
         .card-icon svg { width: 22px; height: 22px; stroke-width: 2; }
 
-        .card-icon.blue { background: linear-gradient(135deg, #e0f2fe, #bae6fd); color: #0369a1; }
-        .card-icon.green { background: linear-gradient(135deg, #d1fae5, #a7f3d0); color: #047857; }
-        .card-icon.purple { background: linear-gradient(135deg, #ede9fe, #ddd6fe); color: #6d28d9; }
+        .card-icon.blue { background: linear-gradient(135deg, #e0f7ff, #cfe9f3); color: #0b5e7a; }
+        .card-icon.green { background: linear-gradient(135deg, #dcfce7, #bbf7d0); color: #15803d; }
+        .card-icon.purple { background: linear-gradient(135deg, #e0f2fe, #dbeafe); color: #1d4ed8; }
         .card-icon.orange { background: linear-gradient(135deg, #ffedd5, #fed7aa); color: #c2410c; }
 
         .card-title {
@@ -374,18 +414,18 @@
             border-radius: 50%;
             background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
             cursor: pointer;
-            box-shadow: 0 2px 6px rgba(15, 76, 117, 0.3);
+            box-shadow: 0 2px 6px rgba(11, 61, 91, 0.3);
             transition: transform var(--transition), box-shadow var(--transition);
             border: 3px solid white;
         }
 
         input[type="range"]::-webkit-slider-thumb:hover {
             transform: scale(1.1);
-            box-shadow: 0 4px 12px rgba(15, 76, 117, 0.4);
+            box-shadow: 0 4px 12px rgba(11, 61, 91, 0.4);
         }
 
         input[type="range"]:focus-visible::-webkit-slider-thumb {
-            box-shadow: 0 0 0 4px rgba(15, 76, 117, 0.15);
+            box-shadow: 0 0 0 4px rgba(11, 61, 91, 0.15);
         }
 
         /* Select */
@@ -407,7 +447,7 @@
         select:focus-visible {
             outline: none;
             border-color: var(--primary);
-            box-shadow: 0 0 0 4px rgba(15, 76, 117, 0.1);
+            box-shadow: 0 0 0 4px rgba(11, 61, 91, 0.1);
         }
 
         /* Toggle */
@@ -506,15 +546,15 @@
 
         /* Subtle glow for positive/negative indicators */
         .metric-card.success:hover {
-            box-shadow: var(--shadow-lg), 0 0 20px rgba(6, 214, 160, 0.15);
+            box-shadow: var(--shadow-lg), 0 0 20px rgba(22, 163, 74, 0.18);
         }
 
         .metric-card.danger:hover {
-            box-shadow: var(--shadow-lg), 0 0 20px rgba(239, 71, 111, 0.15);
+            box-shadow: var(--shadow-lg), 0 0 20px rgba(239, 68, 68, 0.18);
         }
 
         .metric-card.primary:hover {
-            box-shadow: var(--shadow-lg), 0 0 20px rgba(15, 76, 117, 0.15);
+            box-shadow: var(--shadow-lg), 0 0 20px rgba(11, 61, 91, 0.18);
         }
 
         .metric-label {
@@ -569,18 +609,18 @@
 
         /* Highlighted Payback card - key speed indicator */
         .metric-card.highlight-speed::before {
-            background: linear-gradient(90deg, var(--warning) 0%, #f59e0b 100%);
+            background: linear-gradient(90deg, var(--warning) 0%, #f97316 100%);
             height: 5px;
         }
         .metric-card.highlight-speed {
             border: 2px solid var(--warning);
-            box-shadow: var(--shadow), 0 0 0 3px rgba(255, 209, 102, 0.15);
+            box-shadow: var(--shadow), 0 0 0 3px rgba(245, 158, 11, 0.18);
         }
         .metric-card.highlight-speed:hover {
-            box-shadow: var(--shadow-lg), 0 0 20px rgba(255, 209, 102, 0.25);
+            box-shadow: var(--shadow-lg), 0 0 20px rgba(245, 158, 11, 0.25);
         }
         .metric-card.highlight-speed .metric-value {
-            color: #d97706;
+            color: #b45309;
             font-size: 2.25rem;
         }
         .metric-card.highlight-speed .metric-label {
@@ -588,7 +628,7 @@
         }
         .speed-badge {
             display: inline-block;
-            background: linear-gradient(135deg, var(--warning) 0%, #f59e0b 100%);
+            background: linear-gradient(135deg, var(--warning) 0%, #f97316 100%);
             color: #78350f;
             font-size: 0.6rem;
             font-weight: 700;
@@ -973,7 +1013,7 @@
         .param-section {
             margin-top: 1rem;
             padding: 0.75rem;
-            background: rgba(15, 76, 117, 0.03);
+            background: rgba(11, 61, 91, 0.04);
             border-radius: var(--radius-sm);
             border-left: 3px solid var(--primary-light);
         }
@@ -1014,8 +1054,8 @@
             align-items: center;
             gap: 1rem;
             padding: 1rem 1.5rem;
-            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-            border: 2px solid #0ea5e9;
+            background: linear-gradient(135deg, #f0f7f9 0%, #e1f1f4 100%);
+            border: 2px solid var(--primary-light);
             border-radius: var(--radius);
             box-shadow: var(--shadow);
         }
@@ -1057,17 +1097,17 @@
 
         .tag-persistance {
             background: #dbeafe;
-            color: #1d4ed8;
+            color: #1e40af;
         }
 
         .tag-fuites {
             background: #fef3c7;
-            color: #b45309;
+            color: #92400e;
         }
 
         .tag-mode {
-            background: #d1fae5;
-            color: #047857;
+            background: #dcfce7;
+            color: #15803d;
         }
 
         .actions-bar {
@@ -1079,9 +1119,9 @@
 
         .btn {
             padding: 0.5rem 0.9rem;
-            background: var(--card);
+            background: linear-gradient(180deg, #ffffff 0%, #f6f9fb 100%);
             color: var(--text);
-            border: 1px solid var(--border);
+            border: 1px solid rgba(15, 23, 42, 0.12);
             border-radius: var(--radius-sm);
             font-size: 0.8rem;
             font-weight: 600;
@@ -1091,7 +1131,7 @@
 
         .btn:hover {
             border-color: var(--primary-light);
-            background: #f8fafc;
+            background: #ffffff;
             transform: translateY(-1px);
             box-shadow: var(--shadow);
         }
@@ -1117,8 +1157,8 @@
         }
 
         .mc-stat-card {
-            background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
-            border: 1px solid #c4b5fd;
+            background: linear-gradient(135deg, #ecfeff 0%, #dbeafe 100%);
+            border: 1px solid #93c5fd;
             border-radius: var(--radius-sm);
             padding: 1rem;
             text-align: center;
@@ -1127,7 +1167,7 @@
         .mc-stat-label {
             font-size: 0.7rem;
             font-weight: 600;
-            color: #6d28d9;
+            color: #1e3a8a;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-bottom: 0.25rem;
@@ -1136,14 +1176,14 @@
         .mc-stat-value {
             font-size: 1.25rem;
             font-weight: 700;
-            color: #5b21b6;
+            color: #0f172a;
             font-family: 'SF Mono', 'Fira Code', monospace;
         }
 
         /* Monte Carlo Button */
         .btn-mc {
             padding: 0.5rem 1rem;
-            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            background: linear-gradient(135deg, #1f6f8b 0%, #0b3d5b 100%);
             color: white;
             border: none;
             border-radius: var(--radius-sm);
@@ -1155,7 +1195,7 @@
 
         .btn-mc:hover {
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+            box-shadow: 0 6px 16px rgba(31, 111, 139, 0.35);
         }
 
         .btn-mc:disabled {
@@ -1165,7 +1205,7 @@
         }
 
         .btn-mc.loading {
-            background: #a78bfa;
+            background: #3b879f;
         }
 
         /* Map Picker Button */
@@ -1173,7 +1213,7 @@
             width: 100%;
             margin-top: 1rem;
             padding: 1rem;
-            background: linear-gradient(135deg, #0891b2 0%, #06b6d4 100%);
+            background: linear-gradient(135deg, #2a9d8f 0%, #1f6f8b 100%);
             color: white;
             border: none;
             border-radius: var(--radius-sm);
@@ -1189,7 +1229,7 @@
 
         .map-picker-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(8, 145, 178, 0.3);
+            box-shadow: 0 6px 16px rgba(31, 111, 139, 0.35);
         }
 
         .map-picker-icon {
@@ -1346,14 +1386,14 @@
         select:focus-visible {
             outline: 3px solid var(--primary-light);
             outline-offset: 2px;
-            box-shadow: 0 0 0 4px rgba(15, 76, 117, 0.2);
+            box-shadow: 0 0 0 4px rgba(11, 61, 91, 0.22);
         }
 
         /* Contraste amélioré pour texte secondaire */
         .card-subtitle,
         .metric-change,
         small {
-            color: #4a5568; /* Ratio 7:1 sur blanc */
+            color: var(--text-secondary); /* Ratio 7:1 sur blanc */
         }
 
         /* Touch-friendly sliders */
@@ -2333,7 +2373,7 @@
                 <button class="btn" onclick="exportPDF()" data-i18n="action.export_pdf">Exporter PDF</button>
                 <button class="btn" onclick="copyPermalink()" data-i18n="action.copy_link">Copier lien</button>
                 <button class="btn" onclick="saveScenario()" style="background: #059669;" data-i18n="action.save">Sauvegarder</button>
-                <button class="btn" onclick="toggleComparator()" style="background: #7c3aed;" data-i18n="action.comparator">Comparateur</button>
+                <button class="btn" onclick="toggleComparator()" style="background: #1f6f8b; color: white;" data-i18n="action.comparator">Comparateur</button>
             </div>
 
             <!-- Comparateur de scénarios (hidden) -->
@@ -2733,14 +2773,14 @@
         let debounceTimer = null;
         let charts = {};
         const chartColors = {
-            primary: '#0f4c75',
-            primaryLight: '#3282b8',
-            secondary: '#00b4d8',
-            success: '#06d6a0',
-            warning: '#ffd166',
-            danger: '#ef476f',
-            info: '#17a2b8',
-            grid: '#e2e8f0'
+            primary: '#0b3d5b',
+            primaryLight: '#1f6f8b',
+            secondary: '#2a9d8f',
+            success: '#16a34a',
+            warning: '#f59e0b',
+            danger: '#ef4444',
+            info: '#0ea5b7',
+            grid: '#d7e3e8'
         };
         let suppressParamChange = false;
         let currentAbortController = null;  // Pour annuler les requêtes en cours
@@ -3070,7 +3110,7 @@
             let sourceColor = '#6b7280';
             if (source?.type === 'preset') {
                 sourceLabel = `Preset: ${source.nom || source.id}`;
-                sourceColor = '#7c3aed';
+                sourceColor = '#1f6f8b';
             } else if (source?.type === 'map') {
                 sourceLabel = `Carte: ${source.nom}${source.data_year ? ` (BIL ${source.data_year})` : ''}`;
                 sourceColor = '#0891b2';
@@ -3801,6 +3841,7 @@
 
         function initCharts() {
             // chartColors is defined globally above
+            const CHART_FONT = 'Plus Jakarta Sans';
 
             const defaultOptions = {
                 responsive: true,
@@ -3825,7 +3866,7 @@
                         display: true,
                         position: 'top',
                         labels: {
-                            font: { family: 'Inter', size: 11 },
+                            font: { family: CHART_FONT, size: 11 },
                             usePointStyle: true,
                             padding: 20
                         }
@@ -3833,9 +3874,9 @@
                     tooltip: {
                         enabled: true,
                         backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                        titleFont: { family: 'Inter', size: 13, weight: '600' },
-                        bodyFont: { family: 'Inter', size: 12 },
-                        footerFont: { family: 'Inter', size: 11 },
+                        titleFont: { family: CHART_FONT, size: 13, weight: '600' },
+                        bodyFont: { family: CHART_FONT, size: 12 },
+                        footerFont: { family: CHART_FONT, size: 11 },
                         padding: 12,
                         cornerRadius: 8,
                         displayColors: true,
@@ -3849,11 +3890,11 @@
                 scales: {
                     x: {
                         grid: { color: chartColors.grid, drawBorder: false },
-                        ticks: { font: { family: 'Inter', size: 11 } }
+                        ticks: { font: { family: CHART_FONT, size: 11 } }
                     },
                     y: {
                         grid: { color: chartColors.grid, drawBorder: false },
-                        ticks: { font: { family: 'Inter', size: 11 } }
+                        ticks: { font: { family: CHART_FONT, size: 11 } }
                     }
                 }
             };
@@ -3866,7 +3907,7 @@
                         label: 'VAN Cumulative (M$)',
                         data: [],
                         borderColor: chartColors.primary,
-                        backgroundColor: 'rgba(15, 76, 117, 0.1)',
+                        backgroundColor: 'rgba(11, 61, 91, 0.12)',
                         fill: true,
                         tension: 0.4,
                         pointRadius: 3,
@@ -3879,8 +3920,8 @@
                     plugins: { ...defaultOptions.plugins, legend: { display: false } },
                     scales: {
                         ...defaultOptions.scales,
-                        x: { ...defaultOptions.scales.x, title: { display: true, text: 'Année', font: { family: 'Inter', weight: 600 } } },
-                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'M$', font: { family: 'Inter', weight: 600 } } }
+                        x: { ...defaultOptions.scales.x, title: { display: true, text: 'Année', font: { family: CHART_FONT, weight: 600 } } },
+                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'M$', font: { family: CHART_FONT, weight: 600 } } }
                     }
                 }
             });
@@ -3901,12 +3942,12 @@
                         x: {
                             ...defaultOptions.scales.x,
                             stacked: true,
-                            title: { display: true, text: 'Impact sur VAN (M$)', font: { family: 'Inter', weight: 600 } }
+                            title: { display: true, text: 'Impact sur VAN (M$)', font: { family: CHART_FONT, weight: 600 } }
                         },
                         y: {
                             ...defaultOptions.scales.y,
                             stacked: true,
-                            ticks: { font: { family: 'Inter', size: 10 } }
+                            ticks: { font: { family: CHART_FONT, size: 10 } }
                         }
                     }
                 }
@@ -3946,7 +3987,7 @@
                         x: { ...defaultOptions.scales.x },
                         y: {
                             ...defaultOptions.scales.y,
-                            title: { display: true, text: 'M$', font: { family: 'Inter', weight: 600 } }
+                            title: { display: true, text: 'M$', font: { family: CHART_FONT, weight: 600 } }
                         }
                     }
                 }
@@ -3968,7 +4009,7 @@
                     plugins: { ...defaultOptions.plugins, legend: { display: false } },
                     scales: {
                         ...defaultOptions.scales,
-                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'VAN (M$)', font: { family: 'Inter', weight: 600 } } }
+                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'VAN (M$)', font: { family: CHART_FONT, weight: 600 } } }
                     }
                 }
             });
@@ -3987,8 +4028,8 @@
                     ...defaultOptions,
                     scales: {
                         ...defaultOptions.scales,
-                        x: { ...defaultOptions.scales.x, title: { display: true, text: 'Année', font: { family: 'Inter', weight: 600 } } },
-                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'VAN (M$)', font: { family: 'Inter', weight: 600 } } }
+                        x: { ...defaultOptions.scales.x, title: { display: true, text: 'Année', font: { family: CHART_FONT, weight: 600 } } },
+                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'VAN (M$)', font: { family: CHART_FONT, weight: 600 } } }
                     }
                 }
             });
@@ -4013,8 +4054,8 @@
                     plugins: { ...defaultOptions.plugins, legend: { display: false } },
                     scales: {
                         ...defaultOptions.scales,
-                        x: { ...defaultOptions.scales.x, title: { display: true, text: 'Année', font: { family: 'Inter', weight: 600 } } },
-                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'α (%)', font: { family: 'Inter', weight: 600 } }, min: 0 }
+                        x: { ...defaultOptions.scales.x, title: { display: true, text: 'Année', font: { family: CHART_FONT, weight: 600 } } },
+                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'α (%)', font: { family: CHART_FONT, weight: 600 } }, min: 0 }
                     }
                 }
             });
@@ -4050,7 +4091,7 @@
                     },
                     scales: {
                         ...defaultOptions.scales,
-                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'VAN (M$)', font: { family: 'Inter', weight: 600 } } }
+                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'VAN (M$)', font: { family: CHART_FONT, weight: 600 } } }
                     }
                 }
             });
@@ -4076,8 +4117,8 @@
                     plugins: { ...defaultOptions.plugins, legend: { display: false } },
                     scales: {
                         ...defaultOptions.scales,
-                        x: { ...defaultOptions.scales.x, title: { display: true, text: 'Année', font: { family: 'Inter', weight: 600 } } },
-                        y: { ...defaultOptions.scales.y, title: { display: true, text: '% ménages', font: { family: 'Inter', weight: 600 } }, min: 0 }
+                        x: { ...defaultOptions.scales.x, title: { display: true, text: 'Année', font: { family: CHART_FONT, weight: 600 } } },
+                        y: { ...defaultOptions.scales.y, title: { display: true, text: '% ménages', font: { family: CHART_FONT, weight: 600 } }, min: 0 }
                     }
                 }
             });
@@ -4108,8 +4149,8 @@
                     ...defaultOptions,
                     scales: {
                         ...defaultOptions.scales,
-                        x: { ...defaultOptions.scales.x, stacked: true, title: { display: true, text: 'Année', font: { family: 'Inter', weight: 600 } } },
-                        y: { ...defaultOptions.scales.y, stacked: true, title: { display: true, text: 'm³/ménage/an', font: { family: 'Inter', weight: 600 } } }
+                        x: { ...defaultOptions.scales.x, stacked: true, title: { display: true, text: 'Année', font: { family: CHART_FONT, weight: 600 } } },
+                        y: { ...defaultOptions.scales.y, stacked: true, title: { display: true, text: 'm³/ménage/an', font: { family: CHART_FONT, weight: 600 } } }
                     }
                 }
             });
@@ -4129,8 +4170,8 @@
                     ...defaultOptions,
                     scales: {
                         ...defaultOptions.scales,
-                        x: { ...defaultOptions.scales.x, title: { display: true, text: 'Année', font: { family: 'Inter', weight: 600 } } },
-                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'VAN (M$)', font: { family: 'Inter', weight: 600 } } }
+                        x: { ...defaultOptions.scales.x, title: { display: true, text: 'Année', font: { family: CHART_FONT, weight: 600 } } },
+                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'VAN (M$)', font: { family: CHART_FONT, weight: 600 } } }
                     }
                 }
             });
@@ -4143,8 +4184,8 @@
                     datasets: [{
                         label: 'Fréquence',
                         data: [],
-                        backgroundColor: 'rgba(139, 92, 246, 0.6)',
-                        borderColor: '#8b5cf6',
+                        backgroundColor: 'rgba(31, 111, 139, 0.55)',
+                        borderColor: '#1f6f8b',
                         borderWidth: 1,
                         borderRadius: 2,
                     }]
@@ -4160,8 +4201,8 @@
                     },
                     scales: {
                         ...defaultOptions.scales,
-                        x: { ...defaultOptions.scales.x, title: { display: true, text: 'VAN (M$)', font: { family: 'Inter', weight: 600 } } },
-                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'Fréquence', font: { family: 'Inter', weight: 600 } } }
+                        x: { ...defaultOptions.scales.x, title: { display: true, text: 'VAN (M$)', font: { family: CHART_FONT, weight: 600 } } },
+                        y: { ...defaultOptions.scales.y, title: { display: true, text: 'Fréquence', font: { family: CHART_FONT, weight: 600 } } }
                     }
                 }
             });
@@ -4184,7 +4225,7 @@
                     plugins: { ...defaultOptions.plugins, legend: { display: false } },
                     scales: {
                         ...defaultOptions.scales,
-                        x: { ...defaultOptions.scales.x, min: -1, max: 1, title: { display: true, text: 'Corrélation', font: { family: 'Inter', weight: 600 } } },
+                        x: { ...defaultOptions.scales.x, min: -1, max: 1, title: { display: true, text: 'Corrélation', font: { family: CHART_FONT, weight: 600 } } },
                         y: { ...defaultOptions.scales.y }
                     }
                 }
